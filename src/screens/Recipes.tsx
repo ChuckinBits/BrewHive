@@ -1,0 +1,381 @@
+// Recipes: the list, one recipe, and the recipe form.
+
+import { useState } from 'react';
+import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
+import { BEVERAGE_TYPES, MEAD_STYLES, type BeverageType, type IngredientLine, type Recipe, type Settings } from '../db/types.ts';
+import { IconPicker } from '../components/IconPicker.tsx';
+import { IngredientEditor, IngredientList, cleanIngredients } from '../components/IngredientEditor.tsx';
+import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
+import { Book } from '../components/Vessels.tsx';
+import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, toast } from '../components/ui.tsx';
+import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { Icon } from '../icons/Icon.tsx';
+import { abv } from '../lib/calc.ts';
+import { fmtPercent, fmtSG, fmtVolume, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { Link, navigate } from '../lib/router.tsx';
+import { batchSubtitle } from './Batches.tsx';
+
+const SORTS = [
+  { id: 'name', label: 'Name' },
+  { id: 'rating', label: 'Rating' },
+  { id: 'newest', label: 'Newest' },
+];
+
+const estimatedAbv = (recipe: Recipe) => (recipe.targetOG != null && recipe.targetFG != null ? abv(recipe.targetOG, recipe.targetFG) : null);
+
+export function RecipesScreen() {
+  const { view, sort, setView, setSort } = usePrefs('recipes', 'name');
+  const list = useQuery(() => recipes.list());
+  if (!list) return <TopBar title="Recipes" />;
+
+  const sorted = [...list].sort((a, b) => {
+    if (sort === 'rating') return byRating(a, b);
+    if (sort === 'newest') return b.createdAt.localeCompare(a.createdAt);
+    return a.name.localeCompare(b.name);
+  });
+
+  const items: ShelfEntry[] = sorted.map((recipe) => {
+    const est = estimatedAbv(recipe);
+    return {
+      key: recipe.id,
+      to: `/recipes/${recipe.id}`,
+      visual: <Book icon={recipe.icon} color={recipe.color} />,
+      icon: recipe.icon,
+      title: recipe.name,
+      subtitle: recipe.style || 'Mead',
+      meta: est != null ? `~${fmtPercent(est, 0)}` : undefined,
+      rating: recipe.rating,
+    };
+  });
+
+  return (
+    <>
+      <TopBar title="Recipes">{list.length > 0 && <ViewToggle value={view} onChange={setView} />}</TopBar>
+      {list.length === 0 ? (
+        <EmptyState art={<Book icon="traditional" color="#E8A33A" size={132} />} title="No recipes yet">
+          <p>Save a recipe once, then start a new batch from it with one tap.</p>
+          <div className="button-row button-row-center">
+            <Link to="/recipes/new" className="btn btn-primary">
+              Write a recipe
+            </Link>
+          </div>
+        </EmptyState>
+      ) : (
+        <>
+          <div className="toolbar">
+            <span className="muted">{plural(list.length, 'recipe')}</span>
+            <SortSelect value={sort} options={SORTS} onChange={setSort} />
+          </div>
+          <Collection view={view} items={items} />
+          <Fab to="/recipes/new" label="New recipe" />
+        </>
+      )}
+    </>
+  );
+}
+
+export function RecipeDetailScreen({ id }: { id: string }) {
+  const settings = useSettings();
+  const data = useQuery(async () => {
+    const recipe = (await recipes.get(id)) ?? null;
+    const made = recipe ? (await batches.list()).filter((b) => b.recipeId === id).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
+    return { recipe, made };
+  }, [id]);
+  const [deleting, setDeleting] = useState(false);
+
+  if (!data) return <TopBar title="Recipe" back="/recipes" />;
+  const { recipe } = data;
+  if (!recipe) {
+    return (
+      <>
+        <TopBar title="Recipe" back="/recipes" />
+        <p className="notice">This recipe no longer exists.</p>
+      </>
+    );
+  }
+  const est = estimatedAbv(recipe);
+
+  return (
+    <>
+      <TopBar title={recipe.name} back="/recipes">
+        <Link to={`/recipes/${recipe.id}/edit`} className="icon-btn" aria-label="Edit recipe">
+          <Icon name="edit" />
+        </Link>
+      </TopBar>
+
+      <section className="hero">
+        <RatingBadge rating={recipe.rating} reserve />
+        <Book icon={recipe.icon} color={recipe.color} size={168} />
+        <p className="hero-sub">
+          {recipe.style || 'Mead'}
+          {recipe.batchSizeL != null && ` · ${fmtVolume(recipe.batchSizeL, settings.volumeUnit)}`}
+        </p>
+        <Link to={`/batches/new?recipe=${recipe.id}`} className="btn btn-primary">
+          <Icon name="batches" size={20} />
+          Start a batch
+        </Link>
+      </section>
+
+      {(recipe.targetOG != null || recipe.targetFG != null) && (
+        <div className="stats stats-3">
+          <Stat label="Target OG" value={fmtSG(recipe.targetOG)} />
+          <Stat label="Target FG" value={fmtSG(recipe.targetFG)} />
+          <Stat label="Est. ABV" value={fmtPercent(est)} />
+        </div>
+      )}
+
+      <section className="card">
+        <RatingInput value={recipe.rating} onChange={(rating) => recipes.save({ ...recipe, rating })} />
+      </section>
+
+      {recipe.ingredients.length > 0 && (
+        <section className="card">
+          <h2>Ingredients</h2>
+          <IngredientList lines={recipe.ingredients} />
+        </section>
+      )}
+
+      {recipe.steps.length > 0 && (
+        <section className="card">
+          <h2>Steps</h2>
+          <ol className="steps-list">
+            {recipe.steps.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {recipe.notes && (
+        <section className="card">
+          <h2>Notes</h2>
+          <p className="prose">{recipe.notes}</p>
+        </section>
+      )}
+
+      {data.made.length > 0 && (
+        <section className="card">
+          <h2>Batches from this recipe</h2>
+          <ul className="link-list">
+            {data.made.map((batch) => (
+              <li key={batch.id}>
+                <Link to={`/batches/${batch.id}`}>
+                  <span>{batch.name}</span>
+                  <span className="muted">{batchSubtitle(batch)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="button-row">
+        <button type="button" className="btn btn-danger-quiet" onClick={() => setDeleting(true)}>
+          <Icon name="trash" size={20} />
+          Delete
+        </button>
+      </div>
+
+      {deleting && (
+        <ConfirmSheet
+          title="Delete this recipe?"
+          message={`"${recipe.name}" will be deleted. Batches made from it stay.`}
+          confirmLabel="Delete recipe"
+          onClose={() => setDeleting(false)}
+          onConfirm={async () => {
+            await recipes.remove(recipe.id);
+            toast('Recipe deleted');
+            navigate('/recipes', { replace: true });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+interface Draft {
+  name: string;
+  beverageType: BeverageType;
+  style: string;
+  batchSize: string;
+  targetOG: string;
+  targetFG: string;
+  ingredients: IngredientLine[];
+  steps: string;
+  icon: string;
+  color: string;
+  notes: string;
+}
+
+interface Loaded {
+  draft: Draft;
+  existing: Recipe | null;
+}
+
+export function RecipeFormScreen({ id }: { id?: string }) {
+  const settings = useSettings();
+  const loaded = useQuery<Loaded | null>(async () => {
+    const { volumeUnit } = await loadSettings();
+    if (!id) {
+      return {
+        existing: null,
+        draft: {
+          name: '',
+          beverageType: 'mead',
+          style: '',
+          batchSize: volumeToInput(3.785411784, volumeUnit),
+          targetOG: '',
+          targetFG: '',
+          ingredients: [],
+          steps: '',
+          icon: DEFAULT_FLAVOR,
+          color: getFlavor(DEFAULT_FLAVOR).color,
+          notes: '',
+        },
+      };
+    }
+    const recipe = await recipes.get(id);
+    if (!recipe) return null;
+    return {
+      existing: recipe,
+      draft: {
+        name: recipe.name,
+        beverageType: recipe.beverageType,
+        style: recipe.style,
+        batchSize: volumeToInput(recipe.batchSizeL, volumeUnit),
+        targetOG: recipe.targetOG != null ? fmtSG(recipe.targetOG) : '',
+        targetFG: recipe.targetFG != null ? fmtSG(recipe.targetFG) : '',
+        ingredients: recipe.ingredients,
+        steps: recipe.steps.join('\n'),
+        icon: recipe.icon,
+        color: recipe.color,
+        notes: recipe.notes,
+      },
+    };
+  }, [id]);
+
+  const back = id ? `/recipes/${id}` : '/recipes';
+  const title = id ? 'Edit recipe' : 'New recipe';
+  if (loaded === undefined) return <TopBar title={title} back={back} />;
+  if (loaded === null) {
+    return (
+      <>
+        <TopBar title={title} back="/recipes" />
+        <p className="notice">This recipe no longer exists.</p>
+      </>
+    );
+  }
+  return <RecipeForm key={id ?? 'new'} loaded={loaded} settings={settings} back={back} title={title} />;
+}
+
+function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; settings: Settings; back: string; title: string }) {
+  const [draft, setDraft] = useState(loaded.draft);
+  const [error, setError] = useState('');
+  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const isNew = !loaded.existing;
+
+  const save = async () => {
+    const name = draft.name.trim();
+    if (!name) return setError('Give the recipe a name.');
+    const targetOG = parseNum(draft.targetOG);
+    const targetFG = parseNum(draft.targetFG);
+    for (const [label, value, text] of [
+      ['Target OG', targetOG, draft.targetOG],
+      ['Target FG', targetFG, draft.targetFG],
+    ] as const) {
+      if (text.trim() !== '' && (value == null || value < 0.98 || value > 1.2)) {
+        return setError(`${label} should be a gravity between 0.980 and 1.200, such as 1.100.`);
+      }
+    }
+    const saved = await recipes.save({
+      ...(loaded.existing ?? { rating: null, isPublished: false }),
+      name,
+      beverageType: draft.beverageType,
+      style: draft.style.trim(),
+      batchSizeL: volumeFromInput(draft.batchSize, settings.volumeUnit),
+      targetOG,
+      targetFG,
+      ingredients: cleanIngredients(draft.ingredients),
+      steps: draft.steps
+        .split('\n')
+        .map((step) => step.trim())
+        .filter(Boolean),
+      icon: draft.icon,
+      color: draft.color,
+      notes: draft.notes.trim(),
+    });
+    toast(isNew ? 'Recipe saved' : 'Changes saved');
+    navigate(`/recipes/${saved.id}`, { replace: true });
+  };
+
+  return (
+    <>
+      <TopBar title={title} back={back} />
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <Field label="Name">
+          <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => set({ name: e.target.value })} />
+        </Field>
+
+        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+
+        <div className="form-pair">
+          <Field label="Type">
+            <select value={draft.beverageType} onChange={(e) => set({ beverageType: e.target.value as BeverageType })}>
+              {BEVERAGE_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Style">
+            <input type="text" list="mead-styles" value={draft.style} placeholder="Traditional" onChange={(e) => set({ style: e.target.value })} />
+          </Field>
+        </div>
+        <datalist id="mead-styles">
+          {MEAD_STYLES.map((style) => (
+            <option key={style} value={style} />
+          ))}
+        </datalist>
+
+        <Field label={`Batch size (${settings.volumeUnit})`}>
+          <input type="text" inputMode="decimal" value={draft.batchSize} onChange={(e) => set({ batchSize: e.target.value })} />
+        </Field>
+
+        <div className="form-pair">
+          <Field label="Target OG">
+            <input type="text" inputMode="decimal" value={draft.targetOG} placeholder="1.100" onChange={(e) => set({ targetOG: e.target.value })} />
+          </Field>
+          <Field label="Target FG">
+            <input type="text" inputMode="decimal" value={draft.targetFG} placeholder="1.000" onChange={(e) => set({ targetFG: e.target.value })} />
+          </Field>
+        </div>
+
+        <IngredientEditor value={draft.ingredients} onChange={(ingredients) => set({ ingredients })} />
+
+        <Field label="Steps" hint="One step per line.">
+          <textarea rows={6} value={draft.steps} onChange={(e) => set({ steps: e.target.value })} />
+        </Field>
+
+        <Field label="Notes">
+          <textarea rows={3} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} />
+        </Field>
+
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="btn btn-primary btn-block">
+          {isNew ? 'Save recipe' : 'Save changes'}
+        </button>
+      </form>
+    </>
+  );
+}
