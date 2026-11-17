@@ -16,8 +16,11 @@ import {
   gravityPoints,
   isActive,
   isFermentationComplete,
+  analyzeGravity,
+  defaultFerments,
   originalGravity,
   projectedAbv,
+  stabilizedBefore,
   targetFinalGravity,
 } from '../lib/batch.ts';
 import { cToF } from '../lib/calc.ts';
@@ -45,9 +48,16 @@ const EVENT_ICONS: Record<EventType, IconName> = {
 function eventValue(event: BatchEvent, settings: Settings): string {
   if (event.value == null) return '';
   if (event.type === 'gravity') return fmtSG(event.value);
+  if (event.type === 'feeding' || event.type === 'backsweeten') return `→ ${fmtSG(event.value)}`;
   if (event.type === 'temperature') return fmtTemp(event.value, settings.tempUnit);
   if (event.type === 'ph') return `pH ${event.value.toFixed(2)}`;
   return String(event.value);
+}
+
+/** Whether a feeding or backsweetening entry counts toward the potential ABV. */
+function fermentsFor(event: BatchEvent, all: BatchEvent[]): boolean {
+  if (event.type !== 'feeding' && event.type !== 'backsweeten') return false;
+  return event.ferments ?? defaultFerments(event.type, stabilizedBefore(all, event.date));
 }
 
 /** Newest first; entries logged at the same minute keep the order they were added in. */
@@ -86,7 +96,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const sg = currentGravity(batch, data.events);
   const abv = batchAbv(batch, data.events);
   const complete = isFermentationComplete(batch);
-  const projected = projectedAbv(og, targetFinalGravity(batch));
+  const { addedSugar } = analyzeGravity(batch, data.events);
+  // Sugar added later by step feeding or backsweetening raises the potential.
+  const projected = projectedAbv(og == null ? null : og + addedSugar, targetFinalGravity(batch));
 
   const setStatus = async (status: BatchStatus) => {
     if (status === batch.status) return;
@@ -126,7 +138,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
       </div>
 
       <div className="stats">
-        <Stat label="OG" value={fmtSG(og)} />
+        <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
         <Stat label={complete ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
         <Stat label={complete ? 'ABV' : 'ABV so far'} value={fmtPercent(abv)} />
         <Stat
@@ -204,6 +216,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
                         </strong>
                         <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
                       </span>
+                      {event.value != null && (event.type === 'feeding' || event.type === 'backsweeten') && !fermentsFor(event, data.events) && (
+                        <span className="timeline-note">Not expected to ferment</span>
+                      )}
                       {showNote && <span className="timeline-note">{event.note}</span>}
                     </span>
                     <span className="timeline-edit">
@@ -230,7 +245,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}
+      {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} timeline={data.events} onClose={() => setEntry(null)} />}
       {bottling && <BottleSheet batch={batch} abv={abv} finalGravity={sg} onClose={() => setBottling(false)} />}
       {deleting && (
         <ConfirmSheet
@@ -252,7 +267,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 /** The text a value input starts with when editing an entry. */
 function valueToInput(event: BatchEvent, settings: Settings): string {
   if (event.value == null) return '';
-  if (event.type === 'gravity') return fmtSG(event.value);
+  if (event.type === 'gravity' || event.type === 'feeding' || event.type === 'backsweeten') return fmtSG(event.value);
   if (event.type === 'temperature') return String(Number((settings.tempUnit === 'F' ? cToF(event.value) : event.value).toFixed(1)));
   return String(event.value);
 }
@@ -267,11 +282,13 @@ interface EventSheetProps {
   settings: Settings;
   /** The entry being edited, or null to add a new one. */
   existing: BatchEvent | null;
+  /** The batch's other entries, to tell whether it was stabilized before this one. */
+  timeline: BatchEvent[];
   onClose: () => void;
 }
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
+function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
   const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
@@ -282,8 +299,14 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   const [note, setNote] = useState(isStage && !existing?.toStatus ? '' : (existing?.note ?? ''));
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // null: follow the default for this kind of entry. true or false: the user's choice.
+  const [ferments, setFerments] = useState<boolean | null>(existing?.ferments ?? null);
 
   const kind = isStage ? undefined : EVENT_TYPES.find((t) => t.id === type)?.value;
+  const others = timeline.filter((e) => e.id !== existing?.id);
+  const stabilized = stabilizedBefore(others, date || nowLocal());
+  const sugarType = type === 'feeding' || type === 'backsweeten' ? type : null;
+  const fermentsDefault = sugarType ? defaultFerments(sugarType, stabilized) : true;
 
   const save = async () => {
     let parsed: number | null = null;
@@ -296,6 +319,9 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
     } else if (kind === 'ph') {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0 || parsed > 14) return setError('Enter a pH between 0 and 14.');
+    } else if (kind === 'sg-after' && value.trim() !== '') {
+      parsed = parseNum(value);
+      if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter the gravity after adding, between 0.980 and 1.200, or leave it empty.');
     } else if (kind === 'place' && !place.trim()) {
       return setError('Enter where the batch went, such as Basement.');
     }
@@ -306,6 +332,8 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
       note: note.trim(),
       value: parsed,
       place: kind === 'place' ? place.trim() : undefined,
+      // Stored only when the user overrode the default, so the default can follow later "Stabilized" entries.
+      ferments: kind === 'sg-after' && ferments != null && ferments !== fermentsDefault ? ferments : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -370,6 +398,24 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
           <Field label="pH">
             <input type="text" inputMode="decimal" value={value} placeholder="3.6" onChange={(e) => setValue(e.target.value)} />
           </Field>
+        )}
+        {kind === 'sg-after' && (
+          <>
+            <Field label="Gravity after adding (optional)" hint="Take a reading once it is mixed in, so the added sugar is counted.">
+              <input type="text" inputMode="decimal" value={value} placeholder="1.030" onChange={(e) => setValue(e.target.value)} />
+            </Field>
+            <label className="check-field">
+              <input type="checkbox" checked={ferments ?? fermentsDefault} onChange={(e) => setFerments(e.target.checked)} />
+              This will ferment
+            </label>
+            <p className="field-hint">
+              {(ferments ?? fermentsDefault)
+                ? 'The added sugar raises the potential ABV.'
+                : stabilized
+                  ? 'Not counted toward the potential ABV, because the batch was stabilized before this.'
+                  : 'Not counted toward the potential ABV.'}
+            </p>
+          </>
         )}
         {kind === 'place' && (
           <Field label="Where to?" hint="Somewhere you keep batches, such as Basement or Closet shelf.">
