@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
-import { batchAbv, currentGravity, isFermentationComplete, planStatusEntry, projectedAbv, targetFinalGravity } from './batch.ts';
+import { batchAbv, currentGravity, isFermentationComplete, planStatusEntry, projectedAbv, stageWhenComplete, targetFinalGravity } from './batch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 
@@ -40,16 +40,24 @@ const stageEntry = (id: string, date: string, from: BatchStatus, to: BatchStatus
 
 const reading = (date: string, sg: number): BatchEvent => ({ ...base, id: date, batchId: 'b1', type: 'gravity', date, value: sg, note: '' });
 
-test('potential ABV assumes fermentation to 1.000', () => {
+test('potential ABV assumes fermentation to 1.000, with no separate target', () => {
   const p = projectedAbv(1.1, 1.0);
-  assert.equal(p?.label, 'Potential ABV');
-  assert.ok(Math.abs((p?.value ?? 0) - 13.125) < 1e-9);
+  assert.ok(Math.abs((p?.potential ?? 0) - 13.125) < 1e-9);
+  assert.equal(p?.target, null);
 });
 
-test('a target FG other than 1.000 turns it into a target ABV', () => {
+test('a target FG other than 1.000 adds a target ABV beside the potential', () => {
   const p = projectedAbv(1.1, 1.01);
-  assert.equal(p?.label, 'Target ABV');
-  assert.ok(Math.abs((p?.value ?? 0) - 11.8125) < 1e-9);
+  assert.ok(Math.abs((p?.potential ?? 0) - 13.125) < 1e-9);
+  assert.ok(Math.abs((p?.target ?? 0) - 11.8125) < 1e-9);
+});
+
+test('marking fermentation complete moves Planned and Primary batches to Secondary, never backwards', () => {
+  assert.equal(stageWhenComplete('planned'), 'secondary');
+  assert.equal(stageWhenComplete('primary'), 'secondary');
+  assert.equal(stageWhenComplete('secondary'), 'secondary');
+  assert.equal(stageWhenComplete('aging'), 'aging');
+  assert.equal(stageWhenComplete('bottled'), 'bottled');
 });
 
 test('no projected ABV without an OG', () => {

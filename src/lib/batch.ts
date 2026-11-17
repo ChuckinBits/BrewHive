@@ -56,18 +56,25 @@ export function batchAbv(batch: Batch, events: BatchEvent[]): number | null {
 }
 
 export interface ProjectedAbv {
-  /** "Potential ABV" when fermenting to 1.000, "Target ABV" for any other target. */
-  label: 'Potential ABV' | 'Target ABV';
-  value: number;
+  /** The ABV if it ferments all the way to 1.000. */
+  potential: number;
+  /** The ABV at the batch's target final gravity. Null when the target is 1.000, so it would only repeat the potential. */
+  target: number | null;
 }
 
-/** What the batch will reach if it ferments to its target gravity. Null once fermentation is complete, or with no OG. */
+/** Where the batch could end up. Shown before and after fermentation completes. Null without an OG. */
 export function projectedAbv(og: number | null, targetFG: number): ProjectedAbv | null {
   if (og == null) return null;
-  return {
-    label: Math.abs(targetFG - DEFAULT_TARGET_FG) < 0.0005 ? 'Potential ABV' : 'Target ABV',
-    value: abv(og, targetFG),
-  };
+  const isDefault = Math.abs(targetFG - DEFAULT_TARGET_FG) < 0.0005;
+  return { potential: abv(og, DEFAULT_TARGET_FG), target: isDefault ? null : abv(og, targetFG) };
+}
+
+/**
+ * The stage a batch moves to when fermentation is marked complete: Secondary,
+ * if it is still in Planned or Primary. A batch already further along stays put.
+ */
+export function stageWhenComplete(status: BatchStatus): BatchStatus {
+  return status === 'planned' || status === 'primary' ? 'secondary' : status;
 }
 
 /** The same calendar day, comparing yyyy-mm-dd or local date-time strings. */

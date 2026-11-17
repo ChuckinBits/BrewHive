@@ -10,7 +10,7 @@ import { IngredientEditor, cleanIngredients } from '../components/IngredientEdit
 import { StyleField } from '../components/StyleField.tsx';
 import { Field, TopBar, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
-import { DEFAULT_TARGET_FG, gravityPoints, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
+import { DEFAULT_TARGET_FG, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
 import { abv } from '../lib/calc.ts';
 import { fmtPercent, fmtSG, newId, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { navigate } from '../lib/router.tsx';
@@ -115,16 +115,25 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const isNew = !loaded.existing;
 
   // The ABV line updates as the gravities are typed.
-  const ogValue = parseNum(draft.og);
-  const validOg = ogValue != null && ogValue >= 0.98 && ogValue <= 1.2 ? ogValue : null;
-  const fgValue = parseNum(draft.fg);
-  let abvLine = '';
-  if (validOg != null && draft.complete && fgValue != null && fgValue >= 0.98 && fgValue <= 1.2) {
-    abvLine = `ABV ${fmtPercent(abv(validOg, fgValue))}`;
-  } else if (validOg != null && !draft.complete) {
-    const projected = projectedAbv(validOg, parseNum(draft.targetFG) ?? DEFAULT_TARGET_FG);
-    if (projected) abvLine = `${projected.label} ${fmtPercent(projected.value)}`;
-  }
+  const inRange = (n: number | null) => (n != null && n >= 0.98 && n <= 1.2 ? n : null);
+  const validOg = inRange(parseNum(draft.og));
+  const validFg = inRange(parseNum(draft.fg));
+  const projected = projectedAbv(validOg, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
+  const abvParts: string[] = [];
+  if (validOg != null && draft.complete && validFg != null) abvParts.push(`ABV ${fmtPercent(abv(validOg, validFg))}`);
+  if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}`);
+  if (projected?.target != null && !draft.complete) abvParts.push(`Target ${fmtPercent(projected.target)}`);
+  const abvLine = abvParts.join(' · ');
+
+  // Marking fermentation complete moves a Planned or Primary batch on to Secondary.
+  const setComplete = (complete: boolean) => {
+    const original = loaded.draft.status;
+    if (complete) set({ complete, status: stageWhenComplete(draft.status) });
+    // Unchecking undoes the automatic move, if the user has not picked a stage since.
+    else set({ complete, status: draft.status === stageWhenComplete(original) && original !== draft.status ? original : draft.status });
+  };
+  const movedToSecondary = draft.complete && !loaded.draft.complete && draft.status !== loaded.draft.status && draft.status === 'secondary';
+
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';
 
   const save = async () => {
@@ -237,9 +246,10 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
 
         <div className="gravity-group">
           <label className="check-field">
-            <input type="checkbox" checked={draft.complete} onChange={(e) => set({ complete: e.target.checked })} />
+            <input type="checkbox" checked={draft.complete} onChange={(e) => setComplete(e.target.checked)} />
             Fermentation completed
           </label>
+          {movedToSecondary && <p className="field-hint">Status moved to Secondary.</p>}
           {draft.complete ? (
             <Field label="Final gravity" hint="Leave it empty to use your latest gravity reading.">
               <input type="text" inputMode="decimal" value={draft.fg} placeholder="1.000" onChange={(e) => set({ fg: e.target.value })} />

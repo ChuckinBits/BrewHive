@@ -20,7 +20,7 @@ import {
   projectedAbv,
   targetFinalGravity,
 } from '../lib/batch.ts';
-import { cToF, daysBetween } from '../lib/calc.ts';
+import { cToF } from '../lib/calc.ts';
 import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtTemp, fmtVolume, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
@@ -86,8 +86,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const sg = currentGravity(batch, data.events);
   const abv = batchAbv(batch, data.events);
   const complete = isFermentationComplete(batch);
-  const projected = complete ? null : projectedAbv(og, targetFinalGravity(batch));
-  const day = batch.startDate <= today() ? daysBetween(batch.startDate, today()) + 1 : null;
+  const projected = projectedAbv(og, targetFinalGravity(batch));
 
   const setStatus = async (status: BatchStatus) => {
     if (status === batch.status) return;
@@ -130,11 +129,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
         <Stat label="OG" value={fmtSG(og)} />
         <Stat label={complete ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
         <Stat label={complete ? 'ABV' : 'ABV so far'} value={fmtPercent(abv)} />
-        {projected ? (
-          <Stat label={projected.label} value={fmtPercent(projected.value)} highlight />
-        ) : (
-          <Stat label={isActive(batch.status) ? 'Day' : 'Started'} value={isActive(batch.status) ? (day ?? '–') : fmtDateShort(batch.startDate)} />
-        )}
+        <Stat
+          label="Potential"
+          value={fmtPercent(projected?.potential)}
+          highlight
+          extra={projected?.target != null ? `Target ${fmtPercent(projected.target)}` : undefined}
+        />
       </div>
 
       <GravityChart points={gravityPoints(batch, data.events)} />

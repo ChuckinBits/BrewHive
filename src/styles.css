@@ -1572,3 +1572,29 @@ input::placeholder {
 .confirm-inline .button-row > .btn {
   flex: 1;
 }
+
+.stat-extra {
+  align-self: stretch;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* A bubble with an extra line pulls up its value so the row stays one height. */
+.stat:has(.stat-extra) {
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+
+/* Small phones: four bubbles in a row get too narrow, so they go two by two. */
+@media (max-width: 359px) {
+  .stats:not(.stats-3) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
