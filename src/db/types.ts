@@ -17,20 +17,26 @@ export const BEVERAGE_TYPES: { id: BeverageType; label: string }[] = [
   { id: 'other', label: 'Other' },
 ];
 
-export const MEAD_STYLES = [
-  'Traditional',
-  'Melomel',
-  'Cyser',
-  'Pyment',
-  'Metheglin',
-  'Bochet',
-  'Braggot',
-  'Acerglyn',
-  'Capsicumel',
-  'Rhodomel',
-  'Hydromel',
-  'Sack mead',
+/** Common mead styles, each with a one-line explanation shown in the style picker. */
+export const MEAD_STYLES: { name: string; about: string }[] = [
+  { name: 'Traditional', about: 'Just honey, water and yeast. The honey itself is the star.' },
+  { name: 'Melomel', about: 'Mead made with fruit, such as berries, cherries or peaches.' },
+  { name: 'Cyser', about: 'Mead made with apples or apple juice. Part mead, part cider.' },
+  { name: 'Pyment', about: 'Mead made with grapes or grape juice. Part mead, part wine.' },
+  { name: 'Metheglin', about: 'Mead made with spices or herbs, such as cinnamon, vanilla or ginger.' },
+  { name: 'Bochet', about: 'Mead made from honey that is caramelized first, for toffee and toasted flavors.' },
+  { name: 'Braggot', about: 'Mead made with malted grain. Part mead, part beer, often with hops.' },
+  { name: 'Acerglyn', about: 'Mead made with maple syrup.' },
+  { name: 'Capsicumel', about: 'Mead made with chili peppers, from mild warmth to real heat.' },
+  { name: 'Rhodomel', about: 'Mead made with roses or rose petals.' },
+  { name: 'Hydromel', about: 'A light, lower-alcohol mead, often called a session mead.' },
+  { name: 'Sack mead', about: 'A strong, rich mead made with extra honey. Usually sweet.' },
 ];
+
+export function styleAbout(style: string): string | undefined {
+  const wanted = style.trim().toLowerCase();
+  return MEAD_STYLES.find((s) => s.name.toLowerCase() === wanted)?.about;
+}
 
 export type BatchStatus = 'planned' | 'primary' | 'secondary' | 'aging' | 'bottled' | 'archived';
 
@@ -56,12 +62,14 @@ export type EventType =
   | 'fining'
   | 'tasting'
   | 'status'
+  | 'moved'
   | 'note';
 
 /** Event types the user can add by hand, in the order the add sheet shows them. */
-export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'temp' | 'ph' }[] = [
+export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'temp' | 'ph' | 'place' }[] = [
   { id: 'gravity', label: 'Gravity reading', value: 'sg' },
   { id: 'note', label: 'Note' },
+  { id: 'moved', label: 'Moved to', value: 'place' },
   { id: 'nutrient', label: 'Nutrients' },
   { id: 'tasting', label: 'Tasting' },
   { id: 'rack', label: 'Racked' },
@@ -75,8 +83,24 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'temp' 
 ];
 
 export function eventLabel(type: EventType): string {
-  if (type === 'status') return 'Status';
+  if (type === 'status') return 'Stage change';
   return EVENT_TYPES.find((t) => t.id === type)?.label ?? 'Note';
+}
+
+export function statusLabel(status: BatchStatus): string {
+  return BATCH_STATUSES.find((s) => s.id === status)?.label ?? status;
+}
+
+/** The heading a timeline entry shows, such as "Moved to Secondary" or "Moved to Basement". */
+export function eventTitle(event: BatchEvent): string {
+  if (event.type === 'status') {
+    if (event.toStatus === 'bottled') return 'Bottled';
+    if (event.toStatus) return `Moved to ${statusLabel(event.toStatus)}`;
+    // Entries made before stages were stored keep their wording in the note.
+    return event.note || 'Stage change';
+  }
+  if (event.type === 'moved') return event.place ? `Moved to ${event.place}` : 'Moved';
+  return eventLabel(event.type);
 }
 
 export interface Base {
@@ -123,8 +147,15 @@ export interface Batch extends Base {
   startDate: string;
   volumeL: number | null;
   og: number | null;
-  /** Final gravity. Left null until the user sets it; the latest reading is used meanwhile. */
+  /**
+   * True once fermentation is finished. Until then the batch shows a potential
+   * (or target) ABV. Missing on batches saved by v0.1: see isFermentationComplete.
+   */
+  fermentationComplete?: boolean;
+  /** Final gravity, once fermentation is complete. The latest reading is used if it is left empty. */
   fg: number | null;
+  /** The gravity fermentation is expected to finish at. Missing means 1.000. */
+  targetFG?: number | null;
   ingredients: IngredientLine[];
   icon: string;
   color: string;
@@ -140,6 +171,18 @@ export interface BatchEvent extends Base {
   /** SG for gravity, °C for temperature, pH for ph. */
   value: number | null;
   note: string;
+  /** For "status" entries: the stage the batch moved to. */
+  toStatus?: BatchStatus;
+  /** For "status" entries: the stage it was in before. */
+  fromStatus?: BatchStatus;
+  /**
+   * For "status" entries made by tapping a stage button. Tapping another stage
+   * the same day replaces an automatic entry instead of adding a second one.
+   * Editing the entry by hand turns this off, so the entry is kept.
+   */
+  auto?: boolean;
+  /** For "moved" entries: where the batch went, such as "Basement". */
+  place?: string;
 }
 
 export interface CellarEntry extends Base {

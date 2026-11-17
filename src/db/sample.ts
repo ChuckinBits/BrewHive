@@ -2,7 +2,7 @@
 // Dates are set relative to today, so the samples never look stale.
 
 import { putMany } from './idb.ts';
-import type { Batch, BatchEvent, CellarEntry, EventType, IngredientLine, Pour, Recipe } from './types.ts';
+import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientLine, Pour, Recipe } from './types.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 
 const stamp = () => {
@@ -91,7 +91,9 @@ export async function loadSampleData(): Promise<void> {
     startDate: daysFromToday(-9),
     volumeL: 3.785,
     og: 1.114,
+    fermentationComplete: false,
     fg: null,
+    targetFG: 1.01,
     ingredients: blackberry.ingredients,
     icon: 'blackberry',
     color: '#4A2A5E',
@@ -107,7 +109,9 @@ export async function loadSampleData(): Promise<void> {
     startDate: daysFromToday(-34),
     volumeL: 3.785,
     og: 1.092,
+    fermentationComplete: false,
     fg: null,
+    targetFG: 1.0,
     ingredients: cyser.ingredients,
     icon: 'apple',
     color: '#D9B44A',
@@ -123,7 +127,9 @@ export async function loadSampleData(): Promise<void> {
     startDate: daysFromToday(-120),
     volumeL: 3.785,
     og: 1.105,
+    fermentationComplete: true,
     fg: 1.002,
+    targetFG: 1.0,
     ingredients: lines(['Wildflower honey', '3 lb'], ['Cinnamon sticks', '2'], ['Cloves', '4'], ['Orange zest', '1 orange']),
     icon: 'cinnamon',
     color: '#B5672F',
@@ -139,7 +145,9 @@ export async function loadSampleData(): Promise<void> {
     startDate: daysFromToday(7),
     volumeL: 3.785,
     og: null,
+    fermentationComplete: false,
     fg: null,
+    targetFG: 1.0,
     ingredients: lines(['Clover honey', '2.5 lb'], ['Strawberries', '3 lb']),
     icon: 'strawberry',
     color: '#E5646A',
@@ -155,7 +163,9 @@ export async function loadSampleData(): Promise<void> {
     startDate: daysFromToday(-210),
     volumeL: 3.785,
     og: 1.1,
+    fermentationComplete: true,
     fg: 0.998,
+    targetFG: 1.0,
     ingredients: traditional.ingredients,
     icon: 'traditional',
     color: '#E8A33A',
@@ -173,6 +183,13 @@ export async function loadSampleData(): Promise<void> {
     ...stamp(),
   });
 
+  const stage = (batchId: string, date: string, fromStatus: BatchStatus, toStatus: BatchStatus, note = ''): BatchEvent => ({
+    ...event(batchId, 'status', date, null, note),
+    fromStatus,
+    toStatus,
+    auto: false,
+  });
+
   const sampleEvents: BatchEvent[] = [
     event(b1.id, 'pitch', at(9), null, 'EC-1118, rehydrated'),
     event(b1.id, 'nutrient', at(8), null, 'Fermaid O, 1.5 g'),
@@ -187,7 +204,7 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'gravity', at(27), 1.05),
     event(b2.id, 'gravity', at(20), 1.018),
     event(b2.id, 'gravity', at(13), 1.006),
-    event(b2.id, 'status', at(12), null, 'Moved to Secondary'),
+    stage(b2.id, at(12), 'primary', 'secondary'),
     event(b2.id, 'rack', at(12), null, 'Racked onto one cinnamon stick'),
     event(b2.id, 'tasting', at(4), null, 'Apple up front, cinnamon just showing. Pull the stick soon.'),
 
@@ -196,14 +213,15 @@ export async function loadSampleData(): Promise<void> {
     event(b3.id, 'gravity', at(92), 1.008),
     event(b3.id, 'gravity', at(75), 1.002),
     event(b3.id, 'rack', at(74)),
+    { ...event(b3.id, 'moved', at(73)), place: 'Basement' },
     event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'),
-    event(b3.id, 'status', at(60), null, 'Moved to Aging'),
+    stage(b3.id, at(60), 'secondary', 'aging'),
 
     event(b5.id, 'pitch', at(210)),
     event(b5.id, 'gravity', at(196), 1.03),
     event(b5.id, 'gravity', at(180), 1.0),
     event(b5.id, 'gravity', at(150), 0.998),
-    event(b5.id, 'status', at(95), null, 'Bottled 5 bottles'),
+    stage(b5.id, at(95), 'aging', 'bottled', '5 × 750 mL'),
   ];
 
   const c1: CellarEntry = {

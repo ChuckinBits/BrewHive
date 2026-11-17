@@ -22,6 +22,12 @@ export function today(): string {
   return toDateInput(new Date());
 }
 
+/** The current local date and time as yyyy-mm-ddThh:mm, the format of a datetime-local input. */
+export function nowLocal(): string {
+  const d = new Date();
+  return `${toDateInput(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** yyyy-mm-dd for a day some number of days before (negative) or after today. */
 export function daysFromToday(days: number): string {
   const d = new Date();

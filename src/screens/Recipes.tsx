@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
-import { BEVERAGE_TYPES, MEAD_STYLES, type BeverageType, type IngredientLine, type Recipe, type Settings } from '../db/types.ts';
+import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
+import { StyleField } from '../components/StyleField.tsx';
 import { IngredientEditor, IngredientList, cleanIngredients } from '../components/IngredientEditor.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
@@ -334,15 +335,8 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
               ))}
             </select>
           </Field>
-          <Field label="Style">
-            <input type="text" list="mead-styles" value={draft.style} placeholder="Traditional" onChange={(e) => set({ style: e.target.value })} />
-          </Field>
+          <StyleField value={draft.style} onChange={(style) => set({ style })} />
         </div>
-        <datalist id="mead-styles">
-          {MEAD_STYLES.map((style) => (
-            <option key={style} value={style} />
-          ))}
-        </datalist>
 
         <Field label={`Batch size (${settings.volumeUnit})`}>
           <input type="text" inputMode="decimal" value={draft.batchSize} onChange={(e) => set({ batchSize: e.target.value })} />
