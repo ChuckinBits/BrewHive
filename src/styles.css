@@ -1598,3 +1598,29 @@ input::placeholder {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Keep the selected stage readable: bold "Secondary" is the widest label. */
+.step {
+  letter-spacing: -0.01em;
+}
+
+.step-on {
+  font-weight: 650;
+}
+
+/* Longer stage names get more room than short ones. */
+.steps {
+  display: flex;
+}
+
+.step {
+  flex: 1 1 auto;
+  padding: 0 6px;
+}
+
+@media (max-width: 389px) {
+  .step {
+    padding: 0 3px;
+    font-size: 11px;
+  }
+}
