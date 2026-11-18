@@ -6,6 +6,7 @@ import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/s
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients } from '../components/StagedIngredients.tsx';
+import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { Carboy } from '../components/Vessels.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
@@ -78,6 +79,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
   // null: closed. 'new': adding an entry. An event: editing that entry.
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
   const [bottling, setBottling] = useState(false);
+  const [savingRecipe, setSavingRecipe] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Batch" back="/" />;
@@ -281,12 +283,17 @@ export function BatchDetailScreen({ id }: { id: string }) {
             Bottle this batch
           </button>
         )}
+        <button type="button" className="btn" onClick={() => setSavingRecipe(true)}>
+          <Icon name="recipes" size={20} />
+          {data.recipe ? 'Update recipe' : 'Save as recipe'}
+        </button>
         <button type="button" className="btn btn-danger-quiet" onClick={() => setDeleting(true)}>
           <Icon name="trash" size={20} />
           Delete
         </button>
       </div>
 
+      {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}
       {bottling && <BottleSheet batch={batch} abv={abv} finalGravity={sg} onClose={() => setBottling(false)} />}
       {deleting && (

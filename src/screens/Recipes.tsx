@@ -13,7 +13,7 @@ import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, T
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { abv } from '../lib/calc.ts';
-import { fmtPercent, fmtSG, fmtVolume, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { fmtDateShort, fmtPercent, fmtSG, fmtVolume, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
 
@@ -81,7 +81,8 @@ export function RecipeDetailScreen({ id }: { id: string }) {
   const data = useQuery(async () => {
     const recipe = (await recipes.get(id)) ?? null;
     const made = recipe ? (await batches.list()).filter((b) => b.recipeId === id).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
-    return { recipe, made };
+    const source = recipe?.updatedFromBatchId ? ((await batches.get(recipe.updatedFromBatchId)) ?? null) : null;
+    return { recipe, made, source };
   }, [id]);
   const [deleting, setDeleting] = useState(false);
 
@@ -112,6 +113,11 @@ export function RecipeDetailScreen({ id }: { id: string }) {
           {recipe.style || 'Mead'}
           {recipe.batchSizeL != null && ` · ${fmtVolume(recipe.batchSizeL, settings.volumeUnit)}`}
         </p>
+        {data.source && recipe.updatedFromAt && (
+          <p className="hero-note">
+            Updated from <Link to={`/batches/${data.source.id}`}>{data.source.name}</Link> on {fmtDateShort(recipe.updatedFromAt.slice(0, 10))}
+          </p>
+        )}
         <Link to={`/batches/new?recipe=${recipe.id}`} className="btn btn-primary">
           <Icon name="batches" size={20} />
           Start a batch

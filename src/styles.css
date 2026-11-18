@@ -1805,3 +1805,34 @@ button.staged-row:hover {
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
 }
+
+/* --- Save as recipe (issue #12) ----------------------------------------- */
+
+.hero-note {
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.change-list ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.notice-inline {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.warning {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 14px;
+}
