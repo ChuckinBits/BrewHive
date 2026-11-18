@@ -57,7 +57,7 @@ function eventValue(event: BatchEvent, settings: Settings): string {
 /** Whether a feeding or backsweetening entry counts toward the potential ABV. */
 function fermentsFor(event: BatchEvent, all: BatchEvent[]): boolean {
   if (event.type !== 'feeding' && event.type !== 'backsweeten') return false;
-  return event.ferments ?? defaultFerments(event.type, stabilizedBefore(all, event.date));
+  return event.ferments ?? defaultFerments(event.type, stabilizedBefore(all, event.date, event.createdAt));
 }
 
 /** Newest first; entries logged at the same minute keep the order they were added in. */
@@ -216,7 +216,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
                         </strong>
                         <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
                       </span>
-                      {event.value != null && (event.type === 'feeding' || event.type === 'backsweeten') && !fermentsFor(event, data.events) && (
+                      {(event.type === 'feeding' || event.type === 'backsweeten') && !fermentsFor(event, data.events) && (
                         <span className="timeline-note">Not expected to ferment</span>
                       )}
                       {showNote && <span className="timeline-note">{event.note}</span>}
@@ -304,7 +304,7 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
 
   const kind = isStage ? undefined : EVENT_TYPES.find((t) => t.id === type)?.value;
   const others = timeline.filter((e) => e.id !== existing?.id);
-  const stabilized = stabilizedBefore(others, date || nowLocal());
+  const stabilized = stabilizedBefore(others, date || nowLocal(), existing?.createdAt);
   const sugarType = type === 'feeding' || type === 'backsweeten' ? type : null;
   const fermentsDefault = sugarType ? defaultFerments(sugarType, stabilized) : true;
 
@@ -500,7 +500,8 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
       notes: '',
     });
     const fg = isFermentationComplete(batch) && batch.fg != null ? batch.fg : finalGravity;
-    await batches.save({ ...batch, status: 'bottled', fermentationComplete: true, fg });
+    const completedAt = isFermentationComplete(batch) && fg === batch.fg ? (batch.completedAt ?? null) : new Date().toISOString();
+    await batches.save({ ...batch, status: 'bottled', fermentationComplete: true, completedAt, fg });
     // A bottling entry records real bottles, so it is never replaced by a later stage tap.
     await events.save({
       batchId: batch.id,

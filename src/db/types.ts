@@ -152,6 +152,12 @@ export interface Batch extends Base {
    * (or target) ABV. Missing on batches saved by v0.1: see isFermentationComplete.
    */
   fermentationComplete?: boolean;
+  /**
+   * When fermentation was marked complete (or the final gravity last changed),
+   * as an exact ISO moment. Places the final gravity on the timeline, so sugar
+   * added afterwards by backsweetening is counted after it.
+   */
+  completedAt?: string | null;
   /** Final gravity, once fermentation is complete. The latest reading is used if it is left empty. */
   fg: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */

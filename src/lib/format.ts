@@ -24,7 +24,12 @@ export function today(): string {
 
 /** The current local date and time as yyyy-mm-ddThh:mm, the format of a datetime-local input. */
 export function nowLocal(): string {
-  const d = new Date();
+  return toLocalMinute(new Date().toISOString());
+}
+
+/** An exact moment (ISO, as in createdAt) as a local yyyy-mm-ddThh:mm, the format timeline entries are dated in. */
+export function toLocalMinute(iso: string): string {
+  const d = new Date(iso);
   return `${toDateInput(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 

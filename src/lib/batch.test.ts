@@ -216,3 +216,58 @@ test('defaultFerments: feeding always, backsweetening unless stabilized', () => 
   assert.equal(defaultFerments('backsweeten', false), true);
   assert.equal(defaultFerments('backsweeten', true), false);
 });
+
+// --- Backsweetening after fermentation is complete (follow-up to issue #3) ----
+
+test('complete batch, then stabilized and backsweetened with "This will ferment": counts (no completion date)', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(b, events), 1.115);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('complete batch: the final gravity sits at its completion date', () => {
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-09T10:00:00.000Z' }), events), 1.115);
+  // Marked complete after the backsweetening fermented out: the FG comes last, and that drop is ABV.
+  const later = batch({ og: 1.1, fermentationComplete: true, fg: 0.998, completedAt: '2026-11-20T10:00:00.000Z' });
+  const refermented = [reading('2026-11-08T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(later, refermented), 1.115);
+  near(batchAbv(later, refermented), (0.1 + 0.017) * 131.25);
+});
+
+test('complete batch, stabilized and backsweetened without ticking the box: the potential stays put', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015)];
+  near(effectiveOG(b, events), 1.1);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('a backsweetening entry without a gravity hands its setting to the next reading', () => {
+  const stabilized = [reading('2026-11-08T10:00', 1.0), entry('stabilize', '2026-11-10T10:00')];
+  const ticked = [...stabilized, entry('backsweeten', '2026-11-11T10:00', null, { ferments: true }), reading('2026-11-11T11:00', 1.015)];
+  near(effectiveOG(batch({ og: 1.1 }), ticked), 1.115);
+  const unticked = [...stabilized, entry('backsweeten', '2026-11-11T10:00'), reading('2026-11-11T11:00', 1.015)];
+  near(effectiveOG(batch({ og: 1.1 }), unticked), 1.1);
+});
+
+test('a feeding entry without a gravity lets the next reading count even a small rise', () => {
+  const events = [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00'), reading('2026-11-06T11:00', 1.022)];
+  near(effectiveOG(batch({ og: 1.1 }), events), 1.102);
+});
+
+test('stabilized and backsweetened in the same minute: the order they were added decides', () => {
+  const stab = entry('stabilize', '2026-11-11T10:00', null, { createdAt: '2026-11-11T17:00:01Z' });
+  const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T17:00:30Z' });
+  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, sweet]), 1.1);
+  near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, { ...sweet, ferments: true }]), 1.115);
+});
+
+test('marked complete, then stabilized and backsweetened in the same minute: the FG comes first', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-11T10:00:05.000Z' });
+  const stab = entry('stabilize', '2026-11-11T10:00', null, { createdAt: '2026-11-11T10:00:20.000Z' });
+  const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T10:00:40.000Z', ferments: true });
+  near(effectiveOG(b, [stab, sweet]), 1.115);
+  near(batchAbv(b, [stab, sweet]), 13.125);
+});
