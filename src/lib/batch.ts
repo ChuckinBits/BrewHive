@@ -250,3 +250,26 @@ export function fillLevel(status: BatchStatus): number {
 export function isActive(status: BatchStatus): boolean {
   return status !== 'bottled' && status !== 'archived';
 }
+
+export type ReviewEntryPlan =
+  | { action: 'add'; rating: number }
+  | { action: 'update'; id: string; rating: number }
+  | { action: 'remove'; id: string }
+  | { action: 'none' };
+
+/**
+ * Decides how the timeline records a change to the batch rating, keeping at
+ * most one automatic "Batch rating" entry per day:
+ * - No automatic entry today: add one.
+ * - An automatic entry today: change its rating.
+ * - Rating cleared: remove today's automatic entry. Earlier days stay.
+ * Tasting entries, and rating entries edited by hand, are never touched.
+ */
+export function planReviewEntry(events: BatchEvent[], rating: number | null, now: string): ReviewEntryPlan {
+  const todays = events
+    .filter((e) => e.type === 'review' && e.auto && !e.deletedAt && sameDay(e.date, now))
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (rating == null) return todays ? { action: 'remove', id: todays.id } : { action: 'none' };
+  if (todays) return { action: 'update', id: todays.id, rating };
+  return { action: 'add', rating };
+}

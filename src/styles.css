@@ -1661,3 +1661,24 @@ input::placeholder {
 .timeline-entry .rating {
   align-self: center;
 }
+
+/* --- Ratings on the timeline (issue #8) ---------------------------------- */
+
+.timeline-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.rating-small {
+  width: 30px;
+  min-width: 30px;
+  height: 28px;
+}
+
+.rating-small .rating-number {
+  padding-top: 2px;
+  font-size: 10.5px;
+}

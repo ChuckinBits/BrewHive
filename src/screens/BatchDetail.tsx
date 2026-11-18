@@ -1,7 +1,7 @@
 // One batch: its numbers, gravity chart, rating and timeline.
 
 import { useState } from 'react';
-import { changeStatus } from '../db/actions.ts';
+import { changeStatus, setBatchRating } from '../db/actions.ts';
 import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
@@ -22,7 +22,7 @@ import {
   targetFinalGravity,
 } from '../lib/batch.ts';
 import { cToF } from '../lib/calc.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtTemp, fmtVolume, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
+import { fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtVolume, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
 
@@ -41,6 +41,7 @@ const EVENT_ICONS: Record<EventType, IconName> = {
   status: 'flag',
   moved: 'pin',
   ingredient: 'plus',
+  review: 'star',
   note: 'note',
 };
 
@@ -149,7 +150,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
       <GravityChart points={gravityPoints(batch, data.events)} />
 
       <section className="card">
-        <RatingInput value={batch.rating} onChange={(rating) => batches.save({ ...batch, rating })} />
+        <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
       </section>
 
       {(batch.ingredients.length > 0 || batch.volumeL != null || data.recipe) && (
@@ -207,9 +208,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
                     </span>
                     <span className="timeline-body">
                       <span className="timeline-head">
-                        <strong>
-                          {eventTitle(event)}
-                          {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
+                        <strong className="timeline-title">
+                          <span>
+                            {eventTitle(event)}
+                            {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
+                          </span>
+                          {(event.type === 'tasting' || event.type === 'review') && <RatingBadge rating={event.rating} small />}
                         </strong>
                         <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
                       </span>
@@ -217,7 +221,6 @@ export function BatchDetailScreen({ id }: { id: string }) {
                       {event.type === 'backsweeten' && event.ferments === true && <span className="timeline-note">Expected to ferment</span>}
                       {showNote && <span className="timeline-note">{event.note}</span>}
                     </span>
-                    {event.type === 'tasting' && <RatingBadge rating={event.rating} />}
                     <span className="timeline-edit">
                       <Icon name="edit" size={18} />
                     </span>
@@ -285,6 +288,8 @@ interface EventSheetProps {
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
 function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   const isStage = existing?.type === 'status';
+  // "Batch rating" entries come from the rating slider; they are edited, not added, here.
+  const isReview = existing?.type === 'review';
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
   const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
@@ -301,7 +306,13 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   const [method, setMethod] = useState(existing?.method ?? STABILIZE_METHODS[0]);
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
 
-  const kind = isStage ? undefined : EVENT_TYPES.find((t) => t.id === type)?.value;
+  const [taster, setTaster] = useState(existing?.taster ?? '');
+  // New tastings set the batch rating by default. Editing an old tasting leaves the batch alone unless ticked.
+  const [setAsBatch, setSetAsBatch] = useState(!existing);
+  const allEntries = useQuery(() => events.list());
+  const knownTasters = [...new Set((allEntries ?? []).map((e) => e.taster?.trim()).filter((t): t is string => !!t))].sort();
+
+  const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
 
   const save = async () => {
     let parsed: number | null = null;
@@ -321,6 +332,8 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
       return setError('Enter where the batch went, such as Basement.');
     } else if (kind === 'ingredient' && !ingredient.trim()) {
       return setError('Enter what you added, such as Oak cubes.');
+    } else if (isReview && rating == null) {
+      return setError('Pick a rating, or remove this entry.');
     }
 
     const fields = {
@@ -334,19 +347,24 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
       amount: kind === 'ingredient' ? amount.trim() : undefined,
       method: kind === 'method' ? method : undefined,
       rating: kind === 'rating' ? rating : undefined,
+      taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
       await events.save({ ...existing, ...fields, value: null, toStatus: stage, auto: false });
+    } else if (existing && isReview) {
+      // Editing a rating entry by hand keeps it, even if the batch rating changes again today.
+      await events.save({ ...existing, ...fields, auto: false });
     } else if (existing) {
       await events.save({ ...existing, ...fields, type });
     } else {
       await events.save({ ...fields, type });
     }
-    // A tasting rating becomes the batch's rating, unless the batch is already rated.
-    const rateBatch = kind === 'rating' && rating != null && batch.rating == null;
+    // "Set as the batch rating": updates the batch only. The tasting itself is the timeline record,
+    // so no separate "Batch rating" entry is added or replaced.
+    const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
-    toast(rateBatch ? 'Saved, and the batch is now rated' : existing ? 'Entry updated' : 'Added to the timeline');
+    toast(rateBatch ? 'Saved, and the batch rating updated' : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
   };
 
@@ -359,7 +377,9 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
           void save();
         }}
       >
-        {isStage ? (
+        {isReview ? (
+          <p className="field-hint">Logged when the batch rating was set. Changing it here doesn't change the batch's current rating.</p>
+        ) : isStage ? (
           <Field label="Stage">
             <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
               {BATCH_STATUSES.map((s) => (
@@ -447,7 +467,25 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
         {kind === 'rating' && (
           <>
             <RatingInput value={rating} onChange={setRating} />
-            {batch.rating == null && <p className="field-hint">The batch isn't rated yet, so this rating becomes its rating too.</p>}
+            {type === 'tasting' && (
+              <>
+                <label className="check-field">
+                  <input type="checkbox" checked={setAsBatch && rating != null} disabled={rating == null} onChange={(e) => setSetAsBatch(e.target.checked)} />
+                  Set as the batch rating
+                </label>
+                {setAsBatch && rating != null && batch.rating != null && batch.rating !== rating && (
+                  <p className="field-hint">Replaces the current batch rating of {fmtRating(batch.rating)}.</p>
+                )}
+                <Field label="Taster (optional)" hint="Leave empty if it was you.">
+                  <input type="text" list="known-tasters" value={taster} placeholder="Sam" onChange={(e) => setTaster(e.target.value)} />
+                </Field>
+                <datalist id="known-tasters">
+                  {knownTasters.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </>
+            )}
           </>
         )}
         {kind === 'place' && (

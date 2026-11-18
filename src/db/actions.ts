@@ -2,7 +2,7 @@
 
 import { batches, events } from './store.ts';
 import type { Batch, BatchStatus } from './types.ts';
-import { planStatusEntry } from '../lib/batch.ts';
+import { planReviewEntry, planStatusEntry } from '../lib/batch.ts';
 import { nowLocal } from '../lib/format.ts';
 
 /**
@@ -24,6 +24,25 @@ export async function recordStatusEntry(batchId: string, from: BatchStatus, to: 
   } else if (plan.action === 'replace') {
     const entry = timeline.find((e) => e.id === plan.id);
     if (entry) await events.save({ ...entry, toStatus: plan.toStatus, date: plan.date });
+  } else if (plan.action === 'remove') {
+    await events.remove(plan.id);
+  }
+}
+
+/**
+ * Sets the batch rating by hand and records it on the timeline, keeping at most
+ * one automatic "Batch rating" entry per day (see planReviewEntry).
+ */
+export async function setBatchRating(batch: Batch, rating: number | null): Promise<void> {
+  await batches.save({ ...batch, rating });
+  const timeline = (await events.list()).filter((e) => e.batchId === batch.id);
+  const now = nowLocal();
+  const plan = planReviewEntry(timeline, rating, now);
+  if (plan.action === 'add') {
+    await events.save({ batchId: batch.id, type: 'review', date: now, value: null, note: '', rating: plan.rating, auto: true });
+  } else if (plan.action === 'update') {
+    const entry = timeline.find((e) => e.id === plan.id);
+    if (entry) await events.save({ ...entry, rating: plan.rating, date: now });
   } else if (plan.action === 'remove') {
     await events.remove(plan.id);
   }
