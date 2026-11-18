@@ -57,11 +57,6 @@ export function currentGravity(batch: Batch, events: BatchEvent[]): number | nul
 /** A rise in a plain gravity reading smaller than this is treated as hydrometer wobble, not added sugar. */
 export const NOISE_RISE = 0.003;
 
-/** Whether a feeding or backsweetening entry is expected to ferment, when the user has not said. */
-export function defaultFerments(type: 'feeding' | 'backsweeten', stabilized: boolean): boolean {
-  return type === 'feeding' || !stabilized;
-}
-
 /**
  * True when a "Stabilized" entry comes before this point on the timeline.
  * Entries logged in the same minute count in the order they were added; an
@@ -82,18 +77,25 @@ export interface GravityAnalysis {
 
 const isSugar = (e: BatchEvent): e is BatchEvent & { type: 'feeding' | 'backsweeten' } => e.type === 'feeding' || e.type === 'backsweeten';
 
-/** Whether sugar added by a feeding or backsweetening entry is expected to ferment. */
-function sugarFerments(entry: BatchEvent & { type: 'feeding' | 'backsweeten' }, events: BatchEvent[]): boolean {
-  return entry.ferments ?? defaultFerments(entry.type, stabilizedBefore(events, entry.date, entry.createdAt));
+/**
+ * Whether sugar added by a feeding or backsweetening entry is expected to ferment.
+ * Step feeding always is: adding fermentable sugar is the point of it.
+ * Backsweetening only when "This will ferment" is ticked.
+ */
+export function sugarFerments(entry: BatchEvent): boolean {
+  if (entry.type === 'feeding') return true;
+  if (entry.type === 'backsweeten') return entry.ferments === true;
+  return false;
 }
 
 /**
  * Walks the timeline in order, tracking the gravity level:
  * - A drop counts as fermented.
  * - A rise counts as added sugar when it is expected to ferment, and moves the level up either way:
- *   - On a feeding or backsweetening entry: its "This will ferment" setting decides.
+ *   - On a step feeding entry: always counts.
+ *   - On a backsweetening entry: counts only when "This will ferment" is ticked.
  *   - On a plain reading that follows a feeding or backsweetening entry logged without a
- *     gravity: that entry's setting decides, so "add honey, then take a reading" works.
+ *     gravity: that entry decides, so "add honey, then take a reading" works.
  *   - On any other plain reading: it counts if it rose by NOISE_RISE or more and the batch
  *     was not stabilized before it. A smaller rise is wobble and is ignored.
  * - The final gravity sits where fermentation was marked complete (completedAt). Without that
@@ -154,7 +156,7 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
     }
     const rise = sg - level;
     if (source) {
-      if (sugarFerments(source, events)) result.addedSugar += rise;
+      if (sugarFerments(source)) result.addedSugar += rise;
       level = sg;
     } else if (event && rise >= NOISE_RISE - 1e-9) {
       // A real rise on a plain reading, such as sugar added without logging it.

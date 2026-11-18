@@ -7,12 +7,19 @@ import { fmtRating } from '../lib/format.ts';
 
 // --- Rating -----------------------------------------------------------------
 
-/** The 0 to 10 rating shown at a glance. With `reserve`, an unrated item keeps the same space. */
+const STAR = 'M12 2.2l2.9 6 6.6 1-4.8 4.6 1.1 6.6L12 17.3l-5.8 3.1 1.1-6.6L2.5 9.2l6.6-1z';
+
+/** The 0 to 10 rating shown at a glance, as a number inside a star. With `reserve`, an unrated item keeps the same space. */
 export function RatingBadge({ rating, reserve = false }: { rating: number | null | undefined; reserve?: boolean }) {
   if (rating == null) return reserve ? <span className="rating rating-none" aria-hidden="true" /> : null;
   return (
-    <span className="rating" aria-label={`Rated ${fmtRating(rating)} out of 10`}>
-      {fmtRating(rating)}
+    <span className="rating" role="img" aria-label={`Rated ${fmtRating(rating)} out of 10`}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d={STAR} />
+      </svg>
+      <span className="rating-number" aria-hidden="true">
+        {fmtRating(rating)}
+      </span>
     </span>
   );
 }

@@ -206,8 +206,9 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'feeding', at(17), 1.034, 'Added 8 oz honey to push it a little stronger'),
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
-    event(b2.id, 'rack', at(12), null, 'Racked onto one cinnamon stick'),
-    event(b2.id, 'tasting', at(4), null, 'Apple up front, cinnamon just showing. Pull the stick soon.'),
+    event(b2.id, 'rack', at(12), null, 'Racked off the yeast'),
+    { ...event(b2.id, 'ingredient', at(12, 19)), ingredient: 'Cinnamon stick', amount: '1' },
+    { ...event(b2.id, 'tasting', at(4), null, 'Apple up front, cinnamon just showing. Pull the stick soon.'), rating: 7 },
 
     event(b3.id, 'pitch', at(120)),
     event(b3.id, 'gravity', at(106), 1.04),
@@ -215,7 +216,7 @@ export async function loadSampleData(): Promise<void> {
     event(b3.id, 'gravity', at(75), 1.002),
     event(b3.id, 'rack', at(74)),
     { ...event(b3.id, 'moved', at(73)), place: 'Basement' },
-    event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'),
+    { ...event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'), method: 'Chemical' },
     stage(b3.id, at(60), 'secondary', 'aging'),
 
     event(b5.id, 'pitch', at(210)),
