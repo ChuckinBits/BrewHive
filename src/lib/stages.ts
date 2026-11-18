@@ -66,7 +66,7 @@ export function splitAmount(line: IngredientLine): { quantity: string; unit: str
   if (!match) return { quantity: text, unit: '' };
   const unit = match[2].trim();
   // Keep units we offer as they are; anything else stays as written (for example "to 1 gal").
-  if (unit === '' || INGREDIENT_UNITS.includes(unit)) return { quantity: match[1].trim(), unit };
+  if (unit === '' || INGREDIENT_UNITS.some((u) => u.id === unit)) return { quantity: match[1].trim(), unit };
   return { quantity: text, unit: '' };
 }
 
@@ -103,4 +103,9 @@ export function timelineSections(events: BatchEvent[], currentStatus: BatchStatu
     else sections.push({ stage, events: [e] });
   }
   return sections.reverse().map((s) => ({ ...s, events: s.events.reverse() }));
+}
+
+/** Drops ingredients without a name and trims the rest, before saving. */
+export function cleanIngredients(lines: IngredientLine[]): IngredientLine[] {
+  return lines.map((line) => ({ ...line, name: line.name.trim(), amount: line.amount.trim() })).filter((line) => line.name !== '');
 }

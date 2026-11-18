@@ -5,7 +5,8 @@ import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from 
 import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { StyleField } from '../components/StyleField.tsx';
-import { IngredientEditor, IngredientList, cleanIngredients } from '../components/IngredientEditor.tsx';
+import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
+import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, toast } from '../components/ui.tsx';
@@ -132,7 +133,7 @@ export function RecipeDetailScreen({ id }: { id: string }) {
       {recipe.ingredients.length > 0 && (
         <section className="card">
           <h2>Ingredients</h2>
-          <IngredientList lines={recipe.ingredients} />
+          <IngredientsByStage lines={recipe.ingredients} />
         </section>
       )}
 
@@ -272,6 +273,8 @@ export function RecipeFormScreen({ id }: { id?: string }) {
 function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; settings: Settings; back: string; title: string }) {
   const [draft, setDraft] = useState(loaded.draft);
   const [error, setError] = useState('');
+  // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
+  const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const isNew = !loaded.existing;
 
@@ -351,7 +354,14 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
           </Field>
         </div>
 
-        <IngredientEditor value={draft.ingredients} onChange={(ingredients) => set({ ingredients })} />
+        <fieldset className="ingredient-editor">
+          <legend className="field-label">Ingredients</legend>
+          <EditableIngredients lines={draft.ingredients} onEdit={(line) => setEditing(line)} />
+          <button type="button" className="btn btn-small" onClick={() => setEditing('new')}>
+            <Icon name="plus" size={18} />
+            Add ingredient
+          </button>
+        </fieldset>
 
         <Field label="Steps" hint="One step per line.">
           <textarea rows={6} value={draft.steps} onChange={(e) => set({ steps: e.target.value })} />
@@ -370,6 +380,19 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
           {isNew ? 'Save recipe' : 'Save changes'}
         </button>
       </form>
+
+      {editing && (
+        <IngredientSheet
+          line={editing === 'new' ? null : editing}
+          defaultStage="primary"
+          defaultUnit={settings.volumeUnit === 'gal' ? 'lb' : 'g'}
+          onSave={(line) =>
+            set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] })
+          }
+          onRemove={(id) => set({ ingredients: draft.ingredients.filter((l) => l.id !== id) })}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }

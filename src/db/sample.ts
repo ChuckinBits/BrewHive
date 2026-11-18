@@ -76,7 +76,9 @@ export async function loadSampleData(): Promise<void> {
     batchSizeL: 3.785,
     targetOG: 1.09,
     targetFG: 1.005,
-    ingredients: lines(['Apple juice, no preservatives', '1 gal'], ['Orange blossom honey', '1.5 lb'], ['Cinnamon stick', '1'], ['Lalvin D47 yeast', '1 packet']),
+    ingredients: lines(['Apple juice, no preservatives', '1 gal'], ['Orange blossom honey', '1.5 lb'], ['Cinnamon stick', '1'], ['Lalvin D47 yeast', '1 packet']).map((l) =>
+      l.name === 'Cinnamon stick' ? { ...l, stage: 'secondary' as const } : l,
+    ),
     steps: ['Warm a little juice and dissolve the honey in it.', 'Combine with the rest of the juice, take an OG reading and pitch the yeast.', 'Add the cinnamon stick in secondary for 1 to 2 weeks, tasting as you go.'],
     icon: 'apple',
     color: '#D9B44A',

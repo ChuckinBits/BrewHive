@@ -136,8 +136,32 @@ export const INGREDIENT_STAGES: { id: IngredientStage; label: string }[] = [
   { id: 'bottling', label: 'Bottling' },
 ];
 
-/** Units offered for an ingredient amount. An empty unit means a count, such as "2" cinnamon sticks. */
-export const INGREDIENT_UNITS = ['', 'lb', 'oz', 'kg', 'g', 'gal', 'L', 'fl oz', 'mL', 'cup', 'tbsp', 'tsp', 'packet'];
+/**
+ * Units offered for an ingredient amount, A to Z by name, after "no unit".
+ * An empty unit means a count, such as "2" cinnamon sticks.
+ */
+export const INGREDIENT_UNITS: { id: string; name: string }[] = [
+  { id: '', name: 'No unit (a count)' },
+  ...[
+    { id: 'cup', name: 'Cup' },
+    { id: 'fl oz', name: 'Fluid ounce' },
+    { id: 'gal', name: 'Gallon' },
+    { id: 'g', name: 'Gram' },
+    { id: 'kg', name: 'Kilogram' },
+    { id: 'L', name: 'Liter' },
+    { id: 'mL', name: 'Milliliter' },
+    { id: 'oz', name: 'Ounce' },
+    { id: 'packet', name: 'Packet' },
+    { id: 'lb', name: 'Pound' },
+    { id: 'tbsp', name: 'Tablespoon' },
+    { id: 'tsp', name: 'Teaspoon' },
+  ].sort((a, b) => a.name.localeCompare(b.name)),
+];
+
+/** How a unit reads in the unit list: "Pound (lb)", or just "Cup" when the short form is the word itself. */
+export function unitLabel(unit: { id: string; name: string }): string {
+  return unit.id === '' || unit.id.toLowerCase() === unit.name.toLowerCase() ? unit.name : `${unit.name} (${unit.id})`;
+}
 
 export interface IngredientLine {
   id: string;
@@ -148,7 +172,7 @@ export interface IngredientLine {
   quantity?: string;
   /** One of INGREDIENT_UNITS, or a unit from an older free-text amount. */
   unit?: string;
-  /** When it goes in. Missing means Primary. Recipes leave it out. */
+  /** When it goes in. Missing means Primary. Recipes set it too, and batches started from a recipe keep it. */
   stage?: IngredientStage;
 }
 

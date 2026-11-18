@@ -5,7 +5,7 @@
 //   them on the timeline; ones already logged show when they went in.
 
 import { useId, useState } from 'react';
-import { INGREDIENT_STAGES, INGREDIENT_UNITS, type BatchEvent, type IngredientLine, type IngredientStage } from '../db/types.ts';
+import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientLine, type IngredientStage } from '../db/types.ts';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtDateShort, newId } from '../lib/format.ts';
 import { groupByStage, ingredientStageLabel, joinAmount, splitAmount } from '../lib/stages.ts';
@@ -49,6 +49,11 @@ interface LoggableProps {
   /** The timeline entry that logged each ingredient, by line id. */
   added: Map<string, BatchEvent>;
   onLog: (line: IngredientLine) => void;
+}
+
+/** Read-only, as on a recipe: grouped by stage, nothing to tap. */
+export function IngredientsByStage({ lines }: { lines: IngredientLine[] }) {
+  return <LoggableIngredients lines={lines} current={null} added={new Map()} onLog={() => {}} />;
 }
 
 /** On the batch page: ingredients for the current stage can be tapped to log them on the timeline. */
@@ -133,7 +138,7 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
   const [error, setError] = useState('');
   const formId = useId();
   // Keep a unit from an older entry selectable even if it is not in the usual list.
-  const units = INGREDIENT_UNITS.includes(unit) ? INGREDIENT_UNITS : [...INGREDIENT_UNITS, unit];
+  const units = INGREDIENT_UNITS.some((u) => u.id === unit) ? INGREDIENT_UNITS : [...INGREDIENT_UNITS, { id: unit, name: unit }];
 
   const save = () => {
     if (!name.trim()) return setError('Enter the ingredient, such as Wildflower honey.');
@@ -168,14 +173,14 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
           <Field label="Unit">
             <select value={unit} onChange={(e) => setUnit(e.target.value)}>
               {units.map((u) => (
-                <option key={u} value={u}>
-                  {u === '' ? 'No unit (a count)' : u}
+                <option key={u.id} value={u.id}>
+                  {unitLabel(u)}
                 </option>
               ))}
             </select>
           </Field>
         </div>
-        <Field label="Stage" hint="When it goes in. Bottling is for priming sugar and other additions at bottling.">
+        <Field label="Stage" hint="What stage this ingredient goes in.">
           <select value={stage} onChange={(e) => setStage(e.target.value as IngredientStage)}>
             {INGREDIENT_STAGES.map((s) => (
               <option key={s.id} value={s.id}>

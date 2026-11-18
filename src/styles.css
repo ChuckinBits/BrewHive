@@ -1269,13 +1269,6 @@ input::placeholder {
   margin-bottom: 6px;
 }
 
-.ingredient-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 44px;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-}
 
 /* --- Empty states, toasts, settings --------------------------------------- */
 

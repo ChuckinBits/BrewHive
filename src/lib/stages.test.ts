@@ -76,3 +76,12 @@ test('old stage entries without a stored stage are read from their wording', () 
     ['aging', 'primary'],
   );
 });
+
+test('the unit list is A to Z after "no unit", with each short form spelled out', async () => {
+  const { INGREDIENT_UNITS, unitLabel } = await import('../db/types.ts');
+  const names = INGREDIENT_UNITS.slice(1).map((u) => u.name);
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)));
+  assert.equal(unitLabel(INGREDIENT_UNITS[0]), 'No unit (a count)');
+  assert.equal(unitLabel(INGREDIENT_UNITS.find((u) => u.id === 'lb')!), 'Pound (lb)');
+  assert.equal(unitLabel(INGREDIENT_UNITS.find((u) => u.id === 'cup')!), 'Cup');
+});
