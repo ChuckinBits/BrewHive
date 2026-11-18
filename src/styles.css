@@ -1836,3 +1836,32 @@ button.staged-row:hover {
   color: var(--ink);
   font-size: 14px;
 }
+
+/* --- Archived batches (issue #17) --------------------------------------- */
+
+.chips {
+  flex-wrap: wrap;
+}
+
+.archived-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.archived-note > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.list-empty {
+  padding: 32px 0;
+  text-align: center;
+}

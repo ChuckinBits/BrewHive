@@ -9,10 +9,23 @@ import { nowLocal } from '../lib/format.ts';
  * Moves a batch to a new stage and records it on the timeline, keeping at
  * most one automatic stage entry per day (see planStatusEntry).
  */
-export async function changeStatus(batch: Batch, to: BatchStatus): Promise<void> {
+export async function changeStatus(batch: Batch, to: BatchStatus, patch: Partial<Batch> = {}): Promise<void> {
   if (to === batch.status) return;
-  await batches.save({ ...batch, status: to });
+  await batches.save({ ...batch, ...patch, status: to });
   await recordStatusEntry(batch.id, batch.status, to);
+}
+
+/** Archives a batch, remembering its stage so it can be unarchived. */
+export async function archiveBatch(batch: Batch): Promise<void> {
+  if (batch.status === 'archived') return;
+  await changeStatus(batch, 'archived', { statusBeforeArchive: batch.status });
+}
+
+/** Puts an archived batch back in the stage it was in before. Batches without one go back to Bottled. */
+export async function unarchiveBatch(batch: Batch): Promise<void> {
+  if (batch.status !== 'archived') return;
+  const back = batch.statusBeforeArchive && batch.statusBeforeArchive !== 'archived' ? batch.statusBeforeArchive : 'bottled';
+  await changeStatus(batch, back, { statusBeforeArchive: null });
 }
 
 /** Records a stage change on the timeline, following the one-automatic-entry-per-day rule. */

@@ -1,19 +1,17 @@
 // One batch: its numbers, gravity chart, rating and timeline.
 
 import { useState } from 'react';
-import { changeStatus, setBatchRating } from '../db/actions.ts';
+import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
 import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients } from '../components/StagedIngredients.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
-import { Carboy } from '../components/Vessels.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
   batchAbv,
   currentGravity,
-  fillLevel,
   gravityPoints,
   isActive,
   isFermentationComplete,
@@ -26,7 +24,7 @@ import { cToF } from '../lib/calc.ts';
 import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
 import { fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtVolume, newId, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
-import { batchSubtitle } from './Batches.tsx';
+import { BatchArt, batchSubtitle } from './Batches.tsx';
 
 const EVENT_ICONS: Record<EventType, IconName> = {
   gravity: 'droplet',
@@ -80,6 +78,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
   const [bottling, setBottling] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Batch" back="/" />;
@@ -121,25 +120,37 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={batch.rating} reserve />
-        <Carboy icon={batch.icon} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={168} />
+        <BatchArt batch={batch} size={168} />
         <p className="hero-sub">
           {batch.style || 'Mead'} · {batchSubtitle(batch)}
         </p>
       </section>
 
-      <div className="steps" role="group" aria-label="Status">
-        {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((status) => (
-          <button
-            key={status.id}
-            type="button"
-            className={status.id === batch.status ? 'step step-on' : 'step'}
-            aria-pressed={status.id === batch.status}
-            onClick={() => setStatus(status.id)}
-          >
-            {status.label}
+      {batch.status === 'archived' ? (
+        <div className="archived-note">
+          <span>
+            <strong>Archived</strong>
+            <span className="muted">Hidden from Active and Bottled. Everything else still works.</span>
+          </span>
+          <button type="button" className="btn btn-small" onClick={() => void unarchiveBatch(batch).then(() => toast('Batch unarchived'))}>
+            Unarchive
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="steps" role="group" aria-label="Status">
+          {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((status) => (
+            <button
+              key={status.id}
+              type="button"
+              className={status.id === batch.status ? 'step step-on' : 'step'}
+              aria-pressed={status.id === batch.status}
+              onClick={() => setStatus(status.id)}
+            >
+              {status.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="stats">
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
@@ -287,11 +298,32 @@ export function BatchDetailScreen({ id }: { id: string }) {
           <Icon name="recipes" size={20} />
           {data.recipe ? 'Update recipe' : 'Save as recipe'}
         </button>
+        {batch.status !== 'archived' && (
+          <button type="button" className="btn" onClick={() => setArchiving(true)}>
+            <Icon name="archive" size={20} />
+            Archive
+          </button>
+        )}
         <button type="button" className="btn btn-danger-quiet" onClick={() => setDeleting(true)}>
           <Icon name="trash" size={20} />
           Delete
         </button>
       </div>
+
+      {archiving && (
+        <ConfirmSheet
+          title="Archive this batch?"
+          message={`"${batch.name}" moves to the Archived filter and shows as a book on the shelf. You can unarchive it at any time.`}
+          confirmLabel="Archive"
+          tone="normal"
+          onClose={() => setArchiving(false)}
+          onConfirm={async () => {
+            await archiveBatch(batch);
+            setArchiving(false);
+            toast('Batch archived');
+          }}
+        />
+      )}
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}

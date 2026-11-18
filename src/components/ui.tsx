@@ -196,11 +196,13 @@ interface ConfirmProps {
   title: string;
   message: string;
   confirmLabel: string;
+  /** "danger" (the default) for deleting; "normal" for actions that can be undone. */
+  tone?: 'danger' | 'normal';
   onConfirm: () => void;
   onClose: () => void;
 }
 
-export function ConfirmSheet({ title, message, confirmLabel, onConfirm, onClose }: ConfirmProps) {
+export function ConfirmSheet({ title, message, confirmLabel, tone = 'danger', onConfirm, onClose }: ConfirmProps) {
   return (
     <Sheet title={title} onClose={onClose}>
       <p>{message}</p>
@@ -208,7 +210,7 @@ export function ConfirmSheet({ title, message, confirmLabel, onConfirm, onClose 
         <button type="button" className="btn" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="btn btn-danger" onClick={onConfirm}>
+        <button type="button" className={tone === 'danger' ? 'btn btn-danger' : 'btn btn-primary'} onClick={onConfirm}>
           {confirmLabel}
         </button>
       </div>

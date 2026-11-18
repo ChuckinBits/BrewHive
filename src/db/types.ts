@@ -108,6 +108,8 @@ export function statusLabel(status: BatchStatus): string {
 export function eventTitle(event: BatchEvent): string {
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
+    if (event.toStatus === 'archived') return 'Archived';
+    if (event.fromStatus === 'archived') return `Unarchived, back to ${statusLabel(event.toStatus ?? 'bottled')}`;
     if (event.toStatus) return `Moved to ${statusLabel(event.toStatus)}`;
     // Entries made before stages were stored keep their wording in the note.
     return event.note || 'Stage change';
@@ -225,6 +227,8 @@ export interface Batch extends Base {
   fg: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
+  /** The stage the batch was in when it was archived, so Unarchive can put it back. */
+  statusBeforeArchive?: BatchStatus | null;
   ingredients: IngredientLine[];
   icon: string;
   color: string;

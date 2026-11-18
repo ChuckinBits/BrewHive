@@ -20,12 +20,12 @@ export function ingredientStageLabel(stage: IngredientStage): string {
 }
 
 /**
- * The ingredient stage a batch is in right now, or null when it has not started.
- * A bottled (or archived) batch is at Bottling.
+ * The ingredient stage a batch is in right now, or null when it has not started
+ * or is archived. A bottled batch is at Bottling.
  */
 export function currentIngredientStage(status: BatchStatus): IngredientStage | null {
-  if (status === 'planned') return null;
-  if (status === 'bottled' || status === 'archived') return 'bottling';
+  if (status === 'planned' || status === 'archived') return null;
+  if (status === 'bottled') return 'bottling';
   return status;
 }
 
