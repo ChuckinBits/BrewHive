@@ -22,7 +22,8 @@ import {
 } from '../lib/batch.ts';
 import { cToF } from '../lib/calc.ts';
 import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtVolume, newId, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
+import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtVolume, newId, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
+import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, suggestCount, totalMl, type BottleLine, type BottleUnit } from '../lib/bottling.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { BatchArt, batchSubtitle } from './Batches.tsx';
 
@@ -635,34 +636,56 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   );
 }
 
-const BOTTLE_SIZES = [187, 330, 375, 500, 750, 1000];
+/** The size a unit starts at when picked. */
+const UNIT_START_SIZE: Record<BottleUnit, string> = { ml: '750', floz: '12', cup: '1', pint: '1', quart: '1', l: '1', other: '' };
 
 function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv: number | null; finalGravity: number | null; onClose: () => void }) {
-  const [count, setCount] = useState('5');
-  const [size, setSize] = useState(750);
+  const volumeMl = batch.volumeL != null ? batch.volumeL * 1000 : null;
+  const [lines, setLines] = useState<BottleLine[]>(() => [newLine(volumeMl)]);
   const [bottledDate, setBottledDate] = useState(today());
   const [bestAfter, setBestAfter] = useState('');
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
 
+  const update = (id: string, patch: Partial<BottleLine>) => {
+    setError('');
+    setLines((all) =>
+      all.map((line, i) => {
+        if (line.id !== id) return line;
+        const next = { ...line, ...patch };
+        // Until a count is typed, it follows the size and the volume left for this line.
+        if (!next.countTyped && ('size' in patch || 'unit' in patch)) {
+          const left = volumeMl == null ? null : volumeMl - totalMl(all.slice(0, i));
+          next.count = String(suggestCount(left, lineBottleMl(next)));
+        }
+        return next;
+      }),
+    );
+  };
+
   const save = async () => {
-    const bottles = parseNum(count);
-    if (bottles == null || bottles < 1 || !Number.isInteger(bottles)) return setError('Enter how many bottles you filled.');
-    const entry = await cellar.save({
-      batchId: batch.id,
-      name: batch.name,
-      style: batch.style,
-      bottleSizeMl: size,
-      count: bottles,
-      bottledDate,
-      bestAfter: bestAfter || null,
-      location: location.trim(),
-      abv: abv != null ? Number(abv.toFixed(1)) : null,
-      icon: batch.icon,
-      color: batch.color,
-      rating: batch.rating,
-      notes: '',
-    });
+    const problem = bottlingError(lines);
+    if (problem) return setError(problem);
+    const saved = [];
+    for (const line of lines) {
+      saved.push(
+        await cellar.save({
+          batchId: batch.id,
+          name: batch.name,
+          style: batch.style,
+          bottleSizeMl: Math.round(lineBottleMl(line)!),
+          count: parseNum(line.count)!,
+          bottledDate,
+          bestAfter: bestAfter || null,
+          location: location.trim(),
+          abv: abv != null ? Number(abv.toFixed(1)) : null,
+          icon: batch.icon,
+          color: batch.color,
+          rating: batch.rating,
+          notes: line.unit === 'other' ? line.container.trim() : '',
+        }),
+      );
+    }
     const fg = isFermentationComplete(batch) && batch.fg != null ? batch.fg : finalGravity;
     const completedAt = isFermentationComplete(batch) && fg === batch.fg ? (batch.completedAt ?? null) : new Date().toISOString();
     await batches.save({ ...batch, status: 'bottled', fermentationComplete: true, completedAt, fg });
@@ -672,15 +695,17 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
       type: 'status',
       date: nowLocal(),
       value: null,
-      note: `${bottles} × ${size >= 1000 ? `${size / 1000} L` : `${size} mL`}`,
+      note: bottlingNote(lines),
       toStatus: 'bottled',
       fromStatus: batch.status,
       auto: false,
     });
     toast('Bottles added to your cellar');
     onClose();
-    navigate(`/cellar/${entry.id}`);
+    navigate(saved.length === 1 ? `/cellar/${saved[0].id}` : '/cellar');
   };
+
+  const total = totalMl(lines);
 
   return (
     <Sheet title="Bottle this batch" onClose={onClose}>
@@ -691,20 +716,55 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
           void save();
         }}
       >
-        <div className="form-pair">
-          <Field label="Bottles filled">
-            <input type="text" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} />
-          </Field>
-          <Field label="Bottle size">
-            <select value={size} onChange={(e) => setSize(Number(e.target.value))}>
-              {BOTTLE_SIZES.map((ml) => (
-                <option key={ml} value={ml}>
-                  {ml >= 1000 ? `${ml / 1000} L` : `${ml} mL`}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+        {lines.map((line, i) => (
+          <fieldset key={line.id} className="bottle-line" aria-label={`Bottle size ${i + 1}`}>
+            <div className="bottle-line-fields">
+              <Field label="Bottles filled">
+                <input type="text" inputMode="numeric" value={line.count} onChange={(e) => update(line.id, { count: e.target.value, countTyped: true })} />
+              </Field>
+              <Field label={line.unit === 'other' ? 'Size (mL)' : 'Size'}>
+                <input type="text" inputMode="decimal" value={line.size} onChange={(e) => update(line.id, { size: e.target.value })} />
+              </Field>
+              <Field label="Unit">
+                <select
+                  value={line.unit}
+                  onChange={(e) => {
+                    const unit = e.target.value as BottleUnit;
+                    // "Other" is measured in mL, so carry the current size over.
+                    const ml = lineBottleMl(line);
+                    update(line.id, { unit, size: unit === 'other' ? (ml ? String(Math.round(ml)) : '') : UNIT_START_SIZE[unit] });
+                  }}
+                >
+                  {BOTTLE_UNITS.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            {line.unit === 'other' && (
+              <Field label="Container">
+                <input type="text" value={line.container} placeholder="Growler" onChange={(e) => update(line.id, { container: e.target.value })} />
+              </Field>
+            )}
+            {lines.length > 1 && (
+              <button type="button" className="btn btn-quiet btn-small bottle-line-remove" onClick={() => setLines((all) => all.filter((l) => l.id !== line.id))}>
+                <Icon name="trash" size={16} />
+                Remove this size
+              </button>
+            )}
+          </fieldset>
+        ))}
+        <button type="button" className="btn btn-block" onClick={() => setLines((all) => [...all, newLine(volumeMl, all)])}>
+          <Icon name="plus" size={20} />
+          Add another size
+        </button>
+        <p className="bottle-total" aria-live="polite">
+          Total: {fmtBottle(total)}
+          {volumeMl != null && ` of ${fmtBottle(volumeMl)}`}
+          <span className="field-hint">A guide only; some loss when bottling is normal.</span>
+        </p>
         <div className="form-pair">
           <Field label="Bottled on">
             <input type="date" value={bottledDate} onChange={(e) => setBottledDate(e.target.value)} />

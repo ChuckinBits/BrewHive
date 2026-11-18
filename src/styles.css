@@ -1869,3 +1869,39 @@ button.staged-row:hover {
 .list-empty .btn {
   margin-top: 8px;
 }
+
+/* --- Bottling in several sizes (issue #20) ------------------------------ */
+
+.bottle-line {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.bottle-line-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.bottle-line-remove {
+  align-self: flex-start;
+}
+
+.bottle-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.bottle-total .field-hint {
+  font-weight: 400;
+}
