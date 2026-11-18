@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { batches, cellar, pours, usePrefs, useQuery } from '../db/store.ts';
-import { POUR_TYPES, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
+import { POUR_TYPES, type Batch, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
+import { archiveBatch } from '../db/actions.ts';
+import { CELLAR_FILTERS, inCellarFilter, shouldAskToArchive, shouldResetArchivePrompt, type CellarFilter } from '../lib/cellar.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
@@ -31,9 +33,13 @@ function readiness(entry: CellarEntry): string {
 export function CellarScreen() {
   const { view, sort, setView, setSort } = usePrefs('cellar', 'newest');
   const list = useQuery(() => cellar.list());
+  // Always opens on what is still in the cellar.
+  const [filter, setFilter] = useState<CellarFilter>('in');
   if (!list) return <TopBar title="Cellar" />;
 
-  const sorted = [...list].sort((a, b) => {
+  const counts = Object.fromEntries(CELLAR_FILTERS.map((f) => [f.id, list.filter((e) => inCellarFilter(e, f.id)).length])) as Record<CellarFilter, number>;
+
+  const sorted = list.filter((e) => inCellarFilter(e, filter)).sort((a, b) => {
     // Empty entries always go last.
     if ((a.count === 0) !== (b.count === 0)) return a.count === 0 ? 1 : -1;
     if (sort === 'rating') return byRating(a, b);
@@ -71,10 +77,34 @@ export function CellarScreen() {
       ) : (
         <>
           <div className="toolbar">
+            <div className="chips" role="group" aria-label="Filter cellar">
+              {CELLAR_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={f.id === filter ? 'chip chip-on' : 'chip'}
+                  aria-pressed={f.id === filter}
+                  onClick={() => setFilter(f.id)}
+                >
+                  {f.label} <span className="chip-count">{counts[f.id]}</span>
+                </button>
+              ))}
+            </div>
             <span className="muted">{plural(total, 'bottle')}</span>
             <SortSelect value={sort} options={SORTS} onChange={setSort} />
           </div>
-          <Collection view={view} items={items} />
+          {items.length > 0 ? (
+            <Collection view={view} items={items} />
+          ) : filter === 'in' ? (
+            <div className="list-empty">
+              <p>Every bottle has been enjoyed.</p>
+              <button type="button" className="btn btn-small" onClick={() => setFilter('empty')}>
+                See empty bottles
+              </button>
+            </div>
+          ) : (
+            <p className="muted list-empty">No empty bottles yet.</p>
+          )}
           <Fab to="/cellar/new" label="Add bottles" />
         </>
       )}
@@ -95,6 +125,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
   const [pouring, setPouring] = useState(false);
   const [editingPour, setEditingPour] = useState<Pour | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [askArchive, setAskArchive] = useState<Batch | null>(null);
 
   if (!data) return <TopBar title="Cellar" back="/cellar" />;
   const { entry } = data;
@@ -211,8 +242,28 @@ export function CellarDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {pouring && <PourSheet entry={entry} existing={null} onClose={() => setPouring(false)} />}
-      {editingPour && <PourSheet entry={entry} existing={editingPour} onClose={() => setEditingPour(null)} />}
+      {pouring && <PourSheet entry={entry} existing={null} onClose={() => setPouring(false)} onLastBottle={setAskArchive} />}
+      {editingPour && <PourSheet entry={entry} existing={editingPour} onClose={() => setEditingPour(null)} onLastBottle={setAskArchive} />}
+      {askArchive && (
+        <ConfirmSheet
+          title="Archive the batch?"
+          message={`That was the last bottle of ${askArchive.name}. Archive the batch?`}
+          confirmLabel="Archive"
+          cancelLabel="Not now"
+          tone="normal"
+          onClose={async () => {
+            setAskArchive(null);
+            const latest = await batches.get(askArchive.id);
+            if (latest) await batches.save({ ...latest, archivePromptDismissed: true });
+          }}
+          onConfirm={async () => {
+            setAskArchive(null);
+            const latest = await batches.get(askArchive.id);
+            if (latest) await archiveBatch(latest);
+            toast('Batch archived');
+          }}
+        />
+      )}
       {deleting && (
         <ConfirmSheet
           title="Remove from the cellar?"
@@ -235,7 +286,18 @@ export function CellarDetailScreen({ id }: { id: string }) {
  * takes its bottles from the entry, and editing or removing it puts back
  * what it no longer uses.
  */
-function PourSheet({ entry, existing, onClose }: { entry: CellarEntry; existing: Pour | null; onClose: () => void }) {
+function PourSheet({
+  entry,
+  existing,
+  onClose,
+  onLastBottle,
+}: {
+  entry: CellarEntry;
+  existing: Pour | null;
+  onClose: () => void;
+  /** Called when this leaves a bottled batch with no bottles anywhere in the cellar. */
+  onLastBottle: (batch: Batch) => void;
+}) {
   const [count, setCount] = useState(existing ? String(existing.count) : '1');
   const [type, setType] = useState<PourType>(existing?.type ?? 'drank');
   const [date, setDate] = useState(existing?.date ?? today());
@@ -255,8 +317,22 @@ function PourSheet({ entry, existing, onClose }: { entry: CellarEntry; existing:
     await pours.save(existing ? { ...existing, ...fields } : fields);
     const left = available - bottles;
     await cellar.save({ ...entry, count: left });
-    toast(left === 0 ? 'That was the last bottle' : existing ? 'Pour updated' : 'Pour logged');
     onClose();
+    // The archive prompt says it was the last bottle, so no toast on top of it.
+    if (!(await afterCountChange())) toast(left === 0 ? 'That was the last bottle' : existing ? 'Pour updated' : 'Pour logged');
+  };
+
+  // Ask to archive once a batch's last bottle is gone; forget "Not now" once bottles come back.
+  const afterCountChange = async (): Promise<boolean> => {
+    if (!entry.batchId) return false;
+    const batch = await batches.get(entry.batchId);
+    const entries = await cellar.list();
+    if (shouldResetArchivePrompt(batch, entries)) await batches.save({ ...batch!, archivePromptDismissed: false });
+    else if (shouldAskToArchive(batch, entries)) {
+      onLastBottle(batch!);
+      return true;
+    }
+    return false;
   };
 
   const remove = async () => {
@@ -265,6 +341,7 @@ function PourSheet({ entry, existing, onClose }: { entry: CellarEntry; existing:
     await cellar.save({ ...entry, count: entry.count + existing.count });
     toast(`Pour removed, ${plural(existing.count, 'bottle')} back in the cellar`);
     onClose();
+    await afterCountChange();
   };
 
   return (

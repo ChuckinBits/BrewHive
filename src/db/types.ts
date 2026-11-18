@@ -229,6 +229,8 @@ export interface Batch extends Base {
   targetFG?: number | null;
   /** The stage the batch was in when it was archived, so Unarchive can put it back. */
   statusBeforeArchive?: BatchStatus | null;
+  /** "Not now" was chosen when the last bottle was poured; cleared when bottles come back. */
+  archivePromptDismissed?: boolean;
   ingredients: IngredientLine[];
   icon: string;
   color: string;

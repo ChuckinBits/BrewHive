@@ -198,17 +198,18 @@ interface ConfirmProps {
   confirmLabel: string;
   /** "danger" (the default) for deleting; "normal" for actions that can be undone. */
   tone?: 'danger' | 'normal';
+  cancelLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-export function ConfirmSheet({ title, message, confirmLabel, tone = 'danger', onConfirm, onClose }: ConfirmProps) {
+export function ConfirmSheet({ title, message, confirmLabel, tone = 'danger', cancelLabel = 'Cancel', onConfirm, onClose }: ConfirmProps) {
   return (
     <Sheet title={title} onClose={onClose}>
       <p>{message}</p>
       <div className="button-row">
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {cancelLabel}
         </button>
         <button type="button" className={tone === 'danger' ? 'btn btn-danger' : 'btn btn-primary'} onClick={onConfirm}>
           {confirmLabel}

@@ -1865,3 +1865,7 @@ button.staged-row:hover {
   padding: 32px 0;
   text-align: center;
 }
+
+.list-empty .btn {
+  margin-top: 8px;
+}
