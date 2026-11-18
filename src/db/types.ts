@@ -194,6 +194,10 @@ export interface Recipe extends Base {
   notes: string;
   /** Reserved for the Nostr community in v0.5. */
   isPublished: boolean;
+  /** The batch this recipe was last saved or updated from, if any. */
+  updatedFromBatchId?: string | null;
+  /** When that was, as an ISO moment. */
+  updatedFromAt?: string | null;
 }
 
 export interface Batch extends Base {
