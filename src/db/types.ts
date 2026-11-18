@@ -66,7 +66,7 @@ export type EventType =
   | 'note';
 
 /** Event types the user can add by hand, in the order the add sheet shows them. */
-export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'temp' | 'ph' | 'place' }[] = [
+export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' }[] = [
   { id: 'gravity', label: 'Gravity reading', value: 'sg' },
   { id: 'note', label: 'Note' },
   { id: 'moved', label: 'Moved to', value: 'place' },
@@ -75,9 +75,9 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'temp' 
   { id: 'rack', label: 'Racked' },
   { id: 'temperature', label: 'Temperature', value: 'temp' },
   { id: 'ph', label: 'pH', value: 'ph' },
-  { id: 'feeding', label: 'Step feeding' },
+  { id: 'feeding', label: 'Step feeding', value: 'sg-after' },
   { id: 'stabilize', label: 'Stabilized' },
-  { id: 'backsweeten', label: 'Backsweetened' },
+  { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
   { id: 'fining', label: 'Fining' },
   { id: 'pitch', label: 'Yeast pitched' },
 ];
@@ -152,6 +152,12 @@ export interface Batch extends Base {
    * (or target) ABV. Missing on batches saved by v0.1: see isFermentationComplete.
    */
   fermentationComplete?: boolean;
+  /**
+   * When fermentation was marked complete (or the final gravity last changed),
+   * as an exact ISO moment. Places the final gravity on the timeline, so sugar
+   * added afterwards by backsweetening is counted after it.
+   */
+  completedAt?: string | null;
   /** Final gravity, once fermentation is complete. The latest reading is used if it is left empty. */
   fg: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
@@ -183,6 +189,12 @@ export interface BatchEvent extends Base {
   auto?: boolean;
   /** For "moved" entries: where the batch went, such as "Basement". */
   place?: string;
+  /**
+   * For step feeding and backsweetening: whether the added sugar is expected
+   * to ferment, so it raises the potential ABV. Missing means the default:
+   * feeding ferments, backsweetening ferments unless the batch was stabilized first.
+   */
+  ferments?: boolean;
 }
 
 export interface CellarEntry extends Base {

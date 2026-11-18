@@ -4,14 +4,13 @@
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchStatus, type BeverageType, type IngredientLine, type Settings } from '../db/types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { IngredientEditor, cleanIngredients } from '../components/IngredientEditor.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Field, TopBar, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
-import { DEFAULT_TARGET_FG, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
-import { abv } from '../lib/calc.ts';
+import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { navigate } from '../lib/router.tsx';
 
@@ -37,6 +36,8 @@ interface Loaded {
   draft: Draft;
   existing: Batch | null;
   targetOG: number | null;
+  /** The batch's timeline, so the ABV line can count step feedings. Empty for a new batch. */
+  timeline: BatchEvent[];
 }
 
 export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: string }) {
@@ -49,6 +50,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
       return {
         existing: batch,
         targetOG: null,
+        timeline: (await events.list()).filter((e) => e.batchId === batch.id),
         draft: {
           name: batch.name,
           recipeId: batch.recipeId,
@@ -72,6 +74,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
     return {
       existing: null,
       targetOG: recipe?.targetOG ?? null,
+      timeline: [],
       draft: {
         name: recipe?.name ?? '',
         recipeId: recipe?.id ?? null,
@@ -118,9 +121,28 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const inRange = (n: number | null) => (n != null && n >= 0.98 && n <= 1.2 ? n : null);
   const validOg = inRange(parseNum(draft.og));
   const validFg = inRange(parseNum(draft.fg));
-  const projected = projectedAbv(validOg, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
+  // Date the final gravity when fermentation is first marked complete, or when the FG changes,
+  // so sugar added before that point counts before it and backsweetening afterwards counts after it.
+  const completionDate = (complete: boolean, fg: number | null): string | null => {
+    const wasComplete = loaded.existing ? isFermentationComplete(loaded.existing) : false;
+    if (!complete) return null;
+    if (!wasComplete || fg !== loaded.existing?.fg) return new Date().toISOString();
+    return loaded.existing?.completedAt ?? null;
+  };
+
+  // Work the numbers out from the draft as typed, with the batch's timeline, so step feedings count.
+  const preview = {
+    ...(loaded.existing ?? loaded.draft),
+    og: validOg,
+    fg: validFg,
+    fermentationComplete: draft.complete,
+    completedAt: completionDate(draft.complete, validFg),
+    startDate: draft.startDate,
+  } as Batch;
+  const { addedSugar } = analyzeGravity(preview, loaded.timeline);
+  const projected = projectedAbv(validOg == null ? null : validOg + addedSugar, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
   const abvParts: string[] = [];
-  if (validOg != null && draft.complete && validFg != null) abvParts.push(`ABV ${fmtPercent(abv(validOg, validFg))}`);
+  if (validOg != null && draft.complete && validFg != null) abvParts.push(`ABV ${fmtPercent(batchAbv(preview, loaded.timeline))}`);
   if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}`);
   if (projected?.target != null && !draft.complete) abvParts.push(`Target ${fmtPercent(projected.target)}`);
   const abvLine = abvParts.join(' · ');
@@ -162,6 +184,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       fg = points.length ? points[points.length - 1].sg : null;
     }
 
+    const completedAt = completionDate(draft.complete, fg);
+
     const saved = await batches.save({
       ...(loaded.existing ?? { rating: null }),
       name,
@@ -173,6 +197,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       volumeL: volumeFromInput(draft.volume, settings.volumeUnit),
       og,
       fermentationComplete: draft.complete,
+      completedAt,
       fg,
       targetFG: targetFG ?? DEFAULT_TARGET_FG,
       ingredients: cleanIngredients(draft.ingredients),
