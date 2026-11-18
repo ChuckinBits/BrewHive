@@ -10,7 +10,7 @@ import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Bottle } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Segmented, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
-import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, parseNum, plural, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
@@ -53,8 +53,8 @@ export function CellarScreen() {
   const items: ShelfEntry[] = sorted.map((entry) => ({
     key: entry.id,
     to: `/cellar/${entry.id}`,
-    visual: <Bottle icon={entry.icon} color={entry.color} empty={entry.count === 0} />,
-    icon: entry.icon,
+    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} />,
+    icons: iconsOf(entry),
     title: entry.name,
     subtitle: view === 'shelf' ? `${entry.count} × ${fmtBottle(entry.bottleSizeMl)}` : `${fmtBottle(entry.bottleSizeMl)} · ${readiness(entry)}`,
     meta: `× ${entry.count}`,
@@ -149,7 +149,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
       <section className="hero">
         <RatingBadge rating={entry.rating} reserve />
         <span className={isReady(entry) ? 'shelf-glow' : undefined}>
-          <Bottle icon={entry.icon} color={entry.color} empty={entry.count === 0} size={168} />
+          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} size={168} />
         </span>
         <p className="hero-sub">
           {entry.style || 'Mead'} · {readiness(entry)}
@@ -408,6 +408,7 @@ interface Draft {
   location: string;
   abv: string;
   icon: string;
+  extraIcons: string[];
   color: string;
   notes: string;
 }
@@ -427,6 +428,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
           location: '',
           abv: '',
           icon: DEFAULT_FLAVOR,
+          extraIcons: [],
           color: getFlavor(DEFAULT_FLAVOR).color,
           notes: '',
         },
@@ -446,6 +448,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
         location: entry.location,
         abv: entry.abv != null ? String(entry.abv) : '',
         icon: entry.icon,
+        extraIcons: entry.extraIcons ?? [],
         color: entry.color,
         notes: entry.notes,
       },
@@ -492,6 +495,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
       location: draft.location.trim(),
       abv,
       icon: draft.icon,
+      extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
     });
@@ -513,7 +517,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
           <input type="text" value={draft.name} placeholder="Bramble Melomel 2026" autoFocus={!existing} onChange={(e) => set({ name: e.target.value })} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+        <IconPicker icon={draft.icon} extraIcons={draft.extraIcons} color={draft.color} onChange={set} />
 
         <StyleField value={draft.style} onChange={(style) => set({ style })} />
 

@@ -31,6 +31,7 @@ interface Draft {
   targetFG: string;
   ingredients: IngredientLine[];
   icon: string;
+  extraIcons: string[];
   color: string;
   notes: string;
 }
@@ -69,6 +70,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
           targetFG: fmtSG(targetFinalGravity(batch)),
           ingredients: batch.ingredients,
           icon: batch.icon,
+          extraIcons: batch.extraIcons ?? [],
           color: batch.color,
           notes: batch.notes,
         },
@@ -95,6 +97,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
         // Fresh ids, so editing the batch never changes the recipe's own lines.
         ingredients: (recipe?.ingredients ?? []).map((line) => ({ ...line, id: newId() })),
         icon: recipe?.icon ?? DEFAULT_FLAVOR,
+        extraIcons: recipe?.extraIcons ?? [],
         color: recipe?.color ?? getFlavor(DEFAULT_FLAVOR).color,
         notes: '',
       },
@@ -211,6 +214,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       targetFG: targetFG ?? DEFAULT_TARGET_FG,
       ingredients: cleanIngredients(draft.ingredients),
       icon: draft.icon,
+      extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
     });
@@ -241,7 +245,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           <input type="text" value={draft.name} placeholder="Blackberry Melomel" autoFocus={isNew} onChange={(e) => naming.onName(e.target.value)} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={naming.onIcon} />
+        <IconPicker icon={draft.icon} extraIcons={draft.extraIcons} color={draft.color} onChange={naming.onIcon} />
 
         <div className="form-pair">
           <Field label="Type">

@@ -10,7 +10,7 @@ import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
-import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { abv } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
@@ -41,8 +41,8 @@ export function RecipesScreen() {
     return {
       key: recipe.id,
       to: `/recipes/${recipe.id}`,
-      visual: <Book icon={recipe.icon} color={recipe.color} />,
-      icon: recipe.icon,
+      visual: <Book icon={recipe.icon} extraIcons={recipe.extraIcons} color={recipe.color} />,
+      icons: iconsOf(recipe),
       title: recipe.name,
       subtitle: recipe.style || 'Mead',
       meta: est != null ? `~${fmtPercent(est, 0)}` : undefined,
@@ -108,7 +108,7 @@ export function RecipeDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={recipe.rating} reserve />
-        <Book icon={recipe.icon} color={recipe.color} size={168} />
+        <Book icon={recipe.icon} extraIcons={recipe.extraIcons} color={recipe.color} size={168} />
         <p className="hero-sub">
           {recipe.style || 'Mead'}
           {recipe.batchSizeL != null && ` · ${fmtVolumeBoth(recipe.batchSizeL, recipe.volumeUnit, settings.volumeUnit)}`}
@@ -212,6 +212,7 @@ interface Draft {
   ingredients: IngredientLine[];
   steps: string;
   icon: string;
+  extraIcons: string[];
   color: string;
   notes: string;
 }
@@ -239,6 +240,7 @@ export function RecipeFormScreen({ id }: { id?: string }) {
           ingredients: [],
           steps: '',
           icon: DEFAULT_FLAVOR,
+          extraIcons: [],
           color: getFlavor(DEFAULT_FLAVOR).color,
           notes: '',
         },
@@ -259,6 +261,7 @@ export function RecipeFormScreen({ id }: { id?: string }) {
         ingredients: recipe.ingredients,
         steps: recipe.steps.join('\n'),
         icon: recipe.icon,
+        extraIcons: recipe.extraIcons ?? [],
         color: recipe.color,
         notes: recipe.notes,
       },
@@ -316,6 +319,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
         .map((step) => step.trim())
         .filter(Boolean),
       icon: draft.icon,
+      extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
     });
@@ -337,7 +341,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
           <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => naming.onName(e.target.value)} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={naming.onIcon} />
+        <IconPicker icon={draft.icon} extraIcons={draft.extraIcons} color={draft.color} onChange={naming.onIcon} />
 
         <div className="form-pair">
           <Field label="Type">

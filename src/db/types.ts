@@ -248,6 +248,8 @@ export interface Recipe extends Base {
   steps: string[];
   /** Flavor icon id, see src/icons/flavors.ts. */
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   /** Liquid color, a hex string. */
   color: string;
   /** 0 to 10, or null when not rated. */
@@ -294,6 +296,8 @@ export interface Batch extends Base {
   archivePromptDismissed?: boolean;
   ingredients: IngredientLine[];
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   color: string;
   rating: number | null;
   notes: string;
@@ -354,6 +358,8 @@ export interface CellarEntry extends Base {
   location: string;
   abv: number | null;
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   color: string;
   rating: number | null;
   notes: string;

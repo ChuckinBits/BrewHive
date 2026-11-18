@@ -688,6 +688,7 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
           location: location.trim(),
           abv: abv != null ? Number(abv.toFixed(1)) : null,
           icon: batch.icon,
+          extraIcons: batch.extraIcons ?? [],
           color: batch.color,
           rating: batch.rating,
           notes: line.unit === 'other' ? line.container.trim() : '',

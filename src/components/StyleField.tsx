@@ -137,7 +137,7 @@ export function useNameAndStyle<D extends Suggestable>(draft: D, set: (patch: Pa
       setNameAuto(false);
       set({ name } as Partial<D>);
     },
-    onIcon: (next: { icon: string; color: string }) => {
+    onIcon: (next: { icon: string; extraIcons: string[]; color: string }) => {
       const patch: Partial<Suggestable> = { ...next };
       if (suggesting && next.icon !== draft.icon) Object.assign(patch, suggestion(next.icon, draft.beverageType, draft.style, styleAuto));
       set(patch as Partial<D>);

@@ -10,6 +10,7 @@ import { EmptyState, Fab, TopBar, toast } from '../components/ui.tsx';
 import { batchAbv, fillLevel, isActive } from '../lib/batch.ts';
 import { daysBetween } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, today } from '../lib/format.ts';
+import { iconsOf } from '../icons/FlavorIcon.tsx';
 import { Link } from '../lib/router.tsx';
 
 type Filter = 'active' | 'bottled' | 'archived' | 'all';
@@ -27,8 +28,8 @@ const statusOrder = (b: Batch) => BATCH_STATUSES.findIndex((s) => s.id === b.sta
 
 /** A batch's shelf artwork: a carboy, or a book spine once archived. */
 export function BatchArt({ batch, size }: { batch: Batch; size?: number }) {
-  if (batch.status === 'archived') return <Book icon={batch.icon} color={batch.color} size={size} />;
-  return <Carboy icon={batch.icon} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
+  if (batch.status === 'archived') return <Book icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} size={size} />;
+  return <Carboy icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
 }
 
 export function statusLabel(batch: Batch): string {
@@ -86,7 +87,7 @@ export function BatchesScreen() {
       key: batch.id,
       to: `/batches/${batch.id}`,
       visual: <BatchArt batch={batch} />,
-      icon: batch.icon,
+      icons: iconsOf(batch),
       title: batch.name,
       subtitle: batchSubtitle(batch),
       meta: abv != null && batch.status !== 'planned' ? fmtPercent(abv) : undefined,
