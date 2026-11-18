@@ -1,0 +1,69 @@
+# Changelog
+
+All notable changes to BrewHive are listed here. Versions follow the roadmap:
+minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
+0.5 community) and patch versions are releases within a milestone.
+
+## Unreleased (v0.1.1)
+
+### Batches
+
+- **Archive batches** ([#17]). An Archive button moves a batch out of Active
+  and Bottled into its own Archived filter, where it shows as a book. Unarchive
+  returns it to the status it had.
+- **Bottle in several sizes** ([#20]). Each line has a count, size and unit
+  (mL, fluid ounce, US cup, pint and quart, liter, or a named container). The
+  count defaults to the batch volume over the bottle size (1 gal at 750 mL
+  gives 5). Each size becomes its own cellar entry, and one Bottled entry
+  lists them all.
+- **Per-record units** ([#14]). Batches, recipes and temperature entries can
+  use gal or L and °F or °C, whatever the default. When they differ from the
+  default, both values show: "20 °C (68 °F)".
+- **Styles by type** ([#15]). Mead, beer and wine each have their own styles;
+  cider and kombucha have no Style field; Other takes free text.
+- **Icon suggestions** ([#15]). Picking an icon fills in the name and style
+  while the name is empty: Maple gives "Maple Acerglyn".
+- **Up to 3 icons and a custom color** ([#16]). The main icon sits in front
+  with the others peeking out behind it, everywhere icons appear. The last
+  color swatch opens the device's color picker.
+- **Save a batch as a recipe** ([#12]), and update the recipe as the batch
+  evolves, with a list of what will change.
+- **Ingredients by stage** ([#10]): Primary, Secondary, Aging or Bottling.
+  Ingredients for the current stage can be logged on the timeline with one
+  tap, and the timeline is divided by stage.
+- **Tasting and rating** ([#8]). Tastings can set the batch rating and name
+  a taster; setting the batch rating logs an entry, one per day.
+- **More timeline entries** ([#6]): Ingredient, stabilizing methods
+  (including Nagardo), and ratings shown as a number in a star.
+- **Step feeding and backsweetening count in the ABV** ([#3]).
+- **Editable timeline and potential ABV** ([#1]). Any timeline entry can be
+  edited or removed, a "Moved to" entry records where the batch went, and
+  potential ABV shows as soon as there's an OG.
+
+### Cellar
+
+- **Edit and remove pours** ([#18]). Bottles left always follows.
+- **Ask to archive after the last bottle** ([#19]). Pouring the last bottle
+  of a bottled batch offers to archive it.
+- **Cellar filters** ([#19]): In cellar (the default), Empty and All.
+
+## v0.1.0
+
+First release: a local-first mead and brew log that works offline as an
+installable web app. Batches with a timeline, gravity chart and ABV; recipes;
+a cellar with pours; shelf and list views; backup and restore; light and dark
+themes; sample data.
+
+[#1]: https://github.com/ChuckinBits/BrewHive/issues/1
+[#3]: https://github.com/ChuckinBits/BrewHive/issues/3
+[#6]: https://github.com/ChuckinBits/BrewHive/issues/6
+[#8]: https://github.com/ChuckinBits/BrewHive/issues/8
+[#10]: https://github.com/ChuckinBits/BrewHive/issues/10
+[#12]: https://github.com/ChuckinBits/BrewHive/issues/12
+[#14]: https://github.com/ChuckinBits/BrewHive/issues/14
+[#15]: https://github.com/ChuckinBits/BrewHive/issues/15
+[#16]: https://github.com/ChuckinBits/BrewHive/issues/16
+[#17]: https://github.com/ChuckinBits/BrewHive/issues/17
+[#18]: https://github.com/ChuckinBits/BrewHive/issues/18
+[#19]: https://github.com/ChuckinBits/BrewHive/issues/19
+[#20]: https://github.com/ChuckinBits/BrewHive/issues/20
