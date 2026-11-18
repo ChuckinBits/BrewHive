@@ -8,7 +8,7 @@ import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type Batch
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
 import { Icon } from '../icons/Icon.tsx';
-import { StyleField } from '../components/StyleField.tsx';
+import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
@@ -122,6 +122,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
   const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const naming = useNameAndStyle(draft, set);
   const isNew = !loaded.existing;
 
   // The ABV line updates as the gravities are typed.
@@ -237,14 +238,14 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
         }}
       >
         <Field label="Name">
-          <input type="text" value={draft.name} placeholder="Blackberry Melomel" autoFocus={isNew} onChange={(e) => set({ name: e.target.value })} />
+          <input type="text" value={draft.name} placeholder="Blackberry Melomel" autoFocus={isNew} onChange={(e) => naming.onName(e.target.value)} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+        <IconPicker icon={draft.icon} color={draft.color} onChange={naming.onIcon} />
 
         <div className="form-pair">
           <Field label="Type">
-            <select value={draft.beverageType} onChange={(e) => set({ beverageType: e.target.value as BeverageType })}>
+            <select value={draft.beverageType} onChange={(e) => naming.onType(e.target.value as BeverageType)}>
               {BEVERAGE_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
@@ -252,7 +253,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
               ))}
             </select>
           </Field>
-          <StyleField value={draft.style} onChange={(style) => set({ style })} />
+          <StyleField value={draft.style} type={draft.beverageType} onChange={naming.onStyle} />
         </div>
 
         <div className="form-pair">

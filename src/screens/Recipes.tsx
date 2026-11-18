@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
 import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
-import { StyleField } from '../components/StyleField.tsx';
+import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
@@ -285,6 +285,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
   // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
   const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const naming = useNameAndStyle(draft, set);
   const isNew = !loaded.existing;
 
   const save = async () => {
@@ -333,14 +334,14 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
         }}
       >
         <Field label="Name">
-          <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => set({ name: e.target.value })} />
+          <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => naming.onName(e.target.value)} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+        <IconPicker icon={draft.icon} color={draft.color} onChange={naming.onIcon} />
 
         <div className="form-pair">
           <Field label="Type">
-            <select value={draft.beverageType} onChange={(e) => set({ beverageType: e.target.value as BeverageType })}>
+            <select value={draft.beverageType} onChange={(e) => naming.onType(e.target.value as BeverageType)}>
               {BEVERAGE_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
@@ -348,7 +349,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
               ))}
             </select>
           </Field>
-          <StyleField value={draft.style} onChange={(style) => set({ style })} />
+          <StyleField value={draft.style} type={draft.beverageType} onChange={naming.onStyle} />
         </div>
 
         <UnitField
