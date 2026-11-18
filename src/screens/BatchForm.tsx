@@ -6,10 +6,12 @@ import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
-import { IngredientEditor, cleanIngredients } from '../components/IngredientEditor.tsx';
+import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
+import { Icon } from '../icons/Icon.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Field, TopBar, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { cleanIngredients } from '../lib/stages.ts';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { navigate } from '../lib/router.tsx';
@@ -114,6 +116,8 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
 function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings: Settings; back: string; title: string }) {
   const [draft, setDraft] = useState(loaded.draft);
   const [error, setError] = useState('');
+  // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
+  const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const isNew = !loaded.existing;
 
@@ -289,7 +293,14 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           {abvLine && <p className="projection" aria-live="polite">{abvLine}</p>}
         </div>
 
-        <IngredientEditor value={draft.ingredients} onChange={(ingredients) => set({ ingredients })} />
+        <fieldset className="ingredient-editor">
+          <legend className="field-label">Ingredients</legend>
+          <EditableIngredients lines={draft.ingredients} onEdit={(line) => setEditing(line)} />
+          <button type="button" className="btn btn-small" onClick={() => setEditing('new')}>
+            <Icon name="plus" size={18} />
+            Add ingredient
+          </button>
+        </fieldset>
 
         <Field label="Notes">
           <textarea rows={4} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} />
@@ -304,6 +315,19 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           {isNew ? 'Start batch' : 'Save changes'}
         </button>
       </form>
+
+      {editing && (
+        <IngredientSheet
+          line={editing === 'new' ? null : editing}
+          defaultStage={draft.status === 'secondary' || draft.status === 'aging' ? draft.status : 'primary'}
+          defaultUnit={settings.volumeUnit === 'gal' ? 'lb' : 'g'}
+          onSave={(line) =>
+            set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] })
+          }
+          onRemove={(id) => set({ ingredients: draft.ingredients.filter((l) => l.id !== id) })}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }

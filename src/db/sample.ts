@@ -2,13 +2,17 @@
 // Dates are set relative to today, so the samples never look stale.
 
 import { putMany } from './idb.ts';
-import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientLine, Pour, Recipe } from './types.ts';
+import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientLine, IngredientStage, Pour, Recipe } from './types.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 
 const stamp = () => {
   const now = new Date().toISOString();
   return { createdAt: now, updatedAt: now, deletedAt: null };
 };
+
+/** Copies recipe lines into a batch with fresh ids and a stage for each, by name. */
+const staged = (from: IngredientLine[], stages: Record<string, IngredientStage> = {}): IngredientLine[] =>
+  from.map((line) => ({ ...line, id: newId(), stage: stages[line.name] ?? 'primary' }));
 
 const lines = (...pairs: [string, string][]): IngredientLine[] =>
   pairs.map(([name, amount]) => ({ id: newId(), name, amount }));
@@ -72,7 +76,9 @@ export async function loadSampleData(): Promise<void> {
     batchSizeL: 3.785,
     targetOG: 1.09,
     targetFG: 1.005,
-    ingredients: lines(['Apple juice, no preservatives', '1 gal'], ['Orange blossom honey', '1.5 lb'], ['Cinnamon stick', '1, in secondary'], ['Lalvin D47 yeast', '1 packet']),
+    ingredients: lines(['Apple juice, no preservatives', '1 gal'], ['Orange blossom honey', '1.5 lb'], ['Cinnamon stick', '1'], ['Lalvin D47 yeast', '1 packet']).map((l) =>
+      l.name === 'Cinnamon stick' ? { ...l, stage: 'secondary' as const } : l,
+    ),
     steps: ['Warm a little juice and dissolve the honey in it.', 'Combine with the rest of the juice, take an OG reading and pitch the yeast.', 'Add the cinnamon stick in secondary for 1 to 2 weeks, tasting as you go.'],
     icon: 'apple',
     color: '#D9B44A',
@@ -94,7 +100,7 @@ export async function loadSampleData(): Promise<void> {
     fermentationComplete: false,
     fg: null,
     targetFG: 1.01,
-    ingredients: blackberry.ingredients,
+    ingredients: [...staged(blackberry.ingredients), { id: newId(), name: 'Oak cubes, medium toast', amount: '1 oz', quantity: '1', unit: 'oz', stage: 'aging' }],
     icon: 'blackberry',
     color: '#4A2A5E',
     rating: null,
@@ -112,7 +118,7 @@ export async function loadSampleData(): Promise<void> {
     fermentationComplete: false,
     fg: null,
     targetFG: 1.0,
-    ingredients: cyser.ingredients,
+    ingredients: staged(cyser.ingredients, { 'Cinnamon stick': 'secondary' }),
     icon: 'apple',
     color: '#D9B44A',
     rating: 7,
@@ -191,6 +197,9 @@ export async function loadSampleData(): Promise<void> {
   });
 
   const sampleEvents: BatchEvent[] = [
+    ...b1.ingredients
+      .filter((l) => l.stage === 'primary' && !l.name.startsWith('Pectic'))
+      .map((l) => ({ ...event(b1.id, 'ingredient', at(9, 17)), ingredient: l.name, amount: l.amount, ingredientLineId: l.id })),
     event(b1.id, 'pitch', at(9), null, 'EC-1118, rehydrated'),
     event(b1.id, 'nutrient', at(8), null, 'Fermaid O, 1.5 g'),
     event(b1.id, 'gravity', at(7), 1.096),
@@ -207,7 +216,12 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
     event(b2.id, 'rack', at(12), null, 'Racked off the yeast'),
-    { ...event(b2.id, 'ingredient', at(12, 19)), ingredient: 'Cinnamon stick', amount: '1' },
+    {
+      ...event(b2.id, 'ingredient', at(12, 19)),
+      ingredient: 'Cinnamon stick',
+      amount: '1',
+      ingredientLineId: b2.ingredients.find((l) => l.name === 'Cinnamon stick')?.id,
+    },
     { ...event(b2.id, 'tasting', at(4), null, 'Apple up front, cinnamon just showing. Pull the stick soon.'), rating: 7 },
 
     event(b3.id, 'pitch', at(120)),
