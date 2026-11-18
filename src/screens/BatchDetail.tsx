@@ -1,16 +1,27 @@
 // One batch: its numbers, gravity chart, rating and timeline.
 
 import { useState } from 'react';
+import { changeStatus } from '../db/actions.ts';
 import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, eventLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
+import { BATCH_STATUSES, EVENT_TYPES, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { IngredientList } from '../components/IngredientEditor.tsx';
 import { Carboy } from '../components/Vessels.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
-import { batchAbv, currentGravity, fillLevel, gravityPoints, isActive, originalGravity } from '../lib/batch.ts';
-import { daysBetween } from '../lib/calc.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtTemp, fmtVolume, parseNum, tempFromInput, toDateInput, today } from '../lib/format.ts';
+import {
+  batchAbv,
+  currentGravity,
+  fillLevel,
+  gravityPoints,
+  isActive,
+  isFermentationComplete,
+  originalGravity,
+  projectedAbv,
+  targetFinalGravity,
+} from '../lib/batch.ts';
+import { cToF } from '../lib/calc.ts';
+import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtTemp, fmtVolume, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
 
@@ -27,6 +38,7 @@ const EVENT_ICONS: Record<EventType, IconName> = {
   tasting: 'glass',
   pitch: 'yeast',
   status: 'flag',
+  moved: 'pin',
   note: 'note',
 };
 
@@ -38,10 +50,8 @@ function eventValue(event: BatchEvent, settings: Settings): string {
   return String(event.value);
 }
 
-function nowLocal(): string {
-  const d = new Date();
-  return `${toDateInput(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+/** Newest first; entries logged at the same minute keep the order they were added in. */
+const newestFirst = (a: BatchEvent, b: BatchEvent) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt);
 
 export function BatchDetailScreen({ id }: { id: string }) {
   const settings = useSettings();
@@ -51,15 +61,15 @@ export function BatchDetailScreen({ id }: { id: string }) {
     const all = await events.list();
     return {
       batch,
-      events: all.filter((e) => e.batchId === id).sort((a, b) => b.date.localeCompare(a.date)),
+      events: all.filter((e) => e.batchId === id).sort(newestFirst),
       recipe: batch.recipeId ? ((await recipes.get(batch.recipeId)) ?? null) : null,
     };
   }, [id]);
 
-  const [adding, setAdding] = useState(false);
+  // null: closed. 'new': adding an entry. An event: editing that entry.
+  const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
   const [bottling, setBottling] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [removing, setRemoving] = useState<BatchEvent | null>(null);
 
   if (!data) return <TopBar title="Batch" back="/" />;
   const { batch } = data;
@@ -75,17 +85,14 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const og = originalGravity(batch, data.events);
   const sg = currentGravity(batch, data.events);
   const abv = batchAbv(batch, data.events);
-  const day = batch.startDate <= today() ? daysBetween(batch.startDate, today()) + 1 : null;
+  const complete = isFermentationComplete(batch);
+  const projected = projectedAbv(og, targetFinalGravity(batch));
 
   const setStatus = async (status: BatchStatus) => {
     if (status === batch.status) return;
-    if (status === 'bottled') {
-      setBottling(true);
-      return;
-    }
-    const label = BATCH_STATUSES.find((s) => s.id === status)?.label ?? status;
-    await batches.save({ ...batch, status });
-    await events.save({ batchId: batch.id, type: 'status', date: nowLocal(), value: null, note: `Moved to ${label}` });
+    // Bottling asks how many bottles first, then fills the cellar.
+    if (status === 'bottled') return setBottling(true);
+    await changeStatus(batch, status);
   };
 
   return (
@@ -120,9 +127,14 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <div className="stats">
         <Stat label="OG" value={fmtSG(og)} />
-        <Stat label={batch.fg != null ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
-        <Stat label="ABV" value={fmtPercent(abv)} />
-        <Stat label={isActive(batch.status) ? 'Day' : 'Started'} value={isActive(batch.status) ? (day ?? '–') : fmtDateShort(batch.startDate)} />
+        <Stat label={complete ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
+        <Stat label={complete ? 'ABV' : 'ABV so far'} value={fmtPercent(abv)} />
+        <Stat
+          label="Potential"
+          value={fmtPercent(projected?.potential)}
+          highlight
+          extra={projected?.target != null ? `Target ${fmtPercent(projected.target)}` : undefined}
+        />
       </div>
 
       <GravityChart points={gravityPoints(batch, data.events)} />
@@ -166,7 +178,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
       <section className="card">
         <div className="card-head">
           <h2>Timeline</h2>
-          <button type="button" className="btn btn-primary btn-small" onClick={() => setAdding(true)}>
+          <button type="button" className="btn btn-primary btn-small" onClick={() => setEntry('new')}>
             <Icon name="plus" size={18} />
             Add entry
           </button>
@@ -175,26 +187,32 @@ export function BatchDetailScreen({ id }: { id: string }) {
           <p className="muted">Nothing logged yet. Add a gravity reading or a note to start the timeline.</p>
         ) : (
           <ol className="timeline">
-            {data.events.map((event) => (
-              <li key={event.id}>
-                <span className="timeline-icon">
-                  <Icon name={EVENT_ICONS[event.type]} size={20} />
-                </span>
-                <div className="timeline-body">
-                  <div className="timeline-head">
-                    <strong>
-                      {event.type === 'status' ? event.note : eventLabel(event.type)}
-                      {event.value != null && <span className="timeline-value"> {eventValue(event, settings)}</span>}
-                    </strong>
-                    <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
-                  </div>
-                  {event.type !== 'status' && event.note && <p>{event.note}</p>}
-                </div>
-                <button type="button" className="icon-btn icon-btn-quiet" aria-label={`Remove ${eventLabel(event.type)} entry`} onClick={() => setRemoving(event)}>
-                  <Icon name="trash" size={18} />
-                </button>
-              </li>
-            ))}
+            {data.events.map((event) => {
+              // Old stage entries keep their wording in the note, which is already the title.
+              const showNote = event.note && !(event.type === 'status' && !event.toStatus);
+              return (
+                <li key={event.id} className="timeline-row">
+                  <button type="button" className="timeline-entry" onClick={() => setEntry(event)} aria-label={`Edit ${eventTitle(event)}, ${fmtDate(event.date)}`}>
+                    <span className="timeline-icon">
+                      <Icon name={EVENT_ICONS[event.type]} size={20} />
+                    </span>
+                    <span className="timeline-body">
+                      <span className="timeline-head">
+                        <strong>
+                          {eventTitle(event)}
+                          {event.value != null && <span className="timeline-value"> {eventValue(event, settings)}</span>}
+                        </strong>
+                        <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
+                      </span>
+                      {showNote && <span className="timeline-note">{event.note}</span>}
+                    </span>
+                    <span className="timeline-edit">
+                      <Icon name="edit" size={18} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
@@ -212,20 +230,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {adding && <AddEventSheet batch={batch} settings={settings} onClose={() => setAdding(false)} />}
+      {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}
       {bottling && <BottleSheet batch={batch} abv={abv} finalGravity={sg} onClose={() => setBottling(false)} />}
-      {removing && (
-        <ConfirmSheet
-          title="Remove this entry?"
-          message={`${eventLabel(removing.type)} from ${fmtDate(removing.date)} will be removed from the timeline.`}
-          confirmLabel="Remove"
-          onClose={() => setRemoving(null)}
-          onConfirm={async () => {
-            await events.remove(removing.id);
-            setRemoving(null);
-          }}
-        />
-      )}
       {deleting && (
         <ConfirmSheet
           title="Delete this batch?"
@@ -243,14 +249,41 @@ export function BatchDetailScreen({ id }: { id: string }) {
   );
 }
 
-function AddEventSheet({ batch, settings, onClose }: { batch: Batch; settings: Settings; onClose: () => void }) {
-  const [type, setType] = useState<EventType>('gravity');
-  const [date, setDate] = useState(nowLocal());
-  const [value, setValue] = useState('');
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
+/** The text a value input starts with when editing an entry. */
+function valueToInput(event: BatchEvent, settings: Settings): string {
+  if (event.value == null) return '';
+  if (event.type === 'gravity') return fmtSG(event.value);
+  if (event.type === 'temperature') return String(Number((settings.tempUnit === 'F' ? cToF(event.value) : event.value).toFixed(1)));
+  return String(event.value);
+}
 
-  const kind = EVENT_TYPES.find((t) => t.id === type)?.value;
+/** Old stage entries stored only the words "Moved to Aging". Works out the stage from them. */
+function stageFromNote(note: string): BatchStatus | undefined {
+  return BATCH_STATUSES.find((s) => note.toLowerCase().includes(s.label.toLowerCase()))?.id;
+}
+
+interface EventSheetProps {
+  batch: Batch;
+  settings: Settings;
+  /** The entry being edited, or null to add a new one. */
+  existing: BatchEvent | null;
+  onClose: () => void;
+}
+
+/** Adds a timeline entry, or edits one: its kind, date, reading and note. */
+function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
+  const isStage = existing?.type === 'status';
+  const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
+  const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
+  const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
+  const [value, setValue] = useState(existing ? valueToInput(existing, settings) : '');
+  const [place, setPlace] = useState(existing?.place ?? '');
+  // An old stage entry's note is its title, so it starts empty here.
+  const [note, setNote] = useState(isStage && !existing?.toStatus ? '' : (existing?.note ?? ''));
+  const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const kind = isStage ? undefined : EVENT_TYPES.find((t) => t.id === type)?.value;
 
   const save = async () => {
     let parsed: number | null = null;
@@ -263,14 +296,31 @@ function AddEventSheet({ batch, settings, onClose }: { batch: Batch; settings: S
     } else if (kind === 'ph') {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0 || parsed > 14) return setError('Enter a pH between 0 and 14.');
+    } else if (kind === 'place' && !place.trim()) {
+      return setError('Enter where the batch went, such as Basement.');
     }
-    await events.save({ batchId: batch.id, type, date: date || nowLocal(), value: parsed, note: note.trim() });
-    toast('Added to the timeline');
+
+    const fields = {
+      batchId: batch.id,
+      date: date || nowLocal(),
+      note: note.trim(),
+      value: parsed,
+      place: kind === 'place' ? place.trim() : undefined,
+    };
+    if (existing && isStage) {
+      // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
+      await events.save({ ...existing, ...fields, value: null, toStatus: stage, auto: false });
+    } else if (existing) {
+      await events.save({ ...existing, ...fields, type });
+    } else {
+      await events.save({ ...fields, type });
+    }
+    toast(existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
   };
 
   return (
-    <Sheet title="Add to timeline" onClose={onClose}>
+    <Sheet title={existing ? 'Edit entry' : 'Add to timeline'} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -278,25 +328,37 @@ function AddEventSheet({ batch, settings, onClose }: { batch: Batch; settings: S
           void save();
         }}
       >
-        <Field label="What happened?">
-          <select
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value as EventType);
-              setValue('');
-              setError('');
-            }}
-          >
-            {EVENT_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {isStage ? (
+          <Field label="Stage">
+            <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
+              {BATCH_STATUSES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.id === 'bottled' ? 'Bottled' : `Moved to ${statusLabel(s.id)}`}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <Field label="What happened?">
+            <select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value as EventType);
+                setValue('');
+                setError('');
+              }}
+            >
+              {EVENT_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         {kind === 'sg' && (
           <Field label="Specific gravity" hint="Read it off your hydrometer, for example 1.045.">
-            <input type="text" inputMode="decimal" value={value} placeholder="1.045" autoFocus onChange={(e) => setValue(e.target.value)} />
+            <input type="text" inputMode="decimal" value={value} placeholder="1.045" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
         {kind === 'temp' && (
@@ -309,20 +371,55 @@ function AddEventSheet({ batch, settings, onClose }: { batch: Batch; settings: S
             <input type="text" inputMode="decimal" value={value} placeholder="3.6" onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
+        {kind === 'place' && (
+          <Field label="Where to?" hint="Somewhere you keep batches, such as Basement or Closet shelf.">
+            <input type="text" value={place} placeholder="Basement" autoFocus={!existing} onChange={(e) => setPlace(e.target.value)} />
+          </Field>
+        )}
         <Field label="When">
           <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Note (optional)">
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
+        {isStage && existing?.auto && (
+          <p className="field-hint">Saving changes here keeps this entry, even if you tap another stage later today.</p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
         <button type="submit" className="btn btn-primary btn-block">
-          Save entry
+          {existing ? 'Save changes' : 'Save entry'}
         </button>
+        {existing &&
+          (confirmingDelete ? (
+            <div className="confirm-inline" role="group" aria-label="Confirm removal">
+              <p>Remove this entry from the timeline?</p>
+              <div className="button-row">
+                <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
+                  Keep it
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    await events.remove(existing.id);
+                    toast('Entry removed');
+                    onClose();
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-danger-quiet btn-block" onClick={() => setConfirmingDelete(true)}>
+              <Icon name="trash" size={20} />
+              Remove entry
+            </button>
+          ))}
       </form>
     </Sheet>
   );
@@ -356,8 +453,19 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
       rating: batch.rating,
       notes: '',
     });
-    await batches.save({ ...batch, status: 'bottled', fg: batch.fg ?? finalGravity });
-    await events.save({ batchId: batch.id, type: 'status', date: nowLocal(), value: null, note: `Bottled ${bottles} ${bottles === 1 ? 'bottle' : 'bottles'}` });
+    const fg = isFermentationComplete(batch) && batch.fg != null ? batch.fg : finalGravity;
+    await batches.save({ ...batch, status: 'bottled', fermentationComplete: true, fg });
+    // A bottling entry records real bottles, so it is never replaced by a later stage tap.
+    await events.save({
+      batchId: batch.id,
+      type: 'status',
+      date: nowLocal(),
+      value: null,
+      note: `${bottles} × ${size >= 1000 ? `${size / 1000} L` : `${size} mL`}`,
+      toStatus: 'bottled',
+      fromStatus: batch.status,
+      auto: false,
+    });
     toast('Bottles added to your cellar');
     onClose();
     navigate(`/cellar/${entry.id}`);

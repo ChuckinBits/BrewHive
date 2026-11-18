@@ -924,6 +924,11 @@ a.shelf-item:hover .shelf-visual {
   border-top: 1px solid var(--line);
 }
 
+.timeline li.timeline-row {
+  display: block;
+  padding: 2px 0;
+}
+
 .timeline-icon {
   display: flex;
   align-items: center;
@@ -1384,4 +1389,238 @@ input::placeholder {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* --- Style picker, checkbox, projected ABV ------------------------------- */
+
+.select-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-button > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-button svg {
+  flex: none;
+  color: var(--muted);
+  transform: rotate(90deg);
+}
+
+.style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.style-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.style-choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.style-choice > span > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.style-choice:hover {
+  background: var(--surface-2);
+}
+
+.style-choice-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.style-choice-on svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+.style-custom {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.style-custom .field {
+  flex: 1;
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.check-field input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.gravity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.projection {
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.stat-projected .stat-value {
+  color: var(--accent-ink);
+}
+
+.timeline-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-entry:hover {
+  background: var(--surface-2);
+}
+
+.timeline-edit {
+  display: flex;
+  flex: none;
+  align-self: center;
+  color: var(--muted);
+}
+
+.timeline-entry .timeline-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-note {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.confirm-inline {
+  padding: 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.confirm-inline p {
+  font-weight: 500;
+}
+
+.confirm-inline .button-row {
+  margin: 10px 0 0;
+}
+
+.confirm-inline .button-row > .btn {
+  flex: 1;
+}
+
+.stat-extra {
+  align-self: stretch;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* A bubble with an extra line pulls up its value so the row stays one height. */
+.stat:has(.stat-extra) {
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+
+/* Small phones: four bubbles in a row get too narrow, so they go two by two. */
+@media (max-width: 359px) {
+  .stats:not(.stats-3) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Keep the selected stage readable: bold "Secondary" is the widest label. */
+.step {
+  letter-spacing: -0.01em;
+}
+
+.step-on {
+  font-weight: 650;
+}
+
+/* Longer stage names get more room than short ones. */
+.steps {
+  display: flex;
+}
+
+.step {
+  flex: 1 1 auto;
+  padding: 0 6px;
+}
+
+@media (max-width: 389px) {
+  .step {
+    padding: 0 3px;
+    font-size: 11px;
+  }
 }

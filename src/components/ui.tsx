@@ -87,11 +87,12 @@ export function EmptyState({ art, title, children }: { art: ReactNode; title: st
   );
 }
 
-export function Stat({ label, value }: { label: string; value: ReactNode }) {
+export function Stat({ label, value, highlight = false, extra }: { label: string; value: ReactNode; highlight?: boolean; extra?: ReactNode }) {
   return (
-    <div className="stat">
+    <div className={highlight ? 'stat stat-projected' : 'stat'}>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
+      {extra && <span className="stat-extra">{extra}</span>}
     </div>
   );
 }

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { batches, cellar, pours, usePrefs, useQuery } from '../db/store.ts';
-import { MEAD_STYLES, POUR_TYPES, type CellarEntry, type PourType } from '../db/types.ts';
+import { POUR_TYPES, type CellarEntry, type PourType } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
+import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Bottle } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Segmented, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
@@ -389,14 +390,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
 
         <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
 
-        <Field label="Style">
-          <input type="text" list="mead-styles" value={draft.style} placeholder="Melomel" onChange={(e) => set({ style: e.target.value })} />
-        </Field>
-        <datalist id="mead-styles">
-          {MEAD_STYLES.map((style) => (
-            <option key={style} value={style} />
-          ))}
-        </datalist>
+        <StyleField value={draft.style} onChange={(style) => set({ style })} />
 
         <div className="form-pair">
           <Field label="Bottles">
