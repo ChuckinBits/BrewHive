@@ -92,6 +92,26 @@ export function fmtTemp(celsius: number | null | undefined, unit: 'F' | 'C'): st
   return unit === 'F' ? `${trim(cToF(celsius), 1)} °F` : `${trim(celsius, 1)} °C`;
 }
 
+/** A volume in its record's own unit, with the default unit in brackets when they differ: "19 L (5 gal)". */
+export function fmtVolumeBoth(liters: number | null | undefined, unit: 'gal' | 'L' | null | undefined, defaultUnit: 'gal' | 'L'): string {
+  const own = unit ?? defaultUnit;
+  if (liters == null || own === defaultUnit) return fmtVolume(liters, own);
+  return `${fmtVolume(liters, own)} (${fmtVolume(liters, defaultUnit)})`;
+}
+
+/** A temperature in its entry's own unit, with the default unit in brackets when they differ: "20 °C (68 °F)". */
+export function fmtTempBoth(celsius: number | null | undefined, unit: 'F' | 'C' | null | undefined, defaultUnit: 'F' | 'C'): string {
+  const own = unit ?? defaultUnit;
+  if (celsius == null || own === defaultUnit) return fmtTemp(celsius, own);
+  return `${fmtTemp(celsius, own)} (${fmtTemp(celsius, defaultUnit)})`;
+}
+
+/** Celsius to the number shown in a temperature input. */
+export function tempToInput(celsius: number | null, unit: 'F' | 'C'): string {
+  if (celsius == null) return '';
+  return trim(unit === 'F' ? cToF(celsius) : celsius, 1);
+}
+
 export function tempFromInput(text: string, unit: 'F' | 'C'): number | null {
   const n = parseNum(text);
   if (n == null) return null;

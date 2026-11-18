@@ -4,12 +4,12 @@
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings } from '../db/types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { StyleField } from '../components/StyleField.tsx';
-import { Field, TopBar, toast } from '../components/ui.tsx';
+import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
@@ -23,6 +23,7 @@ interface Draft {
   style: string;
   status: BatchStatus;
   startDate: string;
+  volumeUnit: VolumeUnit;
   volume: string;
   og: string;
   complete: boolean;
@@ -60,7 +61,8 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
           style: batch.style,
           status: batch.status,
           startDate: batch.startDate,
-          volume: volumeToInput(batch.volumeL, volumeUnit),
+          volume: volumeToInput(batch.volumeL, batch.volumeUnit ?? volumeUnit),
+          volumeUnit: batch.volumeUnit ?? volumeUnit,
           og: batch.og != null ? fmtSG(batch.og) : '',
           complete: isFermentationComplete(batch),
           fg: batch.fg != null ? fmtSG(batch.fg) : '',
@@ -84,7 +86,8 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
         style: recipe?.style ?? '',
         status: 'primary',
         startDate: today(),
-        volume: volumeToInput(recipe?.batchSizeL ?? null, volumeUnit),
+        volume: volumeToInput(recipe?.batchSizeL ?? null, recipe?.volumeUnit ?? volumeUnit),
+        volumeUnit: recipe?.volumeUnit ?? volumeUnit,
         og: '',
         complete: false,
         fg: '',
@@ -198,7 +201,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       style: draft.style.trim(),
       status: draft.status,
       startDate: draft.startDate || today(),
-      volumeL: volumeFromInput(draft.volume, settings.volumeUnit),
+      volumeL: volumeFromInput(draft.volume, draft.volumeUnit),
+      volumeUnit: draft.volumeUnit,
       og,
       fermentationComplete: draft.complete,
       completedAt,
@@ -267,9 +271,15 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
         </div>
 
         <div className="form-pair">
-          <Field label={`Volume (${settings.volumeUnit})`}>
-            <input type="text" inputMode="decimal" value={draft.volume} placeholder="1" onChange={(e) => set({ volume: e.target.value })} />
-          </Field>
+          <UnitField
+            label="Volume"
+            value={draft.volume}
+            placeholder={draft.volumeUnit === 'gal' ? '1' : '4'}
+            onChange={(volume) => set({ volume })}
+            unit={draft.volumeUnit}
+            units={VOLUME_UNITS}
+            onUnit={(volumeUnit) => set({ volumeUnit })}
+          />
           <Field label="Original gravity" hint={ogHint}>
             <input type="text" inputMode="decimal" value={draft.og} placeholder="1.100" onChange={(e) => set({ og: e.target.value })} />
           </Field>

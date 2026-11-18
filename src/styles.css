@@ -1905,3 +1905,44 @@ button.staged-row:hover {
 .bottle-total .field-hint {
   font-weight: 400;
 }
+
+/* --- Per-record units (issue #14) --------------------------------------- */
+
+.unit-input {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.unit-input input {
+  flex: 1;
+  min-width: 0;
+}
+
+.unit-switch {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.unit-switch button {
+  min-width: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.unit-switch button.unit-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}

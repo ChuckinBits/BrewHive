@@ -178,11 +178,16 @@ export interface IngredientLine {
   stage?: IngredientStage;
 }
 
+export type VolumeUnit = 'gal' | 'L';
+export type TempUnit = 'F' | 'C';
+
 export interface Recipe extends Base {
   name: string;
   beverageType: BeverageType;
   style: string;
   batchSizeL: number | null;
+  /** The unit the batch size was entered in. Missing means the default from settings. */
+  volumeUnit?: VolumeUnit;
   targetOG: number | null;
   targetFG: number | null;
   ingredients: IngredientLine[];
@@ -211,6 +216,8 @@ export interface Batch extends Base {
   /** yyyy-mm-dd */
   startDate: string;
   volumeL: number | null;
+  /** The unit the volume was entered in. Missing means the default from settings. */
+  volumeUnit?: VolumeUnit;
   og: number | null;
   /**
    * True once fermentation is finished. Until then the batch shows a potential
@@ -240,6 +247,8 @@ export interface Batch extends Base {
 
 export interface BatchEvent extends Base {
   batchId: string;
+  /** For temperature entries: the unit it was entered in. Missing means the default from settings. */
+  tempUnit?: TempUnit;
   type: EventType;
   /** Local date-time, yyyy-mm-ddThh:mm */
   date: string;
