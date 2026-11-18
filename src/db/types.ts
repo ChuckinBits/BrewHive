@@ -126,11 +126,30 @@ export interface Base {
   deletedAt?: string | null;
 }
 
+/** The stage of a batch an ingredient goes in. Bottling covers priming sugar and other additions at bottling. */
+export type IngredientStage = 'primary' | 'secondary' | 'aging' | 'bottling';
+
+export const INGREDIENT_STAGES: { id: IngredientStage; label: string }[] = [
+  { id: 'primary', label: 'Primary' },
+  { id: 'secondary', label: 'Secondary' },
+  { id: 'aging', label: 'Aging' },
+  { id: 'bottling', label: 'Bottling' },
+];
+
+/** Units offered for an ingredient amount. An empty unit means a count, such as "2" cinnamon sticks. */
+export const INGREDIENT_UNITS = ['', 'lb', 'oz', 'kg', 'g', 'gal', 'L', 'fl oz', 'mL', 'cup', 'tbsp', 'tsp', 'packet'];
+
 export interface IngredientLine {
   id: string;
   name: string;
-  /** Free text for now, such as "3 lb" or "1 packet". Linked inventory arrives in v0.2. */
+  /** The amount as shown, such as "3 lb" or "1 packet". Older lines have only this. */
   amount: string;
+  /** The number part of the amount, as typed. */
+  quantity?: string;
+  /** One of INGREDIENT_UNITS, or a unit from an older free-text amount. */
+  unit?: string;
+  /** When it goes in. Missing means Primary. Recipes leave it out. */
+  stage?: IngredientStage;
 }
 
 export interface Recipe extends Base {
@@ -214,6 +233,8 @@ export interface BatchEvent extends Base {
   /** For "ingredient" entries: what was added, and how much. */
   ingredient?: string;
   amount?: string;
+  /** For "ingredient" entries: the line in the batch's ingredient list this entry ticks off. */
+  ingredientLineId?: string;
   /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */
   method?: string;
   /** For "tasting" and "review" entries: a 0 to 10 rating, or null. */
