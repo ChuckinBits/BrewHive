@@ -63,24 +63,35 @@ export type EventType =
   | 'tasting'
   | 'status'
   | 'moved'
+  | 'ingredient'
   | 'note';
 
-/** Event types the user can add by hand, in the order the add sheet shows them. */
-export const EVENT_TYPES: { id: EventType; label: string; value?: 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' }[] = [
+type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' | 'ingredient' | 'method' | 'rating';
+
+/** Event types the user can add by hand: Gravity reading first, as the most common, then A to Z. */
+export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[] = [
   { id: 'gravity', label: 'Gravity reading', value: 'sg' },
-  { id: 'note', label: 'Note' },
-  { id: 'moved', label: 'Moved to', value: 'place' },
-  { id: 'nutrient', label: 'Nutrients' },
-  { id: 'tasting', label: 'Tasting' },
-  { id: 'rack', label: 'Racked' },
-  { id: 'temperature', label: 'Temperature', value: 'temp' },
-  { id: 'ph', label: 'pH', value: 'ph' },
-  { id: 'feeding', label: 'Step feeding', value: 'sg-after' },
-  { id: 'stabilize', label: 'Stabilized' },
-  { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
-  { id: 'fining', label: 'Fining' },
-  { id: 'pitch', label: 'Yeast pitched' },
+  ...(
+    [
+      { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
+      { id: 'fining', label: 'Fining' },
+      { id: 'ingredient', label: 'Ingredient', value: 'ingredient' },
+      { id: 'moved', label: 'Moved to', value: 'place' },
+      { id: 'note', label: 'Note' },
+      { id: 'nutrient', label: 'Nutrients' },
+      { id: 'ph', label: 'pH', value: 'ph' },
+      { id: 'rack', label: 'Racked' },
+      { id: 'stabilize', label: 'Stabilized', value: 'method' },
+      { id: 'feeding', label: 'Step feeding', value: 'sg-after' },
+      { id: 'tasting', label: 'Tasting', value: 'rating' },
+      { id: 'temperature', label: 'Temperature', value: 'temp' },
+      { id: 'pitch', label: 'Yeast pitched' },
+    ] as { id: EventType; label: string; value?: EntryField }[]
+  ).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })),
 ];
+
+/** How a batch was stabilized, chosen on a "Stabilized" entry. */
+export const STABILIZE_METHODS = ['Chemical', 'Pasteurization', 'Filtration', 'Nagardo', 'Other'];
 
 export function eventLabel(type: EventType): string {
   if (type === 'status') return 'Stage change';
@@ -100,6 +111,7 @@ export function eventTitle(event: BatchEvent): string {
     return event.note || 'Stage change';
   }
   if (event.type === 'moved') return event.place ? `Moved to ${event.place}` : 'Moved';
+  if (event.type === 'ingredient') return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
   return eventLabel(event.type);
 }
 
@@ -190,11 +202,17 @@ export interface BatchEvent extends Base {
   /** For "moved" entries: where the batch went, such as "Basement". */
   place?: string;
   /**
-   * For step feeding and backsweetening: whether the added sugar is expected
-   * to ferment, so it raises the potential ABV. Missing means the default:
-   * feeding ferments, backsweetening ferments unless the batch was stabilized first.
+   * For backsweetening: true when the added sugar is expected to ferment, so it
+   * raises the potential ABV. Off unless ticked. Step feeding always ferments.
    */
   ferments?: boolean;
+  /** For "ingredient" entries: what was added, and how much. */
+  ingredient?: string;
+  amount?: string;
+  /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */
+  method?: string;
+  /** For "tasting" entries: a 0 to 10 rating, or null. */
+  rating?: number | null;
 }
 
 export interface CellarEntry extends Base {

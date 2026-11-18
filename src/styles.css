@@ -1624,3 +1624,40 @@ input::placeholder {
     font-size: 11px;
   }
 }
+
+/* --- Star rating badge (issue #6) ----------------------------------------- */
+
+.rating {
+  position: relative;
+  width: 40px;
+  min-width: 40px;
+  height: 38px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--on-accent);
+}
+
+.rating svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.rating-number {
+  position: relative;
+  padding-top: 3px;
+  font-size: 12.5px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.timeline-entry .rating {
+  align-self: center;
+}

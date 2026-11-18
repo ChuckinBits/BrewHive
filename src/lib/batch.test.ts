@@ -4,13 +4,13 @@ import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
 import {
   batchAbv,
   currentGravity,
-  defaultFerments,
   effectiveOG,
   gravityPoints,
   isFermentationComplete,
   planStatusEntry,
   projectedAbv,
   stageWhenComplete,
+  sugarFerments,
   targetFinalGravity,
 } from './batch.ts';
 
@@ -168,17 +168,18 @@ test('backsweetening after stabilizing does not count toward the potential', () 
   near(batchAbv(b, events), 13.125);
 });
 
-test('backsweetening without stabilizing is expected to ferment', () => {
+test('backsweetening does not ferment unless the box is ticked, stabilized or not (issue #6)', () => {
   const b = batch({ og: 1.1 });
   const events = [reading('2026-11-05T10:00', 1.0), entry('backsweeten', '2026-11-07T10:00', 1.015)];
-  near(effectiveOG(b, events), 1.115);
-});
-
-test('"This will ferment" overrides the default either way', () => {
-  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, events), 1.1);
+  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.0), entry('backsweeten', '2026-11-07T10:00', 1.015, { ferments: true })]), 1.115);
   const stabilized = [reading('2026-11-05T10:00', 1.0), entry('stabilize', '2026-11-06T10:00')];
   near(effectiveOG(b, [...stabilized, entry('backsweeten', '2026-11-07T10:00', 1.015, { ferments: true })]), 1.115);
-  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00', 1.04, { ferments: false })]), 1.1);
+});
+
+test('step feeding always ferments, even with an old "won\'t ferment" setting saved (issue #6)', () => {
+  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00', 1.04, { ferments: false })]), 1.12);
 });
 
 test('a plain reading that rises 0.003 or more counts as added sugar', () => {
@@ -211,10 +212,10 @@ test('the gravity after feeding appears on the chart', () => {
   assert.deepEqual(points.map((p) => p.sg), [1.1, 1.02, 1.04]);
 });
 
-test('defaultFerments: feeding always, backsweetening unless stabilized', () => {
-  assert.equal(defaultFerments('feeding', true), true);
-  assert.equal(defaultFerments('backsweeten', false), true);
-  assert.equal(defaultFerments('backsweeten', true), false);
+test('sugarFerments: feeding always, backsweetening only when ticked', () => {
+  assert.equal(sugarFerments(entry('feeding', '2026-11-06T10:00')), true);
+  assert.equal(sugarFerments(entry('backsweeten', '2026-11-06T10:00')), false);
+  assert.equal(sugarFerments(entry('backsweeten', '2026-11-06T10:00', null, { ferments: true })), true);
 });
 
 // --- Backsweetening after fermentation is complete (follow-up to issue #3) ----

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { changeStatus } from '../db/actions.ts';
 import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
+import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { IngredientList } from '../components/IngredientEditor.tsx';
 import { Carboy } from '../components/Vessels.tsx';
@@ -17,10 +17,8 @@ import {
   isActive,
   isFermentationComplete,
   analyzeGravity,
-  defaultFerments,
   originalGravity,
   projectedAbv,
-  stabilizedBefore,
   targetFinalGravity,
 } from '../lib/batch.ts';
 import { cToF } from '../lib/calc.ts';
@@ -42,22 +40,21 @@ const EVENT_ICONS: Record<EventType, IconName> = {
   pitch: 'yeast',
   status: 'flag',
   moved: 'pin',
+  ingredient: 'plus',
   note: 'note',
 };
 
+/** The short value shown after an entry's title, such as "1.045", "3.60" or "1 oz". */
 function eventValue(event: BatchEvent, settings: Settings): string {
+  if (event.type === 'ingredient') return event.amount ?? '';
+  if (event.type === 'stabilize') return event.method ?? '';
   if (event.value == null) return '';
   if (event.type === 'gravity') return fmtSG(event.value);
   if (event.type === 'feeding' || event.type === 'backsweeten') return `→ ${fmtSG(event.value)}`;
   if (event.type === 'temperature') return fmtTemp(event.value, settings.tempUnit);
-  if (event.type === 'ph') return `pH ${event.value.toFixed(2)}`;
+  // The title already says pH, so only the number.
+  if (event.type === 'ph') return event.value.toFixed(2);
   return String(event.value);
-}
-
-/** Whether a feeding or backsweetening entry counts toward the potential ABV. */
-function fermentsFor(event: BatchEvent, all: BatchEvent[]): boolean {
-  if (event.type !== 'feeding' && event.type !== 'backsweeten') return false;
-  return event.ferments ?? defaultFerments(event.type, stabilizedBefore(all, event.date, event.createdAt));
 }
 
 /** Newest first; entries logged at the same minute keep the order they were added in. */
@@ -212,15 +209,15 @@ export function BatchDetailScreen({ id }: { id: string }) {
                       <span className="timeline-head">
                         <strong>
                           {eventTitle(event)}
-                          {event.value != null && <span className="timeline-value"> {eventValue(event, settings)}</span>}
+                          {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
                         </strong>
                         <time dateTime={event.date}>{fmtDateShort(event.date)}</time>
                       </span>
-                      {(event.type === 'feeding' || event.type === 'backsweeten') && !fermentsFor(event, data.events) && (
-                        <span className="timeline-note">Not expected to ferment</span>
-                      )}
+                      {/* Backsweetening usually isn't meant to ferment, so only the exception is marked. */}
+                      {event.type === 'backsweeten' && event.ferments === true && <span className="timeline-note">Expected to ferment</span>}
                       {showNote && <span className="timeline-note">{event.note}</span>}
                     </span>
+                    {event.type === 'tasting' && <RatingBadge rating={event.rating} />}
                     <span className="timeline-edit">
                       <Icon name="edit" size={18} />
                     </span>
@@ -245,7 +242,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} timeline={data.events} onClose={() => setEntry(null)} />}
+      {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}
       {bottling && <BottleSheet batch={batch} abv={abv} finalGravity={sg} onClose={() => setBottling(false)} />}
       {deleting && (
         <ConfirmSheet
@@ -282,13 +279,11 @@ interface EventSheetProps {
   settings: Settings;
   /** The entry being edited, or null to add a new one. */
   existing: BatchEvent | null;
-  /** The batch's other entries, to tell whether it was stabilized before this one. */
-  timeline: BatchEvent[];
   onClose: () => void;
 }
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheetProps) {
+function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
   const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
@@ -299,14 +294,14 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
   const [note, setNote] = useState(isStage && !existing?.toStatus ? '' : (existing?.note ?? ''));
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // null: follow the default for this kind of entry. true or false: the user's choice.
-  const [ferments, setFerments] = useState<boolean | null>(existing?.ferments ?? null);
+  // Backsweetening: off unless ticked. Step feeding always ferments, so it has no checkbox.
+  const [ferments, setFerments] = useState(existing?.ferments === true);
+  const [ingredient, setIngredient] = useState(existing?.ingredient ?? '');
+  const [amount, setAmount] = useState(existing?.amount ?? '');
+  const [method, setMethod] = useState(existing?.method ?? STABILIZE_METHODS[0]);
+  const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
 
   const kind = isStage ? undefined : EVENT_TYPES.find((t) => t.id === type)?.value;
-  const others = timeline.filter((e) => e.id !== existing?.id);
-  const stabilized = stabilizedBefore(others, date || nowLocal(), existing?.createdAt);
-  const sugarType = type === 'feeding' || type === 'backsweeten' ? type : null;
-  const fermentsDefault = sugarType ? defaultFerments(sugarType, stabilized) : true;
 
   const save = async () => {
     let parsed: number | null = null;
@@ -324,6 +319,8 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
       if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter the gravity after adding, between 0.980 and 1.200, or leave it empty.');
     } else if (kind === 'place' && !place.trim()) {
       return setError('Enter where the batch went, such as Basement.');
+    } else if (kind === 'ingredient' && !ingredient.trim()) {
+      return setError('Enter what you added, such as Oak cubes.');
     }
 
     const fields = {
@@ -332,8 +329,11 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
       note: note.trim(),
       value: parsed,
       place: kind === 'place' ? place.trim() : undefined,
-      // Stored only when the user overrode the default, so the default can follow later "Stabilized" entries.
-      ferments: kind === 'sg-after' && ferments != null && ferments !== fermentsDefault ? ferments : undefined,
+      ferments: type === 'backsweeten' && ferments ? true : undefined,
+      ingredient: kind === 'ingredient' ? ingredient.trim() : undefined,
+      amount: kind === 'ingredient' ? amount.trim() : undefined,
+      method: kind === 'method' ? method : undefined,
+      rating: kind === 'rating' ? rating : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -343,7 +343,10 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
     } else {
       await events.save({ ...fields, type });
     }
-    toast(existing ? 'Entry updated' : 'Added to the timeline');
+    // A tasting rating becomes the batch's rating, unless the batch is already rated.
+    const rateBatch = kind === 'rating' && rating != null && batch.rating == null;
+    if (rateBatch) await batches.save({ ...batch, rating });
+    toast(rateBatch ? 'Saved, and the batch is now rated' : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
   };
 
@@ -404,17 +407,47 @@ function EventSheet({ batch, settings, existing, timeline, onClose }: EventSheet
             <Field label="Gravity after adding (optional)" hint="Take a reading once it is mixed in, so the added sugar is counted.">
               <input type="text" inputMode="decimal" value={value} placeholder="1.030" onChange={(e) => setValue(e.target.value)} />
             </Field>
-            <label className="check-field">
-              <input type="checkbox" checked={ferments ?? fermentsDefault} onChange={(e) => setFerments(e.target.checked)} />
-              This will ferment
-            </label>
-            <p className="field-hint">
-              {(ferments ?? fermentsDefault)
-                ? 'The added sugar raises the potential ABV.'
-                : stabilized
-                  ? 'Not counted toward the potential ABV, because the batch was stabilized before this.'
-                  : 'Not counted toward the potential ABV.'}
-            </p>
+            {type === 'backsweeten' && (
+              <>
+                <label className="check-field">
+                  <input type="checkbox" checked={ferments} onChange={(e) => setFerments(e.target.checked)} />
+                  This will ferment
+                </label>
+                <p className="field-hint">
+                  {ferments
+                    ? 'The added sugar raises the potential ABV, for example after adding yeast again.'
+                    : 'Tick this if you expect the added sugar to ferment, so it raises the potential ABV.'}
+                </p>
+              </>
+            )}
+            {type === 'feeding' && <p className="field-hint">The added sugar raises the potential ABV.</p>}
+          </>
+        )}
+        {kind === 'ingredient' && (
+          <div className="form-pair">
+            <Field label="Ingredient">
+              <input type="text" value={ingredient} placeholder="Oak cubes" autoFocus={!existing} onChange={(e) => setIngredient(e.target.value)} />
+            </Field>
+            <Field label="Amount">
+              <input type="text" value={amount} placeholder="1 oz" onChange={(e) => setAmount(e.target.value)} />
+            </Field>
+          </div>
+        )}
+        {kind === 'method' && (
+          <Field label="Method">
+            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              {STABILIZE_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {kind === 'rating' && (
+          <>
+            <RatingInput value={rating} onChange={setRating} />
+            {batch.rating == null && <p className="field-hint">The batch isn't rated yet, so this rating becomes its rating too.</p>}
           </>
         )}
         {kind === 'place' && (
