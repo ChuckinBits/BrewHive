@@ -203,6 +203,7 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'pitch', at(34)),
     event(b2.id, 'gravity', at(27), 1.05),
     event(b2.id, 'gravity', at(20), 1.018),
+    event(b2.id, 'feeding', at(17), 1.034, 'Added 8 oz honey to push it a little stronger'),
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
     event(b2.id, 'rack', at(12), null, 'Racked onto one cinnamon stick'),

@@ -2,6 +2,7 @@
 
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
 import { abv } from './calc.ts';
+import { toLocalMinute } from './format.ts';
 
 /** The final gravity assumed when the user has not set a target: fully dry. */
 export const DEFAULT_TARGET_FG = 1.0;
@@ -12,12 +13,19 @@ export interface GravityPoint {
   sg: number;
 }
 
+/** Entries that can carry a gravity reading: plain readings, and the gravity after step feeding or backsweetening. */
+const READING_TYPES = new Set(['gravity', 'feeding', 'backsweeten']);
+
+const byTime = (a: BatchEvent, b: BatchEvent) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
+
+function readings(events: BatchEvent[]): BatchEvent[] {
+  return events.filter((e) => READING_TYPES.has(e.type) && e.value != null && !e.deletedAt).sort(byTime);
+}
+
 /** The original gravity plus every gravity reading, oldest first. */
 export function gravityPoints(batch: Batch, events: BatchEvent[]): GravityPoint[] {
-  const points: GravityPoint[] = events
-    .filter((e) => e.type === 'gravity' && e.value != null)
-    .map((e) => ({ date: e.date, sg: e.value as number }));
-  if (batch.og != null) points.push({ date: batch.startDate, sg: batch.og });
+  const points: GravityPoint[] = readings(events).map((e) => ({ date: e.date, sg: e.value as number }));
+  if (batch.og != null) points.unshift({ date: batch.startDate, sg: batch.og });
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -46,13 +54,128 @@ export function currentGravity(batch: Batch, events: BatchEvent[]): number | nul
   return points.length ? points[points.length - 1].sg : null;
 }
 
+/** A rise in a plain gravity reading smaller than this is treated as hydrometer wobble, not added sugar. */
+export const NOISE_RISE = 0.003;
+
+/** Whether a feeding or backsweetening entry is expected to ferment, when the user has not said. */
+export function defaultFerments(type: 'feeding' | 'backsweeten', stabilized: boolean): boolean {
+  return type === 'feeding' || !stabilized;
+}
+
+/**
+ * True when a "Stabilized" entry comes before this point on the timeline.
+ * Entries logged in the same minute count in the order they were added; an
+ * entry not saved yet (no createdAt) comes after everything already there.
+ */
+export function stabilizedBefore(events: BatchEvent[], date: string, createdAt = '\uffff'): boolean {
+  return events.some((e) => e.type === 'stabilize' && !e.deletedAt && (e.date < date || (e.date === date && e.createdAt < createdAt)));
+}
+
+export interface GravityAnalysis {
+  /** Points of gravity fermented so far: every drop between readings added up. Never goes down when a reading rises. */
+  fermented: number;
+  /** Points of gravity added by step feeding or backsweetening that are expected to ferment. */
+  addedSugar: number;
+  /** Whether any reading came after the OG, so there is something to measure. */
+  hasReadings: boolean;
+}
+
+const isSugar = (e: BatchEvent): e is BatchEvent & { type: 'feeding' | 'backsweeten' } => e.type === 'feeding' || e.type === 'backsweeten';
+
+/** Whether sugar added by a feeding or backsweetening entry is expected to ferment. */
+function sugarFerments(entry: BatchEvent & { type: 'feeding' | 'backsweeten' }, events: BatchEvent[]): boolean {
+  return entry.ferments ?? defaultFerments(entry.type, stabilizedBefore(events, entry.date, entry.createdAt));
+}
+
+/**
+ * Walks the timeline in order, tracking the gravity level:
+ * - A drop counts as fermented.
+ * - A rise counts as added sugar when it is expected to ferment, and moves the level up either way:
+ *   - On a feeding or backsweetening entry: its "This will ferment" setting decides.
+ *   - On a plain reading that follows a feeding or backsweetening entry logged without a
+ *     gravity: that entry's setting decides, so "add honey, then take a reading" works.
+ *   - On any other plain reading: it counts if it rose by NOISE_RISE or more and the batch
+ *     was not stabilized before it. A smaller rise is wobble and is ignored.
+ * - The final gravity sits where fermentation was marked complete (completedAt). Without that
+ *   date it sits right after the last plain reading, so sugar added after fermentation finished
+ *   (backsweetening) comes after it.
+ */
+export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnalysis {
+  const og = originalGravity(batch, events);
+  const result: GravityAnalysis = { fermented: 0, addedSugar: 0, hasReadings: false };
+  if (og == null) return result;
+
+  type Step = { sg: number | null; event: BatchEvent | null };
+  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  const withValue = readings(live);
+  // When there is no OG, the first reading stands in for it.
+  const skip = batch.og == null ? withValue[0] : undefined;
+  const steps: Step[] = live
+    .filter((e) => e !== skip && ((READING_TYPES.has(e.type) && e.value != null) || isSugar(e)))
+    .map((e) => ({ sg: e.value, event: e }));
+
+  if (isFermentationComplete(batch) && batch.fg != null) {
+    const fgStep: Step = { sg: batch.fg, event: null };
+    let at: number;
+    if (batch.completedAt) {
+      // completedAt is an exact moment (ISO). An entry comes after the final gravity if it is dated
+      // a later minute, or the same minute and was added after fermentation was marked complete.
+      const exact = batch.completedAt.length > 16;
+      const minute = exact ? toLocalMinute(batch.completedAt) : batch.completedAt;
+      at = steps.findIndex(
+        (s) => !!s.event && (s.event.date.slice(0, 16) > minute || (exact && s.event.date.slice(0, 16) === minute && s.event.createdAt > (batch.completedAt as string))),
+      );
+      if (at < 0) at = steps.length;
+    } else {
+      let lastPlain = -1;
+      steps.forEach((s, i) => {
+        if (s.event?.type === 'gravity') lastPlain = i;
+      });
+      at = lastPlain + 1;
+    }
+    steps.splice(at, 0, fgStep);
+  }
+
+  let level = og;
+  // A feeding or backsweetening entry logged without a gravity, waiting for the next reading.
+  let pending: (BatchEvent & { type: 'feeding' | 'backsweeten' }) | null = null;
+  for (const { sg, event } of steps) {
+    if (sg == null) {
+      if (event && isSugar(event)) pending = event;
+      continue;
+    }
+    result.hasReadings = true;
+    const source = event && isSugar(event) ? event : pending;
+    pending = null;
+    if (sg <= level) {
+      result.fermented += level - sg;
+      level = sg;
+      continue;
+    }
+    const rise = sg - level;
+    if (source) {
+      if (sugarFerments(source, events)) result.addedSugar += rise;
+      level = sg;
+    } else if (event && rise >= NOISE_RISE - 1e-9) {
+      // A real rise on a plain reading, such as sugar added without logging it.
+      if (!stabilizedBefore(events, event.date, event.createdAt)) result.addedSugar += rise;
+      level = sg;
+    }
+    // Otherwise: wobble (or a final gravity above the level). The level stays where it was.
+  }
+  return result;
+}
+
 /** ABV so far. Null until there is a reading after the OG (or an FG), so a new batch shows a dash, not 0%. */
 export function batchAbv(batch: Batch, events: BatchEvent[]): number | null {
+  const analysis = analyzeGravity(batch, events);
+  return analysis.hasReadings ? Math.max(0, analysis.fermented * 131.25) : null;
+}
+
+/** The OG plus any added sugar expected to ferment: what the potential ABV is worked out from. */
+export function effectiveOG(batch: Batch, events: BatchEvent[]): number | null {
   const og = originalGravity(batch, events);
-  const hasFinal = isFermentationComplete(batch) && batch.fg != null;
-  const hasLaterReading = hasFinal || gravityPoints(batch, events).length > 1;
-  const sg = currentGravity(batch, events);
-  return og != null && sg != null && hasLaterReading ? abv(og, sg) : null;
+  return og == null ? null : og + analyzeGravity(batch, events).addedSugar;
 }
 
 export interface ProjectedAbv {

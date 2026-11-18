@@ -1,7 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
-import { batchAbv, currentGravity, isFermentationComplete, planStatusEntry, projectedAbv, stageWhenComplete, targetFinalGravity } from './batch.ts';
+import {
+  batchAbv,
+  currentGravity,
+  defaultFerments,
+  effectiveOG,
+  gravityPoints,
+  isFermentationComplete,
+  planStatusEntry,
+  projectedAbv,
+  stageWhenComplete,
+  targetFinalGravity,
+} from './batch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 
@@ -115,4 +126,148 @@ test('entries added or edited by hand are never replaced', () => {
 
 test('tapping the current stage does nothing', () => {
   assert.equal(planStatusEntry([], 'aging', 'aging', '2026-11-17T09:00').action, 'none');
+});
+
+// --- Step feeding and backsweetening (issue #3) ------------------------------
+
+const entry = (type: BatchEvent['type'], date: string, value: number | null = null, patch: Partial<BatchEvent> = {}): BatchEvent => ({
+  ...base,
+  id: `${type}-${date}`,
+  batchId: 'b1',
+  type,
+  date,
+  value,
+  note: '',
+  ...patch,
+});
+
+const near = (actual: number | null | undefined, expected: number) =>
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} is not ${expected}`);
+
+test('a step feeding raises the potential ABV (issue example: 13.1% to 15.75%)', () => {
+  const b = batch({ og: 1.1 });
+  const events = [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00', 1.04)];
+  near(effectiveOG(b, events), 1.12);
+  near(projectedAbv(effectiveOG(b, events), 1.0)?.potential, 15.75);
+});
+
+test('a higher reading never lowers the ABV (issue example: stays 10.5%)', () => {
+  const b = batch({ og: 1.1 });
+  const before = [reading('2026-11-05T10:00', 1.02)];
+  near(batchAbv(b, before), 10.5);
+  const after = [...before, entry('feeding', '2026-11-06T10:00', 1.04)];
+  near(batchAbv(b, after), 10.5);
+  // ...and keeps growing as the new sugar ferments.
+  near(batchAbv(b, [...after, reading('2026-11-10T10:00', 1.01)]), 14.4375);
+});
+
+test('backsweetening after stabilizing does not count toward the potential', () => {
+  const b = batch({ og: 1.1 });
+  const events = [reading('2026-11-05T10:00', 1.0), entry('stabilize', '2026-11-06T10:00'), entry('backsweeten', '2026-11-07T10:00', 1.015)];
+  near(effectiveOG(b, events), 1.1);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('backsweetening without stabilizing is expected to ferment', () => {
+  const b = batch({ og: 1.1 });
+  const events = [reading('2026-11-05T10:00', 1.0), entry('backsweeten', '2026-11-07T10:00', 1.015)];
+  near(effectiveOG(b, events), 1.115);
+});
+
+test('"This will ferment" overrides the default either way', () => {
+  const b = batch({ og: 1.1 });
+  const stabilized = [reading('2026-11-05T10:00', 1.0), entry('stabilize', '2026-11-06T10:00')];
+  near(effectiveOG(b, [...stabilized, entry('backsweeten', '2026-11-07T10:00', 1.015, { ferments: true })]), 1.115);
+  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00', 1.04, { ferments: false })]), 1.1);
+});
+
+test('a plain reading that rises 0.003 or more counts as added sugar', () => {
+  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.02), reading('2026-11-06T10:00', 1.025)]), 1.105);
+});
+
+test('a plain reading that rises less than 0.003 is wobble and changes nothing', () => {
+  const b = batch({ og: 1.1 });
+  const events = [reading('2026-11-05T10:00', 1.02), reading('2026-11-06T10:00', 1.022), reading('2026-11-07T10:00', 1.01)];
+  near(effectiveOG(b, events), 1.1);
+  // The wobble does not inflate the ABV: 1.100 to 1.010 is 11.8125%.
+  near(batchAbv(b, events), 11.8125);
+});
+
+test('a big rise on a plain reading after stabilizing moves the level but adds no sugar', () => {
+  const b = batch({ og: 1.1 });
+  const events = [reading('2026-11-05T10:00', 1.0), entry('stabilize', '2026-11-06T10:00'), reading('2026-11-07T10:00', 1.012)];
+  near(effectiveOG(b, events), 1.1);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('feeding entries without a gravity change nothing', () => {
+  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00')]), 1.1);
+});
+
+test('the gravity after feeding appears on the chart', () => {
+  const points = gravityPoints(batch({ og: 1.1 }), [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00', 1.04)]);
+  assert.deepEqual(points.map((p) => p.sg), [1.1, 1.02, 1.04]);
+});
+
+test('defaultFerments: feeding always, backsweetening unless stabilized', () => {
+  assert.equal(defaultFerments('feeding', true), true);
+  assert.equal(defaultFerments('backsweeten', false), true);
+  assert.equal(defaultFerments('backsweeten', true), false);
+});
+
+// --- Backsweetening after fermentation is complete (follow-up to issue #3) ----
+
+test('complete batch, then stabilized and backsweetened with "This will ferment": counts (no completion date)', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(b, events), 1.115);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('complete batch: the final gravity sits at its completion date', () => {
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-09T10:00:00.000Z' }), events), 1.115);
+  // Marked complete after the backsweetening fermented out: the FG comes last, and that drop is ABV.
+  const later = batch({ og: 1.1, fermentationComplete: true, fg: 0.998, completedAt: '2026-11-20T10:00:00.000Z' });
+  const refermented = [reading('2026-11-08T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(later, refermented), 1.115);
+  near(batchAbv(later, refermented), (0.1 + 0.017) * 131.25);
+});
+
+test('complete batch, stabilized and backsweetened without ticking the box: the potential stays put', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
+  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015)];
+  near(effectiveOG(b, events), 1.1);
+  near(batchAbv(b, events), 13.125);
+});
+
+test('a backsweetening entry without a gravity hands its setting to the next reading', () => {
+  const stabilized = [reading('2026-11-08T10:00', 1.0), entry('stabilize', '2026-11-10T10:00')];
+  const ticked = [...stabilized, entry('backsweeten', '2026-11-11T10:00', null, { ferments: true }), reading('2026-11-11T11:00', 1.015)];
+  near(effectiveOG(batch({ og: 1.1 }), ticked), 1.115);
+  const unticked = [...stabilized, entry('backsweeten', '2026-11-11T10:00'), reading('2026-11-11T11:00', 1.015)];
+  near(effectiveOG(batch({ og: 1.1 }), unticked), 1.1);
+});
+
+test('a feeding entry without a gravity lets the next reading count even a small rise', () => {
+  const events = [reading('2026-11-05T10:00', 1.02), entry('feeding', '2026-11-06T10:00'), reading('2026-11-06T11:00', 1.022)];
+  near(effectiveOG(batch({ og: 1.1 }), events), 1.102);
+});
+
+test('stabilized and backsweetened in the same minute: the order they were added decides', () => {
+  const stab = entry('stabilize', '2026-11-11T10:00', null, { createdAt: '2026-11-11T17:00:01Z' });
+  const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T17:00:30Z' });
+  const b = batch({ og: 1.1 });
+  near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, sweet]), 1.1);
+  near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, { ...sweet, ferments: true }]), 1.115);
+});
+
+test('marked complete, then stabilized and backsweetened in the same minute: the FG comes first', () => {
+  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-11T10:00:05.000Z' });
+  const stab = entry('stabilize', '2026-11-11T10:00', null, { createdAt: '2026-11-11T10:00:20.000Z' });
+  const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T10:00:40.000Z', ferments: true });
+  near(effectiveOG(b, [stab, sweet]), 1.115);
+  near(batchAbv(b, [stab, sweet]), 13.125);
 });
