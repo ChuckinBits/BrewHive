@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { batches, cellar, pours, usePrefs, useQuery } from '../db/store.ts';
-import { POUR_TYPES, type CellarEntry, type PourType } from '../db/types.ts';
+import { POUR_TYPES, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
@@ -93,6 +93,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
     };
   }, [id]);
   const [pouring, setPouring] = useState(false);
+  const [editingPour, setEditingPour] = useState<Pour | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Cellar" back="/cellar" />;
@@ -174,23 +175,31 @@ export function CellarDetailScreen({ id }: { id: string }) {
           <p className="muted">No bottles opened yet.</p>
         ) : (
           <ol className="timeline">
-            {data.pours.map((pour) => (
-              <li key={pour.id}>
-                <span className="timeline-icon">
-                  <Icon name="glass" size={20} />
-                </span>
-                <div className="timeline-body">
-                  <div className="timeline-head">
-                    <strong>
-                      {POUR_TYPES.find((t) => t.id === pour.type)?.label} {plural(pour.count, 'bottle')}
-                    </strong>
-                    <time dateTime={pour.date}>{fmtDateShort(pour.date)}</time>
-                  </div>
-                  {pour.note && <p>{pour.note}</p>}
-                </div>
-                <RatingBadge rating={pour.rating} />
-              </li>
-            ))}
+            {data.pours.map((pour) => {
+              const title = `${POUR_TYPES.find((t) => t.id === pour.type)?.label} ${plural(pour.count, 'bottle')}`;
+              return (
+                <li key={pour.id} className="timeline-row">
+                  <button type="button" className="timeline-entry" onClick={() => setEditingPour(pour)} aria-label={`Edit ${title}, ${fmtDate(pour.date)}`}>
+                    <span className="timeline-icon">
+                      <Icon name="glass" size={20} />
+                    </span>
+                    <span className="timeline-body">
+                      <span className="timeline-head">
+                        <strong className="timeline-title">
+                          <span>{title}</span>
+                          <RatingBadge rating={pour.rating} small />
+                        </strong>
+                        <time dateTime={pour.date}>{fmtDateShort(pour.date)}</time>
+                      </span>
+                      {pour.note && <span className="timeline-note">{pour.note}</span>}
+                    </span>
+                    <span className="timeline-edit">
+                      <Icon name="edit" size={18} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
@@ -202,7 +211,8 @@ export function CellarDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {pouring && <PourSheet entry={entry} onClose={() => setPouring(false)} />}
+      {pouring && <PourSheet entry={entry} existing={null} onClose={() => setPouring(false)} />}
+      {editingPour && <PourSheet entry={entry} existing={editingPour} onClose={() => setEditingPour(null)} />}
       {deleting && (
         <ConfirmSheet
           title="Remove from the cellar?"
@@ -220,26 +230,45 @@ export function CellarDetailScreen({ id }: { id: string }) {
   );
 }
 
-function PourSheet({ entry, onClose }: { entry: CellarEntry; onClose: () => void }) {
-  const [count, setCount] = useState('1');
-  const [type, setType] = useState<PourType>('drank');
-  const [date, setDate] = useState(today());
-  const [note, setNote] = useState('');
-  const [rating, setRating] = useState<number | null>(null);
+/**
+ * Logs a pour, or edits or removes one. Bottles left always follows: a pour
+ * takes its bottles from the entry, and editing or removing it puts back
+ * what it no longer uses.
+ */
+function PourSheet({ entry, existing, onClose }: { entry: CellarEntry; existing: Pour | null; onClose: () => void }) {
+  const [count, setCount] = useState(existing ? String(existing.count) : '1');
+  const [type, setType] = useState<PourType>(existing?.type ?? 'drank');
+  const [date, setDate] = useState(existing?.date ?? today());
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // The most this pour can be: what is left, plus what it already took.
+  const available = entry.count + (existing?.count ?? 0);
 
   const save = async () => {
     const bottles = parseNum(count);
     if (bottles == null || bottles < 1 || !Number.isInteger(bottles)) return setError('Enter how many bottles.');
-    if (bottles > entry.count) return setError(`Only ${plural(entry.count, 'bottle')} left.`);
-    await pours.save({ cellarEntryId: entry.id, date: date || today(), count: bottles, type, note: note.trim(), rating });
-    await cellar.save({ ...entry, count: entry.count - bottles });
-    toast(entry.count - bottles === 0 ? 'That was the last bottle' : 'Pour logged');
+    if (bottles > available) return setError(`Only ${plural(available, 'bottle')} ${existing ? 'available for this pour' : 'left'}.`);
+    const fields = { cellarEntryId: entry.id, date: date || today(), count: bottles, type, note: note.trim(), rating };
+    await pours.save(existing ? { ...existing, ...fields } : fields);
+    const left = available - bottles;
+    await cellar.save({ ...entry, count: left });
+    toast(left === 0 ? 'That was the last bottle' : existing ? 'Pour updated' : 'Pour logged');
+    onClose();
+  };
+
+  const remove = async () => {
+    if (!existing) return;
+    await pours.remove(existing.id);
+    await cellar.save({ ...entry, count: entry.count + existing.count });
+    toast(`Pour removed, ${plural(existing.count, 'bottle')} back in the cellar`);
     onClose();
   };
 
   return (
-    <Sheet title="Log a pour" onClose={onClose}>
+    <Sheet title={existing ? 'Edit pour' : 'Log a pour'} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -266,8 +295,27 @@ function PourSheet({ entry, onClose }: { entry: CellarEntry; onClose: () => void
           </p>
         )}
         <button type="submit" className="btn btn-primary btn-block">
-          Save pour
+          {existing ? 'Save changes' : 'Save pour'}
         </button>
+        {existing &&
+          (confirmingDelete ? (
+            <div className="confirm-inline" role="group" aria-label="Confirm removal">
+              <p>Remove this pour? {plural(existing.count, 'bottle')} will go back in the cellar.</p>
+              <div className="button-row">
+                <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
+                  Keep it
+                </button>
+                <button type="button" className="btn btn-danger" onClick={() => void remove()}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-danger-quiet btn-block" onClick={() => setConfirmingDelete(true)}>
+              <Icon name="trash" size={20} />
+              Remove pour
+            </button>
+          ))}
       </form>
     </Sheet>
   );
