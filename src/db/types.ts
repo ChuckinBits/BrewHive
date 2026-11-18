@@ -64,6 +64,7 @@ export type EventType =
   | 'status'
   | 'moved'
   | 'ingredient'
+  | 'review'
   | 'note';
 
 type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' | 'ingredient' | 'method' | 'rating';
@@ -95,6 +96,7 @@ export const STABILIZE_METHODS = ['Chemical', 'Pasteurization', 'Filtration', 'N
 
 export function eventLabel(type: EventType): string {
   if (type === 'status') return 'Stage change';
+  if (type === 'review') return 'Batch rating';
   return EVENT_TYPES.find((t) => t.id === type)?.label ?? 'Note';
 }
 
@@ -112,6 +114,8 @@ export function eventTitle(event: BatchEvent): string {
   }
   if (event.type === 'moved') return event.place ? `Moved to ${event.place}` : 'Moved';
   if (event.type === 'ingredient') return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
+  if (event.type === 'tasting') return event.taster ? `Tasting by ${event.taster}` : 'Tasting';
+  if (event.type === 'review') return 'Batch rating';
   return eventLabel(event.type);
 }
 
@@ -194,9 +198,10 @@ export interface BatchEvent extends Base {
   /** For "status" entries: the stage it was in before. */
   fromStatus?: BatchStatus;
   /**
-   * For "status" entries made by tapping a stage button. Tapping another stage
-   * the same day replaces an automatic entry instead of adding a second one.
-   * Editing the entry by hand turns this off, so the entry is kept.
+   * For "status" entries made by tapping a stage button, and "review" entries
+   * made by setting the batch rating. Changing it again the same day replaces
+   * an automatic entry instead of adding a second one. Editing the entry by
+   * hand turns this off, so the entry is kept.
    */
   auto?: boolean;
   /** For "moved" entries: where the batch went, such as "Basement". */
@@ -211,8 +216,10 @@ export interface BatchEvent extends Base {
   amount?: string;
   /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */
   method?: string;
-  /** For "tasting" entries: a 0 to 10 rating, or null. */
+  /** For "tasting" and "review" entries: a 0 to 10 rating, or null. */
   rating?: number | null;
+  /** For "tasting" entries: who tasted it, if not the user. Optional. */
+  taster?: string;
 }
 
 export interface CellarEntry extends Base {

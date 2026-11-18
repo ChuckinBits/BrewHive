@@ -7,6 +7,7 @@ import {
   effectiveOG,
   gravityPoints,
   isFermentationComplete,
+  planReviewEntry,
   planStatusEntry,
   projectedAbv,
   stageWhenComplete,
@@ -271,4 +272,33 @@ test('marked complete, then stabilized and backsweetened in the same minute: the
   const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T10:00:40.000Z', ferments: true });
   near(effectiveOG(b, [stab, sweet]), 1.115);
   near(batchAbv(b, [stab, sweet]), 13.125);
+});
+
+// --- Batch rating entries (issue #8) -----------------------------------------
+
+const review = (id: string, date: string, rating: number, auto = true): BatchEvent => ({ ...base, id, batchId: 'b1', type: 'review', date, value: null, note: '', rating, auto });
+
+test('the first batch rating of the day adds an entry', () => {
+  assert.deepEqual(planReviewEntry([], 8, '2026-11-18T09:00'), { action: 'add', rating: 8 });
+});
+
+test('changing the rating again the same day updates that entry', () => {
+  assert.deepEqual(planReviewEntry([review('r1', '2026-11-18T09:00', 8)], 7.5, '2026-11-18T09:10'), { action: 'update', id: 'r1', rating: 7.5 });
+});
+
+test('a new day gets its own entry, so the rating can be tracked over time', () => {
+  assert.deepEqual(planReviewEntry([review('r1', '2026-11-17T09:00', 8)], 7, '2026-11-18T09:00'), { action: 'add', rating: 7 });
+});
+
+test('clearing removes only today\'s entry, never earlier ones', () => {
+  const events = [review('old', '2026-11-17T09:00', 8), review('today', '2026-11-18T09:00', 7)];
+  assert.deepEqual(planReviewEntry(events, null, '2026-11-18T09:30'), { action: 'remove', id: 'today' });
+  assert.deepEqual(planReviewEntry([review('old', '2026-11-17T09:00', 8)], null, '2026-11-18T09:30'), { action: 'none' });
+});
+
+test('tastings and rating entries edited by hand are never replaced', () => {
+  const tasting: BatchEvent = { ...base, id: 't1', batchId: 'b1', type: 'tasting', date: '2026-11-18T09:00', value: null, note: '', rating: 9 };
+  assert.deepEqual(planReviewEntry([tasting], 6, '2026-11-18T09:10'), { action: 'add', rating: 6 });
+  assert.deepEqual(planReviewEntry([review('r1', '2026-11-18T09:00', 8, false)], 6, '2026-11-18T09:10'), { action: 'add', rating: 6 });
+  assert.deepEqual(planReviewEntry([tasting], null, '2026-11-18T09:10'), { action: 'none' });
 });
