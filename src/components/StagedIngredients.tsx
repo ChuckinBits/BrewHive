@@ -5,11 +5,14 @@
 //   them on the timeline; ones already logged show when they went in.
 
 import { useId, useState } from 'react';
-import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientLine, type IngredientStage } from '../db/types.ts';
+import { categoriesOf, ingredients, useQuery, useSettings } from '../db/store.ts';
+import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientLine, type IngredientStage, type LibraryIngredient } from '../db/types.ts';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtDateShort, newId } from '../lib/format.ts';
+import { categoryOf, filterIngredients } from '../lib/library.ts';
 import { groupByStage, ingredientStageLabel, joinAmount, splitAmount } from '../lib/stages.ts';
-import { Field, Sheet } from './ui.tsx';
+import { CategoryChips, LibrarySheet } from '../screens/Ingredients.tsx';
+import { Field, Sheet, toast } from './ui.tsx';
 
 interface EditableProps {
   lines: IngredientLine[];
@@ -137,18 +140,56 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
   const [stage, setStage] = useState<IngredientStage>(line?.stage ?? (line ? 'primary' : defaultStage));
   const [error, setError] = useState('');
   const formId = useId();
+
+  // The ingredient library: pick from it, or save a new name to it.
+  const settings = useSettings();
+  const categories = categoriesOf(settings);
+  const library = useQuery(() => ingredients.list()) ?? [];
+  const [linkedId, setLinkedId] = useState(line?.ingredientId);
+  const [picking, setPicking] = useState(false);
+  const [pickCategory, setPickCategory] = useState<string | null>(null);
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
+  const [newCategory, setNewCategory] = useState('other');
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  // The library item this name is: the one picked, or one with exactly this name.
+  const match =
+    library.find((i) => i.id === linkedId && i.name.trim().toLowerCase() === name.trim().toLowerCase()) ??
+    library.find((i) => i.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const isNew = name.trim() !== '' && !match;
+  // A name already picked from the list shows the whole list again, to switch to another.
+  const suggestions = filterIngredients(library, match ? '' : name, pickCategory, categories);
+  // Offer to save a new name only once it's clearly new: nothing in the list matches, or the list is closed.
+  // (Typing "clov" on the way to Clover honey shouldn't ask.) Only a choice that was shown gets saved.
+  const offerSave = isNew && (!picking || suggestions.length === 0);
+
+  const pick = (item: LibraryIngredient) => {
+    setName(item.name);
+    setLinkedId(item.id);
+    // Its default unit, unless this line already has an amount in another unit.
+    if (!quantity.trim() || !line) setUnit(item.defaultUnit);
+    setPicking(false);
+    setError('');
+  };
   // Keep a unit from an older entry selectable even if it is not in the usual list.
   const units = INGREDIENT_UNITS.some((u) => u.id === unit) ? INGREDIENT_UNITS : [...INGREDIENT_UNITS, { id: unit, name: unit }];
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return setError('Enter the ingredient, such as Wildflower honey.');
+    let ingredientId = match?.id;
+    if (offerSave && saveToLibrary) {
+      // A new name, saved for next time with this line's unit as its default.
+      const saved = await ingredients.save({ name: name.trim(), category: newCategory, defaultUnit: unit, notes: '' });
+      ingredientId = saved.id;
+      toast(`${saved.name} added to your ingredients`);
+    }
     onSave({
       id: line?.id ?? newId(),
-      name: name.trim(),
+      name: match ? match.name : name.trim(),
       quantity: quantity.trim(),
       unit,
       amount: joinAmount(quantity, unit),
       stage,
+      ...(ingredientId ? { ingredientId } : {}),
     });
     onClose();
   };
@@ -160,12 +201,71 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
         className="form"
         onSubmit={(e) => {
           e.preventDefault();
-          save();
+          void save();
         }}
       >
         <Field label="Ingredient">
-          <input type="text" value={name} placeholder="Wildflower honey" autoFocus={!line} onChange={(e) => setName(e.target.value)} />
+          <input
+            type="text"
+            value={name}
+            placeholder="Wildflower honey"
+            autoFocus={!line}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={picking}
+            aria-controls={`${formId}-list`}
+            onFocus={() => setPicking(true)}
+            onClick={() => setPicking(true)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setPicking(true);
+              setError('');
+            }}
+          />
         </Field>
+        {picking && (
+          <div className="picker">
+            <CategoryChips categories={categories} value={pickCategory} onChange={setPickCategory} />
+            <ul className="picker-list" id={`${formId}-list`} role="listbox" aria-label="Your ingredients">
+              {suggestions.map((item) => (
+                <li key={item.id} role="option" aria-selected={item.id === match?.id}>
+                  <button type="button" className="picker-row" onClick={() => pick(item)}>
+                    <span className="library-name">{item.name}</span>
+                    <span className="muted">{categoryOf(item, categories).label}</span>
+                  </button>
+                </li>
+              ))}
+              {suggestions.length === 0 && <li className="muted picker-empty">{name.trim() ? `No ingredient called "${name.trim()}" yet.` : 'No ingredients here yet.'}</li>}
+            </ul>
+            <div className="picker-foot">
+              <button type="button" className="btn btn-quiet btn-small" onClick={() => setLibraryOpen(true)}>
+                Your ingredients
+              </button>
+              <button type="button" className="btn btn-quiet btn-small" onClick={() => setPicking(false)}>
+                Close list
+              </button>
+            </div>
+          </div>
+        )}
+        {offerSave && (
+          <div className="save-to-library">
+            <label className="check-field">
+              <input type="checkbox" checked={saveToLibrary} onChange={(e) => setSaveToLibrary(e.target.checked)} />
+              Save to my ingredients
+            </label>
+            {saveToLibrary && (
+              <Field label="Category">
+                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+          </div>
+        )}
         <div className="form-pair">
           <Field label="Quantity">
             <input type="text" inputMode="decimal" value={quantity} placeholder="3" onChange={(e) => setQuantity(e.target.value)} />
@@ -211,6 +311,7 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
           </button>
         )}
       </form>
+      {libraryOpen && <LibrarySheet onClose={() => setLibraryOpen(false)} />}
     </Sheet>
   );
 }

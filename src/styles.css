@@ -2186,3 +2186,67 @@ button.staged-row:hover {
   flex-direction: column;
   min-width: 0;
 }
+
+button.library-row {
+  width: 100%;
+  border-width: 0 0 1px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-list-sheet {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+/* --- Ingredient picker (v0.2, issue #32) -------------------------------- */
+
+.picker {
+  margin-top: -6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.picker-list {
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.picker-empty {
+  padding: 12px 8px;
+}
+
+.picker-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.save-to-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

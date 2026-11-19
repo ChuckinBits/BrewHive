@@ -173,7 +173,17 @@ export function IngredientFormScreen({ id, category }: { id?: string; category?:
   return <IngredientForm key={id ?? 'new'} item={loaded.item} all={loaded.all} categories={categories} startCategory={category} />;
 }
 
-function IngredientForm({ item, all, categories, startCategory }: { item: LibraryIngredient | null; all: LibraryIngredient[]; categories: IngredientCategory[]; startCategory?: string }) {
+interface FormProps {
+  item: LibraryIngredient | null;
+  all: LibraryIngredient[];
+  categories: IngredientCategory[];
+  startCategory?: string;
+  /** In a sheet: called when saved or deleted, instead of going back to the Ingredients screen. */
+  onDone?: () => void;
+}
+
+export function IngredientForm({ item, all, categories, startCategory, onDone }: FormProps) {
+  const done = () => (onDone ? onDone() : navigate('/ingredients'));
   const [name, setName] = useState(item?.name ?? '');
   const [category, setCategory] = useState(item?.category ?? (startCategory && categories.some((c) => c.id === startCategory) ? startCategory : 'other'));
   const [defaultUnit, setDefaultUnit] = useState(item?.defaultUnit ?? '');
@@ -196,12 +206,12 @@ function IngredientForm({ item, all, categories, startCategory }: { item: Librar
     if (duplicate) return setError(`${duplicate.name} is already in your ingredients.`);
     await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim() });
     toast(item ? 'Ingredient saved' : 'Added to your ingredients');
-    navigate('/ingredients');
+    done();
   };
 
   return (
     <>
-      <TopBar title={item ? 'Edit ingredient' : 'New ingredient'} back="/ingredients" />
+      {!onDone && <TopBar title={item ? 'Edit ingredient' : 'New ingredient'} back="/ingredients" />}
       <form
         className="form"
         onSubmit={(e) => {
@@ -245,7 +255,7 @@ function IngredientForm({ item, all, categories, startCategory }: { item: Librar
         </button>
       </form>
 
-      {item && usedIn && (
+      {item && usedIn && !onDone && (
         <section className="card used-in">
           <h2>Used in</h2>
           {usedIn.recipes.length + usedIn.batches.length === 0 ? (
@@ -292,10 +302,53 @@ function IngredientForm({ item, all, categories, startCategory }: { item: Librar
           onConfirm={async () => {
             await ingredients.remove(item.id);
             toast('Ingredient deleted');
-            navigate('/ingredients');
+            done();
           }}
         />
       )}
     </>
+  );
+}
+
+/**
+ * The library in a sheet, opened from the ingredient sheet so the batch or recipe being edited
+ * isn't left behind. Tap an ingredient to edit it, or add one.
+ */
+export function LibrarySheet({ onClose }: { onClose: () => void }) {
+  const settings = useSettings();
+  const categories = categoriesOf(settings);
+  const all = useQuery(() => ingredients.list()) ?? [];
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LibraryIngredient | 'new' | null>(null);
+  const shown = filterIngredients(all, search, category, categories);
+
+  if (editing) {
+    return (
+      <Sheet title={editing === 'new' ? 'New ingredient' : 'Edit ingredient'} onClose={() => setEditing(null)}>
+        <IngredientForm item={editing === 'new' ? null : editing} all={all} categories={categories} startCategory={category ?? undefined} onDone={() => setEditing(null)} />
+      </Sheet>
+    );
+  }
+  return (
+    <Sheet title="Your ingredients" onClose={onClose}>
+      <input type="search" className="search" placeholder="Search ingredients" aria-label="Search your ingredients" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <CategoryChips categories={categories} value={category} onChange={setCategory} />
+      <ul className="library-list library-list-sheet">
+        {shown.map((item) => (
+          <li key={item.id}>
+            <button type="button" className="library-row" onClick={() => setEditing(item)}>
+              <span className="library-name">{item.name}</span>
+              <span className="muted">{categoryOf(item, categories).label}</span>
+              <Icon name="edit" size={18} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="btn btn-block" onClick={() => setEditing('new')}>
+        <Icon name="plus" size={20} />
+        Add ingredient
+      </button>
+    </Sheet>
   );
 }
