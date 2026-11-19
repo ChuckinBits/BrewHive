@@ -2,18 +2,18 @@
 
 import { useState } from 'react';
 import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
-import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings } from '../db/types.ts';
+import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
-import { StyleField } from '../components/StyleField.tsx';
+import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
-import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, toast } from '../components/ui.tsx';
-import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
+import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { abv } from '../lib/calc.ts';
-import { fmtDateShort, fmtPercent, fmtSG, fmtVolume, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
 
@@ -41,8 +41,8 @@ export function RecipesScreen() {
     return {
       key: recipe.id,
       to: `/recipes/${recipe.id}`,
-      visual: <Book icon={recipe.icon} color={recipe.color} />,
-      icon: recipe.icon,
+      visual: <Book icon={recipe.icon} extraIcons={recipe.extraIcons} color={recipe.color} />,
+      icons: iconsOf(recipe),
       title: recipe.name,
       subtitle: recipe.style || 'Mead',
       meta: est != null ? `~${fmtPercent(est, 0)}` : undefined,
@@ -108,10 +108,10 @@ export function RecipeDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={recipe.rating} reserve />
-        <Book icon={recipe.icon} color={recipe.color} size={168} />
+        <Book icon={recipe.icon} extraIcons={recipe.extraIcons} color={recipe.color} size={168} />
         <p className="hero-sub">
           {recipe.style || 'Mead'}
-          {recipe.batchSizeL != null && ` · ${fmtVolume(recipe.batchSizeL, settings.volumeUnit)}`}
+          {recipe.batchSizeL != null && ` · ${fmtVolumeBoth(recipe.batchSizeL, recipe.volumeUnit, settings.volumeUnit)}`}
         </p>
         {data.source && recipe.updatedFromAt && (
           <p className="hero-note">
@@ -206,11 +206,13 @@ interface Draft {
   beverageType: BeverageType;
   style: string;
   batchSize: string;
+  volumeUnit: VolumeUnit;
   targetOG: string;
   targetFG: string;
   ingredients: IngredientLine[];
   steps: string;
   icon: string;
+  extraIcons: string[];
   color: string;
   notes: string;
 }
@@ -231,12 +233,14 @@ export function RecipeFormScreen({ id }: { id?: string }) {
           name: '',
           beverageType: 'mead',
           style: '',
-          batchSize: volumeToInput(3.785411784, volumeUnit),
+          batchSize: volumeToInput(volumeUnit === 'gal' ? 3.785411784 : 4, volumeUnit),
+          volumeUnit,
           targetOG: '',
           targetFG: '',
           ingredients: [],
           steps: '',
           icon: DEFAULT_FLAVOR,
+          extraIcons: [],
           color: getFlavor(DEFAULT_FLAVOR).color,
           notes: '',
         },
@@ -250,12 +254,14 @@ export function RecipeFormScreen({ id }: { id?: string }) {
         name: recipe.name,
         beverageType: recipe.beverageType,
         style: recipe.style,
-        batchSize: volumeToInput(recipe.batchSizeL, volumeUnit),
+        batchSize: volumeToInput(recipe.batchSizeL, recipe.volumeUnit ?? volumeUnit),
+        volumeUnit: recipe.volumeUnit ?? volumeUnit,
         targetOG: recipe.targetOG != null ? fmtSG(recipe.targetOG) : '',
         targetFG: recipe.targetFG != null ? fmtSG(recipe.targetFG) : '',
         ingredients: recipe.ingredients,
         steps: recipe.steps.join('\n'),
         icon: recipe.icon,
+        extraIcons: recipe.extraIcons ?? [],
         color: recipe.color,
         notes: recipe.notes,
       },
@@ -282,6 +288,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
   // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
   const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const naming = useNameAndStyle(draft, set);
   const isNew = !loaded.existing;
 
   const save = async () => {
@@ -302,7 +309,8 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
       name,
       beverageType: draft.beverageType,
       style: draft.style.trim(),
-      batchSizeL: volumeFromInput(draft.batchSize, settings.volumeUnit),
+      batchSizeL: volumeFromInput(draft.batchSize, draft.volumeUnit),
+      volumeUnit: draft.volumeUnit,
       targetOG,
       targetFG,
       ingredients: cleanIngredients(draft.ingredients),
@@ -311,6 +319,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
         .map((step) => step.trim())
         .filter(Boolean),
       icon: draft.icon,
+      extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
     });
@@ -329,14 +338,14 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
         }}
       >
         <Field label="Name">
-          <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => set({ name: e.target.value })} />
+          <input type="text" value={draft.name} placeholder="Traditional Show Mead" autoFocus={isNew} onChange={(e) => naming.onName(e.target.value)} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+        <IconPicker icon={draft.icon} extraIcons={draft.extraIcons} color={draft.color} onChange={naming.onIcon} />
 
         <div className="form-pair">
           <Field label="Type">
-            <select value={draft.beverageType} onChange={(e) => set({ beverageType: e.target.value as BeverageType })}>
+            <select value={draft.beverageType} onChange={(e) => naming.onType(e.target.value as BeverageType)}>
               {BEVERAGE_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
@@ -344,12 +353,17 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
               ))}
             </select>
           </Field>
-          <StyleField value={draft.style} onChange={(style) => set({ style })} />
+          <StyleField value={draft.style} type={draft.beverageType} onChange={naming.onStyle} />
         </div>
 
-        <Field label={`Batch size (${settings.volumeUnit})`}>
-          <input type="text" inputMode="decimal" value={draft.batchSize} onChange={(e) => set({ batchSize: e.target.value })} />
-        </Field>
+        <UnitField
+          label="Batch size"
+          value={draft.batchSize}
+          onChange={(batchSize) => set({ batchSize })}
+          unit={draft.volumeUnit}
+          units={VOLUME_UNITS}
+          onUnit={(volumeUnit) => set({ volumeUnit })}
+        />
 
         <div className="form-pair">
           <Field label="Target OG">

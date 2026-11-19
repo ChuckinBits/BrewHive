@@ -152,6 +152,51 @@ export function Segmented<T extends string>({ label, value, options, onChange, i
   );
 }
 
+interface UnitFieldProps<T extends string> {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  unit: T;
+  units: { id: T; label: string; name: string }[];
+  onUnit: (unit: T) => void;
+  placeholder?: string;
+  hint?: ReactNode;
+  autoFocus?: boolean;
+}
+
+/** A number with a small unit switch beside it, such as gal / L or °F / °C. */
+export function UnitField<T extends string>({ label, value, onChange, unit, units, onUnit, placeholder, hint, autoFocus }: UnitFieldProps<T>) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="unit-input">
+        <input id={id} type="text" inputMode="decimal" value={value} placeholder={placeholder} autoFocus={autoFocus} onChange={(e) => onChange(e.target.value)} />
+        <div className="unit-switch" role="group" aria-label={`${label} unit`}>
+          {units.map((u) => (
+            <button key={u.id} type="button" aria-pressed={u.id === unit} aria-label={u.name} className={u.id === unit ? 'unit-on' : undefined} onClick={() => onUnit(u.id)}>
+              {u.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {hint && <span className="field-hint">{hint}</span>}
+    </div>
+  );
+}
+
+export const VOLUME_UNITS = [
+  { id: 'gal' as const, label: 'gal', name: 'Gallons' },
+  { id: 'L' as const, label: 'L', name: 'Liters' },
+];
+
+export const TEMP_UNITS = [
+  { id: 'F' as const, label: '°F', name: 'Fahrenheit' },
+  { id: 'C' as const, label: '°C', name: 'Celsius' },
+];
+
 // --- Sheets (dialogs that slide up from the bottom) -------------------------
 
 interface SheetProps {
@@ -196,19 +241,22 @@ interface ConfirmProps {
   title: string;
   message: string;
   confirmLabel: string;
+  /** "danger" (the default) for deleting; "normal" for actions that can be undone. */
+  tone?: 'danger' | 'normal';
+  cancelLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-export function ConfirmSheet({ title, message, confirmLabel, onConfirm, onClose }: ConfirmProps) {
+export function ConfirmSheet({ title, message, confirmLabel, tone = 'danger', cancelLabel = 'Cancel', onConfirm, onClose }: ConfirmProps) {
   return (
     <Sheet title={title} onClose={onClose}>
       <p>{message}</p>
       <div className="button-row">
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {cancelLabel}
         </button>
-        <button type="button" className="btn btn-danger" onClick={onConfirm}>
+        <button type="button" className={tone === 'danger' ? 'btn btn-danger' : 'btn btn-primary'} onClick={onConfirm}>
           {confirmLabel}
         </button>
       </div>

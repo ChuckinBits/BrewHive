@@ -37,3 +37,48 @@ export function FlavorIcon({ id, size = 40, x, y }: Props) {
     />
   );
 }
+
+/** How many icons a batch, recipe or bottle can show. The first is the main one. */
+export const MAX_ICONS = 3;
+
+/** A record's icons, main first. */
+export function iconsOf(record: { icon: string; extraIcons?: string[] }): string[] {
+  return [record.icon, ...(record.extraIcons ?? [])].slice(0, MAX_ICONS);
+}
+
+interface StackProps {
+  icons: string[];
+  size?: number;
+  x?: number;
+  y?: number;
+}
+
+/**
+ * The main icon in front, with the 2nd peeking out behind it on the left and
+ * the 3rd on the right. With one icon it's just that icon. For use inside an SVG.
+ */
+export function FlavorStack({ icons, size = 40, x = 0, y = 0 }: StackProps) {
+  const [main, left, right] = icons;
+  if (!left) return <FlavorIcon id={main} size={size} x={x} y={y} />;
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  // The main icon keeps its full size and place; the others sit behind it and peek out.
+  const small = size * 0.62;
+  const side = size * 0.42;
+  return (
+    <g>
+      <FlavorIcon id={left} size={small} x={cx - side - small / 2} y={cy - size * 0.1 - small / 2} />
+      {right && <FlavorIcon id={right} size={small} x={cx + side - small / 2} y={cy - size * 0.1 - small / 2} />}
+      <FlavorIcon id={main} size={size} x={x} y={y} />
+    </g>
+  );
+}
+
+/** FlavorStack on its own, for use in HTML (list rows, the picker). */
+export function FlavorIcons({ icons, size = 40 }: { icons: string[]; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" overflow="visible" aria-hidden="true">
+      <FlavorStack icons={icons} size={48} />
+    </svg>
+  );
+}

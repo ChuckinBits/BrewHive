@@ -4,15 +4,18 @@ import { useState } from 'react';
 import { batches, events, usePrefs, useQuery } from '../db/store.ts';
 import { loadSampleData } from '../db/sample.ts';
 import { BATCH_STATUSES, type Batch, type BatchEvent } from '../db/types.ts';
-import { Carboy } from '../components/Vessels.tsx';
+import { Book, Carboy } from '../components/Vessels.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { EmptyState, Fab, TopBar, toast } from '../components/ui.tsx';
 import { batchAbv, fillLevel, isActive } from '../lib/batch.ts';
 import { daysBetween } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, today } from '../lib/format.ts';
+import { iconsOf } from '../icons/FlavorIcon.tsx';
 import { Link } from '../lib/router.tsx';
 
-type Filter = 'active' | 'bottled' | 'all';
+type Filter = 'active' | 'bottled' | 'archived' | 'all';
+
+const FILTER_LABELS: Record<Filter, string> = { active: 'Active', bottled: 'Bottled', archived: 'Archived', all: 'All' };
 
 const SORTS = [
   { id: 'newest', label: 'Newest' },
@@ -22,6 +25,12 @@ const SORTS = [
 ];
 
 const statusOrder = (b: Batch) => BATCH_STATUSES.findIndex((s) => s.id === b.status);
+
+/** A batch's shelf artwork: a carboy, or a book spine once archived. */
+export function BatchArt({ batch, size }: { batch: Batch; size?: number }) {
+  if (batch.status === 'archived') return <Book icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} size={size} />;
+  return <Carboy icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
+}
 
 export function statusLabel(batch: Batch): string {
   return BATCH_STATUSES.find((s) => s.id === batch.status)?.label ?? batch.status;
@@ -51,16 +60,20 @@ export function BatchesScreen() {
     eventsByBatch.set(event.batchId, list);
   }
 
+  const inFilter = (b: Batch, f: Filter) =>
+    f === 'all' ? true : f === 'active' ? isActive(b.status) : f === 'bottled' ? b.status === 'bottled' : b.status === 'archived';
   const counts = {
-    active: data.batches.filter((b) => isActive(b.status)).length,
-    bottled: data.batches.filter((b) => !isActive(b.status)).length,
+    active: data.batches.filter((b) => inFilter(b, 'active')).length,
+    bottled: data.batches.filter((b) => inFilter(b, 'bottled')).length,
+    archived: data.batches.filter((b) => inFilter(b, 'archived')).length,
     all: data.batches.length,
   };
   // Fall back to "all" when the chosen filter would hide every batch.
-  const shown: Filter = counts[filter] === 0 && counts.all > 0 ? 'all' : filter;
+  // With nothing active, open on everything rather than an empty shelf.
+  const shown: Filter = filter === 'active' && counts.active === 0 && counts.all > 0 ? 'all' : filter;
 
   const visible = data.batches
-    .filter((b) => (shown === 'all' ? true : shown === 'active' ? isActive(b.status) : !isActive(b.status)))
+    .filter((b) => inFilter(b, shown))
     .sort((a, b) => {
       if (sort === 'rating') return byRating(a, b);
       if (sort === 'name') return a.name.localeCompare(b.name);
@@ -73,8 +86,8 @@ export function BatchesScreen() {
     return {
       key: batch.id,
       to: `/batches/${batch.id}`,
-      visual: <Carboy icon={batch.icon} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} />,
-      icon: batch.icon,
+      visual: <BatchArt batch={batch} />,
+      icons: iconsOf(batch),
       title: batch.name,
       subtitle: batchSubtitle(batch),
       meta: abv != null && batch.status !== 'planned' ? fmtPercent(abv) : undefined,
@@ -109,7 +122,7 @@ export function BatchesScreen() {
         <>
           <div className="toolbar">
             <div className="chips" role="group" aria-label="Filter batches">
-              {(['active', 'bottled', 'all'] as const).map((id) => (
+              {(['active', 'bottled', 'archived', 'all'] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -117,13 +130,17 @@ export function BatchesScreen() {
                   aria-pressed={id === shown}
                   onClick={() => setFilter(id)}
                 >
-                  {id === 'active' ? 'Active' : id === 'bottled' ? 'Bottled' : 'All'} <span className="chip-count">{counts[id]}</span>
+                  {FILTER_LABELS[id]} <span className="chip-count">{counts[id]}</span>
                 </button>
               ))}
             </div>
             <SortSelect value={sort} options={SORTS} onChange={setSort} />
           </div>
-          <Collection view={view} items={items} />
+          {items.length === 0 ? (
+            <p className="muted list-empty">No {FILTER_LABELS[shown].toLowerCase()} batches.</p>
+          ) : (
+            <Collection view={view} items={items} />
+          )}
         </>
       )}
 

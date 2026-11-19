@@ -2,7 +2,7 @@
 // Both show the same items, with the icon prominent and the rating on top.
 
 import type { ReactNode } from 'react';
-import { FlavorIcon } from '../icons/FlavorIcon.tsx';
+import { FlavorIcons } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { Link } from '../lib/router.tsx';
 import type { ViewMode } from '../db/types.ts';
@@ -13,7 +13,8 @@ export interface ShelfEntry {
   to: string;
   /** A Carboy, Book or Bottle. */
   visual: ReactNode;
-  icon: string;
+  /** Main icon first. */
+  icons: string[];
   title: string;
   subtitle?: string;
   /** Extra text at the right of a list row, such as "x 6". */
@@ -67,7 +68,7 @@ export function ItemList({ items }: { items: ShelfEntry[] }) {
         <li key={item.key}>
           <Link to={item.to} className="item-row">
             <span className="icon-tile">
-              <FlavorIcon id={item.icon} size={38} />
+              <FlavorIcons icons={item.icons} size={38} />
             </span>
             <span className="item-text">
               <strong>{item.title}</strong>

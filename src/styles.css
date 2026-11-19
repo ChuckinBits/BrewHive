@@ -1836,3 +1836,206 @@ button.staged-row:hover {
   color: var(--ink);
   font-size: 14px;
 }
+
+/* --- Archived batches (issue #17) --------------------------------------- */
+
+.chips {
+  flex-wrap: wrap;
+}
+
+.archived-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.archived-note > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.list-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+
+.list-empty .btn {
+  margin-top: 8px;
+}
+
+/* --- Bottling in several sizes (issue #20) ------------------------------ */
+
+.bottle-line {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.bottle-line-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.bottle-line-remove {
+  align-self: flex-start;
+}
+
+.bottle-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.bottle-total .field-hint {
+  font-weight: 400;
+}
+
+/* --- Per-record units (issue #14) --------------------------------------- */
+
+.unit-input {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.unit-input input {
+  flex: 1;
+  min-width: 0;
+}
+
+.unit-switch {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.unit-switch button {
+  min-width: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.unit-switch button.unit-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+/* --- Multiple icons and a custom color (issue #16) ---------------------- */
+
+.picked-icons {
+  margin-bottom: 14px;
+}
+
+.picked-icons ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.picked-icons li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.picked-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.picked-number,
+.icon-choice-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent, #e8a33a);
+  color: #2a1f14;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.icon-choice {
+  position: relative;
+}
+
+.icon-choice-number {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.icon-choice:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sheet-done {
+  position: sticky;
+  bottom: 0;
+  margin-top: 14px;
+}
+
+.swatch-custom {
+  display: inline-block;
+  background-image: conic-gradient(#e5484d, #f2a93b, #efd27a, #8bc34a, #3fa7d6, #7b3f8e, #e5484d);
+}
+
+.swatch-custom-set {
+  background-image: none;
+  box-shadow: inset 0 0 0 3px transparent;
+  outline: 2px solid transparent;
+}
+
+.swatch-custom-set::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: conic-gradient(#e5484d, #f2a93b, #efd27a, #8bc34a, #3fa7d6, #7b3f8e, #e5484d);
+  -webkit-mask: radial-gradient(circle, transparent 15px, #000 15.5px);
+  mask: radial-gradient(circle, transparent 15px, #000 15.5px);
+}
+
+.swatch-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}

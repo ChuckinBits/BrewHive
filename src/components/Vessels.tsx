@@ -4,7 +4,7 @@
 // on a shelf.
 
 import { useId } from 'react';
-import { FlavorIcon } from '../icons/FlavorIcon.tsx';
+import { FlavorStack } from '../icons/FlavorIcon.tsx';
 
 const W = 96;
 const H = 132;
@@ -13,6 +13,8 @@ const LABEL_INK = '#2A1F14';
 
 interface Common {
   icon: string;
+  /** Up to two more icons, shown smaller behind the main one. */
+  extraIcons?: string[];
   color: string;
   /** Height in pixels. Width follows. */
   size?: number;
@@ -27,7 +29,7 @@ interface CarboyProps extends Common {
   fermenting?: boolean;
 }
 
-export function Carboy({ icon, color, level, fermenting = false, size = 118 }: CarboyProps) {
+export function Carboy({ icon, extraIcons = [], color, level, fermenting = false, size = 118 }: CarboyProps) {
   const clip = useId();
   const top = 124 - Math.max(0, Math.min(1, level)) * 84;
   return (
@@ -64,12 +66,12 @@ export function Carboy({ icon, color, level, fermenting = false, size = 118 }: C
       <path d="M18 70V106" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" fill="none" />
       {/* Label with the flavor icon */}
       <circle cx="48" cy="86" r="21" fill={LABEL_FILL} stroke={LABEL_INK} strokeWidth="1.5" />
-      <FlavorIcon id={icon} size={30} x={33} y={71} />
+      <FlavorStack icons={[icon, ...extraIcons]} size={30} x={33} y={71} />
     </svg>
   );
 }
 
-export function Book({ icon, color, size = 118 }: Common) {
+export function Book({ icon, extraIcons = [], color, size = 118 }: Common) {
   return (
     <svg className="vessel" width={(size * W) / H} height={size} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
       {/* Pages peek out behind the cover */}
@@ -79,7 +81,7 @@ export function Book({ icon, color, size = 118 }: Common) {
       <rect className="vessel-line" x="14" y="18" width="60" height="106" rx="4" fill={color} strokeWidth="2" />
       <path d="M18 18h5v106h-5a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4z" fill="#000000" opacity="0.2" />
       <circle cx="47" cy="60" r="21" fill={LABEL_FILL} stroke={LABEL_INK} strokeWidth="1.5" />
-      <FlavorIcon id={icon} size={30} x={32} y={45} />
+      <FlavorStack icons={[icon, ...extraIcons]} size={30} x={32} y={45} />
       <rect x="32" y="93" width="30" height="3.5" rx="1.75" fill="#FFFFFF" opacity="0.6" />
       <rect x="38" y="101" width="18" height="3.5" rx="1.75" fill="#FFFFFF" opacity="0.4" />
     </svg>
@@ -93,7 +95,7 @@ interface BottleProps extends Common {
   empty?: boolean;
 }
 
-export function Bottle({ icon, color, empty = false, size = 118 }: BottleProps) {
+export function Bottle({ icon, extraIcons = [], color, empty = false, size = 118 }: BottleProps) {
   const clip = useId();
   return (
     <svg className="vessel" width={(size * W) / H} height={size} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
@@ -112,7 +114,7 @@ export function Bottle({ icon, color, empty = false, size = 118 }: BottleProps) 
       <rect className="vessel-line" x="40.5" y="4" width="15" height="9" rx="2.5" fill="#F2A93B" strokeWidth="1.75" />
       <path d="M35 62V84" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="2.5" strokeLinecap="round" fill="none" />
       <rect x="31.5" y="68" width="33" height="38" rx="5" fill={LABEL_FILL} stroke={LABEL_INK} strokeWidth="1.5" />
-      <FlavorIcon id={icon} size={27} x={34.5} y={73.5} />
+      <FlavorStack icons={[icon, ...extraIcons]} size={27} x={34.5} y={73.5} />
     </svg>
   );
 }

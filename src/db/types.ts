@@ -33,9 +33,63 @@ export const MEAD_STYLES: { name: string; about: string }[] = [
   { name: 'Sack mead', about: 'A strong, rich mead made with extra honey. Usually sweet.' },
 ];
 
-export function styleAbout(style: string): string | undefined {
+export const BEER_STYLES: { name: string; about: string }[] = [
+  { name: 'Ale', about: 'Top-fermented at warmer temperatures, often fruity and full.' },
+  { name: 'Lager', about: 'Fermented cool and conditioned cold, for a clean, crisp beer.' },
+  { name: 'IPA', about: 'A strong, heavily hopped pale ale, bitter and aromatic.' },
+  { name: 'Pale ale', about: 'A balanced, hop-forward ale made with pale malt.' },
+  { name: 'Stout', about: 'A dark, roasty ale, with notes of coffee and chocolate.' },
+  { name: 'Porter', about: 'A dark ale, a little lighter and less roasty than a stout.' },
+  { name: 'Wheat beer', about: 'Brewed with plenty of wheat, usually hazy and light.' },
+  { name: 'Sour', about: 'Deliberately tart, soured with bacteria or wild yeast.' },
+  { name: 'Saison', about: 'A dry, spicy, highly carbonated farmhouse ale.' },
+  { name: 'Amber/Red ale', about: 'A malty ale with caramel flavors and a reddish color.' },
+  { name: 'Brown ale', about: 'A malty, nutty ale, mild on the hops.' },
+  { name: 'Pilsner', about: 'A pale, crisp lager with a firm hop bite.' },
+];
+
+export const WINE_STYLES: { name: string; about: string }[] = [
+  { name: 'Red', about: 'Fermented with the grape skins for color and tannin.' },
+  { name: 'White', about: 'Made from pressed juice without the skins.' },
+  { name: 'Rosé', about: 'Only brief contact with red grape skins, for a pink wine.' },
+  { name: 'Sparkling', about: 'Carbonated, usually by a second fermentation in the bottle.' },
+  { name: 'Dessert', about: 'A sweet wine, often strong, served with or as dessert.' },
+  { name: 'Fruit wine', about: 'Wine made from fruit other than grapes.' },
+  { name: 'Country wine', about: 'Wine made from flowers, vegetables, herbs or grains.' },
+];
+
+/** The styles offered for a type: a list, free text ("free"), or no Style field at all ("none"). */
+export function stylesFor(type: BeverageType): { name: string; about: string }[] | 'free' | 'none' {
+  switch (type) {
+    case 'mead':
+      return MEAD_STYLES;
+    case 'beer':
+      return BEER_STYLES;
+    case 'wine':
+      return WINE_STYLES;
+    case 'other':
+      return 'free';
+    default:
+      return 'none';
+  }
+}
+
+const ALL_LISTED = [...MEAD_STYLES, ...BEER_STYLES, ...WINE_STYLES];
+
+/** After switching type: the style to keep. Styles from another type's list are cleared; custom ones stay. */
+export function styleForType(style: string, type: BeverageType): string {
+  const styles = stylesFor(type);
+  if (styles === 'none') return '';
+  if (styles === 'free') return style;
   const wanted = style.trim().toLowerCase();
-  return MEAD_STYLES.find((s) => s.name.toLowerCase() === wanted)?.about;
+  if (styles.some((s) => s.name.toLowerCase() === wanted)) return style;
+  return ALL_LISTED.some((s) => s.name.toLowerCase() === wanted) ? '' : style;
+}
+
+export function styleAbout(style: string, type: BeverageType = 'mead'): string | undefined {
+  const wanted = style.trim().toLowerCase();
+  const styles = stylesFor(type);
+  return (Array.isArray(styles) ? styles : MEAD_STYLES).find((s) => s.name.toLowerCase() === wanted)?.about;
 }
 
 export type BatchStatus = 'planned' | 'primary' | 'secondary' | 'aging' | 'bottled' | 'archived';
@@ -108,6 +162,8 @@ export function statusLabel(status: BatchStatus): string {
 export function eventTitle(event: BatchEvent): string {
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
+    if (event.toStatus === 'archived') return 'Archived';
+    if (event.fromStatus === 'archived') return `Unarchived, back to ${statusLabel(event.toStatus ?? 'bottled')}`;
     if (event.toStatus) return `Moved to ${statusLabel(event.toStatus)}`;
     // Entries made before stages were stored keep their wording in the note.
     return event.note || 'Stage change';
@@ -176,17 +232,24 @@ export interface IngredientLine {
   stage?: IngredientStage;
 }
 
+export type VolumeUnit = 'gal' | 'L';
+export type TempUnit = 'F' | 'C';
+
 export interface Recipe extends Base {
   name: string;
   beverageType: BeverageType;
   style: string;
   batchSizeL: number | null;
+  /** The unit the batch size was entered in. Missing means the default from settings. */
+  volumeUnit?: VolumeUnit;
   targetOG: number | null;
   targetFG: number | null;
   ingredients: IngredientLine[];
   steps: string[];
   /** Flavor icon id, see src/icons/flavors.ts. */
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   /** Liquid color, a hex string. */
   color: string;
   /** 0 to 10, or null when not rated. */
@@ -209,6 +272,8 @@ export interface Batch extends Base {
   /** yyyy-mm-dd */
   startDate: string;
   volumeL: number | null;
+  /** The unit the volume was entered in. Missing means the default from settings. */
+  volumeUnit?: VolumeUnit;
   og: number | null;
   /**
    * True once fermentation is finished. Until then the batch shows a potential
@@ -225,8 +290,14 @@ export interface Batch extends Base {
   fg: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
+  /** The stage the batch was in when it was archived, so Unarchive can put it back. */
+  statusBeforeArchive?: BatchStatus | null;
+  /** "Not now" was chosen when the last bottle was poured; cleared when bottles come back. */
+  archivePromptDismissed?: boolean;
   ingredients: IngredientLine[];
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   color: string;
   rating: number | null;
   notes: string;
@@ -234,6 +305,8 @@ export interface Batch extends Base {
 
 export interface BatchEvent extends Base {
   batchId: string;
+  /** For temperature entries: the unit it was entered in. Missing means the default from settings. */
+  tempUnit?: TempUnit;
   type: EventType;
   /** Local date-time, yyyy-mm-ddThh:mm */
   date: string;
@@ -285,6 +358,8 @@ export interface CellarEntry extends Base {
   location: string;
   abv: number | null;
   icon: string;
+  /** Up to two more icons shown behind the main one, in order. */
+  extraIcons?: string[];
   color: string;
   rating: number | null;
   notes: string;

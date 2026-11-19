@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { batches, cellar, pours, usePrefs, useQuery } from '../db/store.ts';
-import { POUR_TYPES, type CellarEntry, type PourType } from '../db/types.ts';
+import { POUR_TYPES, type Batch, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
+import { archiveBatch } from '../db/actions.ts';
+import { CELLAR_FILTERS, inCellarFilter, shouldAskToArchive, shouldResetArchivePrompt, type CellarFilter } from '../lib/cellar.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Bottle } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Segmented, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
-import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
+import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, parseNum, plural, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
@@ -31,9 +33,13 @@ function readiness(entry: CellarEntry): string {
 export function CellarScreen() {
   const { view, sort, setView, setSort } = usePrefs('cellar', 'newest');
   const list = useQuery(() => cellar.list());
+  // Always opens on what is still in the cellar.
+  const [filter, setFilter] = useState<CellarFilter>('in');
   if (!list) return <TopBar title="Cellar" />;
 
-  const sorted = [...list].sort((a, b) => {
+  const counts = Object.fromEntries(CELLAR_FILTERS.map((f) => [f.id, list.filter((e) => inCellarFilter(e, f.id)).length])) as Record<CellarFilter, number>;
+
+  const sorted = list.filter((e) => inCellarFilter(e, filter)).sort((a, b) => {
     // Empty entries always go last.
     if ((a.count === 0) !== (b.count === 0)) return a.count === 0 ? 1 : -1;
     if (sort === 'rating') return byRating(a, b);
@@ -47,8 +53,8 @@ export function CellarScreen() {
   const items: ShelfEntry[] = sorted.map((entry) => ({
     key: entry.id,
     to: `/cellar/${entry.id}`,
-    visual: <Bottle icon={entry.icon} color={entry.color} empty={entry.count === 0} />,
-    icon: entry.icon,
+    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} />,
+    icons: iconsOf(entry),
     title: entry.name,
     subtitle: view === 'shelf' ? `${entry.count} × ${fmtBottle(entry.bottleSizeMl)}` : `${fmtBottle(entry.bottleSizeMl)} · ${readiness(entry)}`,
     meta: `× ${entry.count}`,
@@ -71,10 +77,34 @@ export function CellarScreen() {
       ) : (
         <>
           <div className="toolbar">
+            <div className="chips" role="group" aria-label="Filter cellar">
+              {CELLAR_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={f.id === filter ? 'chip chip-on' : 'chip'}
+                  aria-pressed={f.id === filter}
+                  onClick={() => setFilter(f.id)}
+                >
+                  {f.label} <span className="chip-count">{counts[f.id]}</span>
+                </button>
+              ))}
+            </div>
             <span className="muted">{plural(total, 'bottle')}</span>
             <SortSelect value={sort} options={SORTS} onChange={setSort} />
           </div>
-          <Collection view={view} items={items} />
+          {items.length > 0 ? (
+            <Collection view={view} items={items} />
+          ) : filter === 'in' ? (
+            <div className="list-empty">
+              <p>Every bottle has been enjoyed.</p>
+              <button type="button" className="btn btn-small" onClick={() => setFilter('empty')}>
+                See empty bottles
+              </button>
+            </div>
+          ) : (
+            <p className="muted list-empty">No empty bottles yet.</p>
+          )}
           <Fab to="/cellar/new" label="Add bottles" />
         </>
       )}
@@ -93,7 +123,9 @@ export function CellarDetailScreen({ id }: { id: string }) {
     };
   }, [id]);
   const [pouring, setPouring] = useState(false);
+  const [editingPour, setEditingPour] = useState<Pour | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [askArchive, setAskArchive] = useState<Batch | null>(null);
 
   if (!data) return <TopBar title="Cellar" back="/cellar" />;
   const { entry } = data;
@@ -117,7 +149,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
       <section className="hero">
         <RatingBadge rating={entry.rating} reserve />
         <span className={isReady(entry) ? 'shelf-glow' : undefined}>
-          <Bottle icon={entry.icon} color={entry.color} empty={entry.count === 0} size={168} />
+          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} size={168} />
         </span>
         <p className="hero-sub">
           {entry.style || 'Mead'} · {readiness(entry)}
@@ -174,23 +206,31 @@ export function CellarDetailScreen({ id }: { id: string }) {
           <p className="muted">No bottles opened yet.</p>
         ) : (
           <ol className="timeline">
-            {data.pours.map((pour) => (
-              <li key={pour.id}>
-                <span className="timeline-icon">
-                  <Icon name="glass" size={20} />
-                </span>
-                <div className="timeline-body">
-                  <div className="timeline-head">
-                    <strong>
-                      {POUR_TYPES.find((t) => t.id === pour.type)?.label} {plural(pour.count, 'bottle')}
-                    </strong>
-                    <time dateTime={pour.date}>{fmtDateShort(pour.date)}</time>
-                  </div>
-                  {pour.note && <p>{pour.note}</p>}
-                </div>
-                <RatingBadge rating={pour.rating} />
-              </li>
-            ))}
+            {data.pours.map((pour) => {
+              const title = `${POUR_TYPES.find((t) => t.id === pour.type)?.label} ${plural(pour.count, 'bottle')}`;
+              return (
+                <li key={pour.id} className="timeline-row">
+                  <button type="button" className="timeline-entry" onClick={() => setEditingPour(pour)} aria-label={`Edit ${title}, ${fmtDate(pour.date)}`}>
+                    <span className="timeline-icon">
+                      <Icon name="glass" size={20} />
+                    </span>
+                    <span className="timeline-body">
+                      <span className="timeline-head">
+                        <strong className="timeline-title">
+                          <span>{title}</span>
+                          <RatingBadge rating={pour.rating} small />
+                        </strong>
+                        <time dateTime={pour.date}>{fmtDateShort(pour.date)}</time>
+                      </span>
+                      {pour.note && <span className="timeline-note">{pour.note}</span>}
+                    </span>
+                    <span className="timeline-edit">
+                      <Icon name="edit" size={18} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
@@ -202,7 +242,28 @@ export function CellarDetailScreen({ id }: { id: string }) {
         </button>
       </div>
 
-      {pouring && <PourSheet entry={entry} onClose={() => setPouring(false)} />}
+      {pouring && <PourSheet entry={entry} existing={null} onClose={() => setPouring(false)} onLastBottle={setAskArchive} />}
+      {editingPour && <PourSheet entry={entry} existing={editingPour} onClose={() => setEditingPour(null)} onLastBottle={setAskArchive} />}
+      {askArchive && (
+        <ConfirmSheet
+          title="Archive the batch?"
+          message={`That was the last bottle of ${askArchive.name}. Archive the batch?`}
+          confirmLabel="Archive"
+          cancelLabel="Not now"
+          tone="normal"
+          onClose={async () => {
+            setAskArchive(null);
+            const latest = await batches.get(askArchive.id);
+            if (latest) await batches.save({ ...latest, archivePromptDismissed: true });
+          }}
+          onConfirm={async () => {
+            setAskArchive(null);
+            const latest = await batches.get(askArchive.id);
+            if (latest) await archiveBatch(latest);
+            toast('Batch archived');
+          }}
+        />
+      )}
       {deleting && (
         <ConfirmSheet
           title="Remove from the cellar?"
@@ -220,26 +281,71 @@ export function CellarDetailScreen({ id }: { id: string }) {
   );
 }
 
-function PourSheet({ entry, onClose }: { entry: CellarEntry; onClose: () => void }) {
-  const [count, setCount] = useState('1');
-  const [type, setType] = useState<PourType>('drank');
-  const [date, setDate] = useState(today());
-  const [note, setNote] = useState('');
-  const [rating, setRating] = useState<number | null>(null);
+/**
+ * Logs a pour, or edits or removes one. Bottles left always follows: a pour
+ * takes its bottles from the entry, and editing or removing it puts back
+ * what it no longer uses.
+ */
+function PourSheet({
+  entry,
+  existing,
+  onClose,
+  onLastBottle,
+}: {
+  entry: CellarEntry;
+  existing: Pour | null;
+  onClose: () => void;
+  /** Called when this leaves a bottled batch with no bottles anywhere in the cellar. */
+  onLastBottle: (batch: Batch) => void;
+}) {
+  const [count, setCount] = useState(existing ? String(existing.count) : '1');
+  const [type, setType] = useState<PourType>(existing?.type ?? 'drank');
+  const [date, setDate] = useState(existing?.date ?? today());
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // The most this pour can be: what is left, plus what it already took.
+  const available = entry.count + (existing?.count ?? 0);
 
   const save = async () => {
     const bottles = parseNum(count);
     if (bottles == null || bottles < 1 || !Number.isInteger(bottles)) return setError('Enter how many bottles.');
-    if (bottles > entry.count) return setError(`Only ${plural(entry.count, 'bottle')} left.`);
-    await pours.save({ cellarEntryId: entry.id, date: date || today(), count: bottles, type, note: note.trim(), rating });
-    await cellar.save({ ...entry, count: entry.count - bottles });
-    toast(entry.count - bottles === 0 ? 'That was the last bottle' : 'Pour logged');
+    if (bottles > available) return setError(`Only ${plural(available, 'bottle')} ${existing ? 'available for this pour' : 'left'}.`);
+    const fields = { cellarEntryId: entry.id, date: date || today(), count: bottles, type, note: note.trim(), rating };
+    await pours.save(existing ? { ...existing, ...fields } : fields);
+    const left = available - bottles;
+    await cellar.save({ ...entry, count: left });
     onClose();
+    // The archive prompt says it was the last bottle, so no toast on top of it.
+    if (!(await afterCountChange())) toast(left === 0 ? 'That was the last bottle' : existing ? 'Pour updated' : 'Pour logged');
+  };
+
+  // Ask to archive once a batch's last bottle is gone; forget "Not now" once bottles come back.
+  const afterCountChange = async (): Promise<boolean> => {
+    if (!entry.batchId) return false;
+    const batch = await batches.get(entry.batchId);
+    const entries = await cellar.list();
+    if (shouldResetArchivePrompt(batch, entries)) await batches.save({ ...batch!, archivePromptDismissed: false });
+    else if (shouldAskToArchive(batch, entries)) {
+      onLastBottle(batch!);
+      return true;
+    }
+    return false;
+  };
+
+  const remove = async () => {
+    if (!existing) return;
+    await pours.remove(existing.id);
+    await cellar.save({ ...entry, count: entry.count + existing.count });
+    toast(`Pour removed, ${plural(existing.count, 'bottle')} back in the cellar`);
+    onClose();
+    await afterCountChange();
   };
 
   return (
-    <Sheet title="Log a pour" onClose={onClose}>
+    <Sheet title={existing ? 'Edit pour' : 'Log a pour'} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -266,8 +372,27 @@ function PourSheet({ entry, onClose }: { entry: CellarEntry; onClose: () => void
           </p>
         )}
         <button type="submit" className="btn btn-primary btn-block">
-          Save pour
+          {existing ? 'Save changes' : 'Save pour'}
         </button>
+        {existing &&
+          (confirmingDelete ? (
+            <div className="confirm-inline" role="group" aria-label="Confirm removal">
+              <p>Remove this pour? {plural(existing.count, 'bottle')} will go back in the cellar.</p>
+              <div className="button-row">
+                <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
+                  Keep it
+                </button>
+                <button type="button" className="btn btn-danger" onClick={() => void remove()}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-danger-quiet btn-block" onClick={() => setConfirmingDelete(true)}>
+              <Icon name="trash" size={20} />
+              Remove pour
+            </button>
+          ))}
       </form>
     </Sheet>
   );
@@ -283,6 +408,7 @@ interface Draft {
   location: string;
   abv: string;
   icon: string;
+  extraIcons: string[];
   color: string;
   notes: string;
 }
@@ -302,6 +428,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
           location: '',
           abv: '',
           icon: DEFAULT_FLAVOR,
+          extraIcons: [],
           color: getFlavor(DEFAULT_FLAVOR).color,
           notes: '',
         },
@@ -321,6 +448,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
         location: entry.location,
         abv: entry.abv != null ? String(entry.abv) : '',
         icon: entry.icon,
+        extraIcons: entry.extraIcons ?? [],
         color: entry.color,
         notes: entry.notes,
       },
@@ -367,6 +495,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
       location: draft.location.trim(),
       abv,
       icon: draft.icon,
+      extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
     });
@@ -388,7 +517,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
           <input type="text" value={draft.name} placeholder="Bramble Melomel 2026" autoFocus={!existing} onChange={(e) => set({ name: e.target.value })} />
         </Field>
 
-        <IconPicker icon={draft.icon} color={draft.color} onChange={set} />
+        <IconPicker icon={draft.icon} extraIcons={draft.extraIcons} color={draft.color} onChange={set} />
 
         <StyleField value={draft.style} onChange={(style) => set({ style })} />
 

@@ -7,7 +7,7 @@ import { fmtSG, newId } from './format.ts';
 import { ingredientStageLabel, stageOf } from './stages.ts';
 
 /** The recipe fields a batch provides. Name, notes, steps and rating are handled separately. */
-export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'targetOG' | 'targetFG' | 'ingredients' | 'icon' | 'color'>;
+export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'volumeUnit' | 'targetOG' | 'targetFG' | 'ingredients' | 'icon' | 'extraIcons' | 'color'>;
 
 /**
  * What a batch puts into its recipe. The target FG is the batch's final
@@ -19,10 +19,12 @@ export function recipeFieldsFromBatch(batch: Batch, events: BatchEvent[]): Recip
     beverageType: batch.beverageType,
     style: batch.style,
     batchSizeL: batch.volumeL,
+    volumeUnit: batch.volumeUnit,
     targetOG: originalGravity(batch, events),
     targetFG: isFermentationComplete(batch) && batch.fg != null ? batch.fg : targetFinalGravity(batch),
     ingredients: batch.ingredients.map((line) => ({ ...line, id: newId(), stage: stageOf(line) })),
     icon: batch.icon,
+    extraIcons: batch.extraIcons ?? [],
     color: batch.color,
   };
 }

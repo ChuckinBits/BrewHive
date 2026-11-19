@@ -1,19 +1,17 @@
 // One batch: its numbers, gravity chart, rating and timeline.
 
 import { useState } from 'react';
-import { changeStatus, setBatchRating } from '../db/actions.ts';
+import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
 import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings } from '../db/types.ts';
+import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients } from '../components/StagedIngredients.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
-import { Carboy } from '../components/Vessels.tsx';
-import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
+import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
   batchAbv,
   currentGravity,
-  fillLevel,
   gravityPoints,
   isActive,
   isFermentationComplete,
@@ -22,11 +20,11 @@ import {
   projectedAbv,
   targetFinalGravity,
 } from '../lib/batch.ts';
-import { cToF } from '../lib/calc.ts';
 import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtVolume, newId, nowLocal, parseNum, tempFromInput, today } from '../lib/format.ts';
+import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
+import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, suggestCount, totalMl, type BottleLine, type BottleUnit } from '../lib/bottling.ts';
 import { Link, navigate } from '../lib/router.tsx';
-import { batchSubtitle } from './Batches.tsx';
+import { BatchArt, batchSubtitle } from './Batches.tsx';
 
 const EVENT_ICONS: Record<EventType, IconName> = {
   gravity: 'droplet',
@@ -54,7 +52,7 @@ function eventValue(event: BatchEvent, settings: Settings): string {
   if (event.value == null) return '';
   if (event.type === 'gravity') return fmtSG(event.value);
   if (event.type === 'feeding' || event.type === 'backsweeten') return `→ ${fmtSG(event.value)}`;
-  if (event.type === 'temperature') return fmtTemp(event.value, settings.tempUnit);
+  if (event.type === 'temperature') return fmtTempBoth(event.value, event.tempUnit, settings.tempUnit);
   // The title already says pH, so only the number.
   if (event.type === 'ph') return event.value.toFixed(2);
   return String(event.value);
@@ -80,6 +78,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
   const [bottling, setBottling] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Batch" back="/" />;
@@ -121,25 +120,37 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={batch.rating} reserve />
-        <Carboy icon={batch.icon} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={168} />
+        <BatchArt batch={batch} size={168} />
         <p className="hero-sub">
           {batch.style || 'Mead'} · {batchSubtitle(batch)}
         </p>
       </section>
 
-      <div className="steps" role="group" aria-label="Status">
-        {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((status) => (
-          <button
-            key={status.id}
-            type="button"
-            className={status.id === batch.status ? 'step step-on' : 'step'}
-            aria-pressed={status.id === batch.status}
-            onClick={() => setStatus(status.id)}
-          >
-            {status.label}
+      {batch.status === 'archived' ? (
+        <div className="archived-note">
+          <span>
+            <strong>Archived</strong>
+            <span className="muted">Hidden from Active and Bottled. Everything else still works.</span>
+          </span>
+          <button type="button" className="btn btn-small" onClick={() => void unarchiveBatch(batch).then(() => toast('Batch unarchived'))}>
+            Unarchive
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="steps" role="group" aria-label="Status">
+          {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((status) => (
+            <button
+              key={status.id}
+              type="button"
+              className={status.id === batch.status ? 'step step-on' : 'step'}
+              aria-pressed={status.id === batch.status}
+              onClick={() => setStatus(status.id)}
+            >
+              {status.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="stats">
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
@@ -198,7 +209,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
             {batch.volumeL != null && (
               <>
                 <dt>Volume</dt>
-                <dd>{fmtVolume(batch.volumeL, settings.volumeUnit)}</dd>
+                <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
               </>
             )}
             <dt>Started</dt>
@@ -287,11 +298,32 @@ export function BatchDetailScreen({ id }: { id: string }) {
           <Icon name="recipes" size={20} />
           {data.recipe ? 'Update recipe' : 'Save as recipe'}
         </button>
+        {batch.status !== 'archived' && (
+          <button type="button" className="btn" onClick={() => setArchiving(true)}>
+            <Icon name="archive" size={20} />
+            Archive
+          </button>
+        )}
         <button type="button" className="btn btn-danger-quiet" onClick={() => setDeleting(true)}>
           <Icon name="trash" size={20} />
           Delete
         </button>
       </div>
+
+      {archiving && (
+        <ConfirmSheet
+          title="Archive this batch?"
+          message={`"${batch.name}" moves to the Archived filter and shows as a book on the shelf. You can unarchive it at any time.`}
+          confirmLabel="Archive"
+          tone="normal"
+          onClose={() => setArchiving(false)}
+          onConfirm={async () => {
+            await archiveBatch(batch);
+            setArchiving(false);
+            toast('Batch archived');
+          }}
+        />
+      )}
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} />}
@@ -317,7 +349,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 function valueToInput(event: BatchEvent, settings: Settings): string {
   if (event.value == null) return '';
   if (event.type === 'gravity' || event.type === 'feeding' || event.type === 'backsweeten') return fmtSG(event.value);
-  if (event.type === 'temperature') return String(Number((settings.tempUnit === 'F' ? cToF(event.value) : event.value).toFixed(1)));
+  if (event.type === 'temperature') return tempToInput(event.value, event.tempUnit ?? settings.tempUnit);
   return String(event.value);
 }
 
@@ -344,6 +376,7 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
   const [value, setValue] = useState(existing ? valueToInput(existing, settings) : '');
   const [place, setPlace] = useState(existing?.place ?? '');
+  const [tempUnit, setTempUnit] = useState<TempUnit>(existing?.tempUnit ?? settings.tempUnit);
   // An old stage entry's note is its title, so it starts empty here.
   const [note, setNote] = useState(isStage && !existing?.toStatus ? '' : (existing?.note ?? ''));
   const [error, setError] = useState('');
@@ -371,7 +404,7 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter a gravity between 0.980 and 1.200, such as 1.045.');
     } else if (kind === 'temp') {
-      parsed = tempFromInput(value, settings.tempUnit);
+      parsed = tempFromInput(value, tempUnit);
       if (parsed == null) return setError('Enter a temperature.');
     } else if (kind === 'ph') {
       parsed = parseNum(value);
@@ -399,6 +432,7 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
       method: kind === 'method' ? method : undefined,
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
+      tempUnit: kind === 'temp' ? tempUnit : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -468,9 +502,16 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
           </Field>
         )}
         {kind === 'temp' && (
-          <Field label={`Temperature (°${settings.tempUnit})`}>
-            <input type="text" inputMode="decimal" value={value} placeholder={settings.tempUnit === 'F' ? '68' : '20'} onChange={(e) => setValue(e.target.value)} />
-          </Field>
+          <UnitField
+            label="Temperature"
+            value={value}
+            placeholder={tempUnit === 'F' ? '68' : '20'}
+            onChange={setValue}
+            unit={tempUnit}
+            units={TEMP_UNITS}
+            onUnit={setTempUnit}
+            hint={tempUnit !== settings.tempUnit && tempFromInput(value, tempUnit) != null ? `= ${fmtTemp(tempFromInput(value, tempUnit), settings.tempUnit)}` : undefined}
+          />
         )}
         {kind === 'ph' && (
           <Field label="pH">
@@ -603,34 +644,57 @@ function EventSheet({ batch, settings, existing, onClose }: EventSheetProps) {
   );
 }
 
-const BOTTLE_SIZES = [187, 330, 375, 500, 750, 1000];
+/** The size a unit starts at when picked. */
+const UNIT_START_SIZE: Record<BottleUnit, string> = { ml: '750', floz: '12', cup: '1', pint: '1', quart: '1', l: '1', other: '' };
 
 function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv: number | null; finalGravity: number | null; onClose: () => void }) {
-  const [count, setCount] = useState('5');
-  const [size, setSize] = useState(750);
+  const volumeMl = batch.volumeL != null ? batch.volumeL * 1000 : null;
+  const [lines, setLines] = useState<BottleLine[]>(() => [newLine(volumeMl)]);
   const [bottledDate, setBottledDate] = useState(today());
   const [bestAfter, setBestAfter] = useState('');
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
 
+  const update = (id: string, patch: Partial<BottleLine>) => {
+    setError('');
+    setLines((all) =>
+      all.map((line, i) => {
+        if (line.id !== id) return line;
+        const next = { ...line, ...patch };
+        // Until a count is typed, it follows the size and the volume left for this line.
+        if (!next.countTyped && ('size' in patch || 'unit' in patch)) {
+          const left = volumeMl == null ? null : volumeMl - totalMl(all.slice(0, i));
+          next.count = String(suggestCount(left, lineBottleMl(next)));
+        }
+        return next;
+      }),
+    );
+  };
+
   const save = async () => {
-    const bottles = parseNum(count);
-    if (bottles == null || bottles < 1 || !Number.isInteger(bottles)) return setError('Enter how many bottles you filled.');
-    const entry = await cellar.save({
-      batchId: batch.id,
-      name: batch.name,
-      style: batch.style,
-      bottleSizeMl: size,
-      count: bottles,
-      bottledDate,
-      bestAfter: bestAfter || null,
-      location: location.trim(),
-      abv: abv != null ? Number(abv.toFixed(1)) : null,
-      icon: batch.icon,
-      color: batch.color,
-      rating: batch.rating,
-      notes: '',
-    });
+    const problem = bottlingError(lines);
+    if (problem) return setError(problem);
+    const saved = [];
+    for (const line of lines) {
+      saved.push(
+        await cellar.save({
+          batchId: batch.id,
+          name: batch.name,
+          style: batch.style,
+          bottleSizeMl: Math.round(lineBottleMl(line)!),
+          count: parseNum(line.count)!,
+          bottledDate,
+          bestAfter: bestAfter || null,
+          location: location.trim(),
+          abv: abv != null ? Number(abv.toFixed(1)) : null,
+          icon: batch.icon,
+          extraIcons: batch.extraIcons ?? [],
+          color: batch.color,
+          rating: batch.rating,
+          notes: line.unit === 'other' ? line.container.trim() : '',
+        }),
+      );
+    }
     const fg = isFermentationComplete(batch) && batch.fg != null ? batch.fg : finalGravity;
     const completedAt = isFermentationComplete(batch) && fg === batch.fg ? (batch.completedAt ?? null) : new Date().toISOString();
     await batches.save({ ...batch, status: 'bottled', fermentationComplete: true, completedAt, fg });
@@ -640,15 +704,17 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
       type: 'status',
       date: nowLocal(),
       value: null,
-      note: `${bottles} × ${size >= 1000 ? `${size / 1000} L` : `${size} mL`}`,
+      note: bottlingNote(lines),
       toStatus: 'bottled',
       fromStatus: batch.status,
       auto: false,
     });
     toast('Bottles added to your cellar');
     onClose();
-    navigate(`/cellar/${entry.id}`);
+    navigate(saved.length === 1 ? `/cellar/${saved[0].id}` : '/cellar');
   };
+
+  const total = totalMl(lines);
 
   return (
     <Sheet title="Bottle this batch" onClose={onClose}>
@@ -659,20 +725,55 @@ function BottleSheet({ batch, abv, finalGravity, onClose }: { batch: Batch; abv:
           void save();
         }}
       >
-        <div className="form-pair">
-          <Field label="Bottles filled">
-            <input type="text" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} />
-          </Field>
-          <Field label="Bottle size">
-            <select value={size} onChange={(e) => setSize(Number(e.target.value))}>
-              {BOTTLE_SIZES.map((ml) => (
-                <option key={ml} value={ml}>
-                  {ml >= 1000 ? `${ml / 1000} L` : `${ml} mL`}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+        {lines.map((line, i) => (
+          <fieldset key={line.id} className="bottle-line" aria-label={`Bottle size ${i + 1}`}>
+            <div className="bottle-line-fields">
+              <Field label="Bottles filled">
+                <input type="text" inputMode="numeric" value={line.count} onChange={(e) => update(line.id, { count: e.target.value, countTyped: true })} />
+              </Field>
+              <Field label={line.unit === 'other' ? 'Size (mL)' : 'Size'}>
+                <input type="text" inputMode="decimal" value={line.size} onChange={(e) => update(line.id, { size: e.target.value })} />
+              </Field>
+              <Field label="Unit">
+                <select
+                  value={line.unit}
+                  onChange={(e) => {
+                    const unit = e.target.value as BottleUnit;
+                    // "Other" is measured in mL, so carry the current size over.
+                    const ml = lineBottleMl(line);
+                    update(line.id, { unit, size: unit === 'other' ? (ml ? String(Math.round(ml)) : '') : UNIT_START_SIZE[unit] });
+                  }}
+                >
+                  {BOTTLE_UNITS.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            {line.unit === 'other' && (
+              <Field label="Container">
+                <input type="text" value={line.container} placeholder="Growler" onChange={(e) => update(line.id, { container: e.target.value })} />
+              </Field>
+            )}
+            {lines.length > 1 && (
+              <button type="button" className="btn btn-quiet btn-small bottle-line-remove" onClick={() => setLines((all) => all.filter((l) => l.id !== line.id))}>
+                <Icon name="trash" size={16} />
+                Remove this size
+              </button>
+            )}
+          </fieldset>
+        ))}
+        <button type="button" className="btn btn-block" onClick={() => setLines((all) => [...all, newLine(volumeMl, all)])}>
+          <Icon name="plus" size={20} />
+          Add another size
+        </button>
+        <p className="bottle-total" aria-live="polite">
+          Total: {fmtBottle(total)}
+          {volumeMl != null && ` of ${fmtBottle(volumeMl)}`}
+          <span className="field-hint">A guide only; some loss when bottling is normal.</span>
+        </p>
         <div className="form-pair">
           <Field label="Bottled on">
             <input type="date" value={bottledDate} onChange={(e) => setBottledDate(e.target.value)} />
