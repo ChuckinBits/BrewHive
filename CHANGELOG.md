@@ -4,42 +4,57 @@ All notable changes to BrewHive are listed here. Versions follow the roadmap:
 minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 0.5 community) and patch versions are releases within a milestone.
 
-## Unreleased
+## v0.1.2 – 2026-11-19
+
+### Fermentation and the final gravity
+
+- **The stage decides when fermentation is done** ([#26]). The "Fermentation
+  is complete" checkbox and the Final gravity field are gone. Primary and
+  Secondary are fermenting ("ABV so far"); Aging and Bottled are done ("ABV").
+- **The final gravity is a timeline reading** ([#26]). Moving a batch from
+  Primary or Secondary to Aging, or bottling it, asks for the final reading.
+  Any gravity reading can also be ticked as the final gravity, and then those
+  moves don't ask. A batch has one final gravity: ticking a newer reading
+  replaces it. The final reading shows a Final badge and settles the ABV, so
+  later readings don't change it.
+- **Estimated ABV** ([#26]). With no final reading, an estimated ABV can be
+  entered instead. It starts at the ABV so far, goes on the timeline as an
+  "Estimated ABV" entry and shows with ≈. Deleting the entry, or logging a
+  later reading, removes it.
+- **Fermenting again** ([#26]). A step feeding or a backsweetening ticked
+  "This will ferment" after the final reading warns that it will remove the
+  Final tag. While Aging or Bottled, a ticked backsweetening offers to move the
+  batch back to Secondary.
+- **Fixed: backsweetening raised the ABV** ([#24]). Backsweetening that isn't
+  set to ferment never adds to the ABV. Step feeding and ticked backsweetening
+  only raise it once a later gravity reading shows them fermenting.
+
+### Targets
 
 - **Aim for an FG or an ABV** ([#27]). The Target field on batches and
-  recipes has an FG / ABV switch. Aiming for an FG works as before: the
-  target ABV rises with step feeding. Aiming for an ABV keeps it fixed and
-  shows the FG it finishes at instead (OG 1.080 + 40 points fed, aiming for
-  14%, finishes around 1.013). Finishing between 0.990 and 1.000 is fine
-  ("drier than most meads get", with the points it would take to finish at
-  1.000); below 0.990 it gives the range of sugar it needs, from finishing at
-  0.990 to finishing at 1.000 ("needs 17–27 pts").
+  recipes has an FG / ABV switch. Aiming for an FG works as before: the target
+  ABV rises with step feeding. Aiming for an ABV keeps it fixed and shows the
+  FG it finishes at instead (OG 1.080 + 40 points fed, aiming for 14%,
+  finishes around 1.013). Batches and recipes keep the choice when saved from
+  one another.
+- **Very dry finishes** ([#27]). Finishing between 0.990 and 1.000 counts as
+  reachable ("drier than most meads get"). Below 0.990, it gives the range of
+  sugar still needed, from finishing at 0.990 to finishing at 1.000
+  ("needs 17–27 pts").
 - **Potential follows a target below 1.000** ([#27]). With a target FG of
   0.995, Potential is worked out to 0.995 ("Potential 13.8% at 0.995")
-  instead of showing a target higher than the potential. While fermenting, the batch page says "Target reached"
-  once the ABV gets there. Batches and recipes keep the choice when saved
-  from one another.
-- **The stage decides when fermentation is done** ([#26]). The "Fermentation
-  is complete" checkbox and the Final gravity field are gone. Moving a batch
-  from Primary or Secondary to Aging, or bottling it, asks for the final
-  reading, which goes on the timeline as a gravity reading marked Final.
-  Any gravity reading can be ticked as the final gravity (only one per batch;
-  a newer one replaces it), and then those moves don't ask. Without a
-  reading, an estimated ABV can be entered instead (it starts at the ABV so
-  far). It goes on the timeline as an "Estimated ABV" entry and shows with ≈;
-  deleting the entry or logging a later reading removes it. The final reading
-  settles the ABV: later readings don't change it, and a step feeding or
-  ticked backsweetening after it warns that it will remove the Final tag. A backsweetening ticked "This will ferment"
-  after fermentation is done offers to move the batch back to Secondary.
-  Final gravities entered in the old field are no longer used: log them as
-  a reading.
-- **No automatic Yeast pitched entry** ([#23]). Starting a batch no longer adds
-  one; add it yourself from Add entry. Non-alcoholic brews never need it.
-- **Fixed: backsweetening raised the ABV** ([#24]). Backsweetening that isn't
-  set to ferment no longer adds to the ABV, even when fermentation was marked
-  complete after it was logged. Step feeding and backsweetening ticked to
-  ferment add to the ABV only once a later gravity reading (or a final gravity
-  entered after them) shows them fermenting.
+  instead of showing a target higher than the potential.
+- **Target reached** ([#27]). While fermenting, the batch page says so once
+  the ABV gets to the target: a cue to stabilize.
+
+### Other
+
+- **No automatic Yeast pitched entry** ([#23]). Starting a batch no longer
+  adds one; add it yourself from Add entry. Non-alcoholic brews never need it.
+
+**Updating from v0.1.1:** existing data carries over. Final gravities entered
+in the old field are no longer used; on batches that had one, log it as a
+gravity reading and tick "Final gravity reading".
 
 ## v0.1.1 – 2026-11-18
 
