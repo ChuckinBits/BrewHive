@@ -151,8 +151,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const abvParts: string[] = [];
   const finalAbv = validOg != null && asksFinal ? batchAbv(preview, previewEvents) : null;
   if (finalAbv != null) abvParts.push(`ABV ${draft.final.mode === 'estimate' ? '≈ ' : ''}${fmtPercent(finalAbv)}`);
-  if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}`);
-  if (projected?.target != null) abvParts.push(`Target ${fmtPercent(projected.target)}`);
+  if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}${projected.potentialFG < 0.9995 ? ` (at ${fmtSG(projected.potentialFG)})` : ''}`);
+  if (projected?.showTarget && projected.target != null) abvParts.push(`Target ${fmtPercent(projected.target)}`);
   const abvLine = abvParts.join(' · ');
 
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';

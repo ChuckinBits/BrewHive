@@ -10,6 +10,7 @@ import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
+  DRIEST_FG,
   abvEstimate,
   batchAbv,
   finalReading,
@@ -174,16 +175,19 @@ export function BatchDetailScreen({ id }: { id: string }) {
           value={fmtPercent(projected?.potential)}
           highlight
           extra={
-            projected?.target == null ? undefined : projected.mode === 'abv' ? (
-              // Two lines, so it fits a phone. Below 1.000 can't happen: show how much more sugar the target needs instead.
+            projected == null ? undefined : projected.mode === 'abv' && projected.target != null ? (
+              // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show how much more sugar it needs.
               <>
                 Target {fmtPercent(projected.target)}
                 <br />
-                {projected.targetFG < 0.9995 ? `needs +${Math.ceil((1 - projected.targetFG) * 1000)} pts` : `FG ${fmtSG(projected.targetFG)}`}
+                {projected.reachable ? `FG ${fmtSG(projected.targetFG)}` : `needs +${Math.ceil((DRIEST_FG - projected.targetFG) * 1000 - 1e-6)} pts`}
               </>
-            ) : (
+            ) : projected.showTarget && projected.target != null ? (
               `Target ${fmtPercent(projected.target)}`
-            )
+            ) : projected.potentialFG < 0.9995 ? (
+              // Worked out to a target FG below 1.000.
+              `at ${fmtSG(projected.potentialFG)}`
+            ) : undefined
           }
         />
       </div>

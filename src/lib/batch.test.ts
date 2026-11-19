@@ -382,3 +382,32 @@ test('target reached: while fermenting, once the measured ABV gets to the target
   assert.equal(targetReached(batch({ og: 1.1, status: 'secondary' }), [reading('2026-11-08T10:00', 0.998)]), false, 'no target besides fully dry');
   assert.equal(targetReached(batch({ og: 1.1, status: 'secondary', targetFG: 1.01 }), [reading('2026-11-08T10:00', 1.01)]), true, 'an FG target counts too');
 });
+
+test('a target FG below 1.000: the potential follows it, and the target is not shown twice', () => {
+  const p = projectedAbv(1.1, { targetMode: 'fg', targetFG: 0.995 });
+  near(p?.potential, (1.1 - 0.995) * 131.25);
+  assert.equal(p?.potentialFG, 0.995);
+  assert.equal(p?.showTarget, false);
+  // 1.000 (dry) and above work as before.
+  const dry = projectedAbv(1.1, { targetMode: 'fg', targetFG: 1.0 });
+  near(dry?.potential, 13.125);
+  assert.equal(dry?.showTarget, false);
+  const sweet = projectedAbv(1.1, { targetMode: 'fg', targetFG: 1.01 });
+  near(sweet?.potential, 13.125);
+  assert.equal(sweet?.showTarget, true);
+  // Target reached still works for a target below 1.000.
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary', targetFG: 0.995 }), [reading('2026-11-08T10:00', 0.994)]), true);
+});
+
+test('an ABV target that finishes between 0.990 and 1.000 is reachable; drier is not', () => {
+  // 1.110 aiming for 15%: finishes around 0.996.
+  const near996 = projectedAbv(1.11, { targetMode: 'abv', targetAbv: 15 });
+  assert.equal(near996?.reachable, true);
+  near(near996?.potential, 15);
+  // 1.080 aiming for 14%: would need 0.973, more than it can reach.
+  const tooDry = projectedAbv(1.08, { targetMode: 'abv', targetAbv: 14 });
+  assert.equal(tooDry?.reachable, false);
+  near(tooDry?.potential, 10.5);
+  // Exactly 0.990 counts.
+  assert.equal(projectedAbv(1.09, { targetMode: 'abv', targetAbv: 13.125 })?.reachable, true);
+});

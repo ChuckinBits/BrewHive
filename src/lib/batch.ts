@@ -202,9 +202,24 @@ export function effectiveOG(batch: Batch, events: BatchEvent[]): number | null {
   return og == null ? null : og + analyzeGravity(batch, events).addedSugar;
 }
 
+/**
+ * The driest finish counted as reachable. Meads often go below 1.000, sometimes down to 0.990;
+ * an ABV target that would need to finish lower than this needs more sugar.
+ */
+export const DRIEST_FG = 0.99;
+
 export interface ProjectedAbv {
-  /** The ABV if it ferments all the way to 1.000. */
+  /**
+   * The ABV if it ferments down to 1.000, or to the expected finish when that's below 1.000
+   * (a target FG under 1.000, or an ABV target that finishes between 0.990 and 1.000).
+   */
   potential: number;
+  /** The gravity the potential is worked out to: 1.000, or the expected finish below it. */
+  potentialFG: number;
+  /** Whether the target is worth showing next to the potential: false when it would only repeat it. */
+  showTarget: boolean;
+  /** For an ABV target: whether it can finish at DRIEST_FG or above. Always true for an FG target. */
+  reachable: boolean;
   /**
    * The target ABV. Aiming for an FG: the ABV at that FG, null when it's 1.000 (it would only
    * repeat the potential). Aiming for an ABV: that ABV, which additions don't change.
@@ -229,13 +244,27 @@ export interface TargetSetting {
 export function projectedAbv(og: number | null, setting: TargetSetting | number): ProjectedAbv | null {
   if (og == null) return null;
   const target: TargetSetting = typeof setting === 'number' ? { targetFG: setting } : setting;
-  const potential = abv(og, DEFAULT_TARGET_FG);
   if (target.targetMode === 'abv' && target.targetAbv != null) {
-    return { potential, target: target.targetAbv, targetFG: og - target.targetAbv / 131.25, mode: 'abv' };
+    const finish = og - target.targetAbv / 131.25;
+    const reachable = finish >= DRIEST_FG - 1e-9;
+    // Finishing between 0.990 and 1.000: the potential goes that low too. Out of reach: it stays at 1.000.
+    const potentialFG = reachable ? Math.min(DEFAULT_TARGET_FG, finish) : DEFAULT_TARGET_FG;
+    return { potential: abv(og, potentialFG), potentialFG, showTarget: true, reachable, target: target.targetAbv, targetFG: finish, mode: 'abv' };
   }
   const fg = target.targetFG ?? DEFAULT_TARGET_FG;
   const isDefault = Math.abs(fg - DEFAULT_TARGET_FG) < 0.0005;
-  return { potential, target: isDefault ? null : abv(og, fg), targetFG: fg, mode: 'fg' };
+  // A target FG below 1.000 is where you expect it to finish, so the potential follows it there.
+  const potentialFG = Math.min(DEFAULT_TARGET_FG, fg);
+  return {
+    potential: abv(og, potentialFG),
+    potentialFG,
+    // Below 1.000 the target and potential are the same number: show it once.
+    showTarget: !isDefault && fg > DEFAULT_TARGET_FG,
+    reachable: true,
+    target: isDefault ? null : abv(og, fg),
+    targetFG: fg,
+    mode: 'fg',
+  };
 }
 
 /**

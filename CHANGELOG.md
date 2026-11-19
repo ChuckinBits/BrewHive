@@ -10,8 +10,12 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
   recipes has an FG / ABV switch. Aiming for an FG works as before: the
   target ABV rises with step feeding. Aiming for an ABV keeps it fixed and
   shows the FG it finishes at instead (OG 1.080 + 40 points fed, aiming for
-  14%, finishes around 1.013), or how many more points it needs when the OG
-  can't reach it. While fermenting, the batch page says "Target reached"
+  14%, finishes around 1.013). Finishing between 0.990 and 1.000 is fine
+  ("drier than most meads get"); below 0.990 it says how many more points of
+  sugar it needs.
+- **Potential follows a target below 1.000** ([#27]). With a target FG of
+  0.995, Potential is worked out to 0.995 ("Potential 13.8% at 0.995")
+  instead of showing a target higher than the potential. While fermenting, the batch page says "Target reached"
   once the ABV gets there. Batches and recipes keep the choice when saved
   from one another.
 - **The stage decides when fermentation is done** ([#26]). The "Fermentation
