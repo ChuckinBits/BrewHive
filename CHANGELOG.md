@@ -4,6 +4,14 @@ All notable changes to BrewHive are listed here. Versions follow the roadmap:
 minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 0.5 community) and patch versions are releases within a milestone.
 
+## Unreleased
+
+- **No automatic Yeast pitched entry** ([#23]). Starting a batch no longer adds
+  one; add it yourself from Add entry. Non-alcoholic brews never need it.
+- **Fixed: backsweetening raised the ABV** ([#24]). Backsweetening that isn't
+  set to ferment no longer adds to the ABV, even when fermentation was marked
+  complete after it was logged.
+
 ## v0.1.1 – 2026-11-18
 
 ### Batches
@@ -67,3 +75,5 @@ themes; sample data.
 [#18]: https://github.com/ChuckinBits/BrewHive/issues/18
 [#19]: https://github.com/ChuckinBits/BrewHive/issues/19
 [#20]: https://github.com/ChuckinBits/BrewHive/issues/20
+[#23]: https://github.com/ChuckinBits/BrewHive/issues/23
+[#24]: https://github.com/ChuckinBits/BrewHive/issues/24
