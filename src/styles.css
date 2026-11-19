@@ -2203,6 +2203,7 @@ button.staged-row:hover {
 
 .more-link {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 12px;
   color: inherit;
@@ -2214,6 +2215,18 @@ button.staged-row:hover {
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.more-link-text strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.more-link > svg {
+  flex: none;
+  color: var(--muted);
 }
 
 button.library-row {
