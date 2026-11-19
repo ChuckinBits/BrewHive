@@ -302,3 +302,26 @@ test('tastings and rating entries edited by hand are never replaced', () => {
   assert.deepEqual(planReviewEntry([review('r1', '2026-11-18T09:00', 8, false)], 6, '2026-11-18T09:10'), { action: 'add', rating: 6 });
   assert.deepEqual(planReviewEntry([tasting], null, '2026-11-18T09:10'), { action: 'none' });
 });
+
+// --- Final gravity and backsweetening ----------------------------------------
+
+test('backsweetening that does not ferment never adds to the ABV, however fermentation was marked complete', () => {
+  const finished = [reading('2026-11-05T10:00', 1.0), reading('2026-11-06T10:00', 0.998)];
+  const sweet = entry('backsweeten', '2026-11-08T10:00', 1.012);
+  const expected = (1.1 - 0.998) * 131.25;
+  const done = (completedAt: string | null) => batch({ status: 'aging', fermentationComplete: true, fg: 0.998, completedAt });
+  // Marked complete after the backsweetening was logged (the restored Pink Lady Cyser).
+  near(batchAbv(done('2026-11-09T18:00:00.000Z'), [...finished, sweet]), expected);
+  // No completion moment recorded, with a reading of the sweetened gravity afterwards.
+  near(batchAbv(done(null), [...finished, sweet, reading('2026-11-09T10:00', 1.012)]), expected);
+  // Sweetened after stabilizing, but logged only as a plain reading.
+  near(batchAbv(done(null), [...finished, entry('stabilize', '2026-11-07T10:00'), reading('2026-11-09T10:00', 1.012)]), expected);
+  // Deleting and re-adding the backsweetening changes nothing.
+  near(batchAbv(done('2026-11-09T18:00:00.000Z'), finished), expected);
+});
+
+test('backsweetening ticked to ferment still keeps the final gravity after it', () => {
+  const b = batch({ status: 'aging', fermentationComplete: true, fg: 0.998, completedAt: '2026-11-20T18:00:00.000Z' });
+  const events = [reading('2026-11-05T10:00', 1.0), entry('backsweeten', '2026-11-08T10:00', 1.02, { ferments: true })];
+  near(batchAbv(b, events), (1.1 - 1.0 + 1.02 - 0.998) * 131.25);
+});
