@@ -4,7 +4,8 @@ import { useRef, useState } from 'react';
 import { createBackup, downloadBackup, restoreBackup } from '../db/backup.ts';
 import { clearAll } from '../db/idb.ts';
 import { loadSampleData } from '../db/sample.ts';
-import { rememberTheme, saveSettings, useSettings } from '../db/store.ts';
+import { currencyOf, rememberTheme, saveSettings, useSettings } from '../db/store.ts';
+import { CURRENCIES } from '../lib/cost.ts';
 import { ConfirmSheet, Segmented, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import { isDemo } from '../lib/demo.ts';
@@ -58,7 +59,7 @@ export function MoreScreen() {
         </span>
         <span className="more-link-text">
           <strong>Ingredients</strong>
-          <span className="muted">Your ingredient library: categories and default units.</span>
+          <span className="muted">Your ingredient library: categories, default units and costs.</span>
         </span>
         <Icon name="chevron" size={18} />
       </Link>
@@ -88,6 +89,16 @@ export function MoreScreen() {
               { id: 'C', label: '°C' },
             ]}
           />
+        </div>
+        <div className="settings-row">
+          <span>Currency</span>
+          <select className="settings-select" aria-label="Currency" value={currencyOf(settings)} onChange={(e) => saveSettings({ currency: e.target.value })}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 

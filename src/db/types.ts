@@ -237,6 +237,19 @@ export interface IngredientLine {
    * name and amount, so renaming or deleting the library item never changes an old batch.
    */
   ingredientId?: string;
+  /**
+   * Batches only: the library cost when the batch was saved, so a later price change doesn't
+   * rewrite an old batch. Recipes always use the current price.
+   */
+  cost?: IngredientCost;
+}
+
+/** What an ingredient cost when bought: price for an amount, such as 24.99 for 12 lb. */
+export interface IngredientCost {
+  price: number;
+  quantity: number;
+  /** One of INGREDIENT_UNITS. */
+  unit: string;
 }
 
 // --- Ingredient library (v0.2) ------------------------------------------------
@@ -272,6 +285,8 @@ export interface LibraryIngredient extends Base {
   /** The unit a new line starts with when this ingredient is picked. One of INGREDIENT_UNITS. */
   defaultUnit: string;
   notes: string;
+  /** Optional. Used for batch and recipe totals. */
+  cost?: IngredientCost | null;
 }
 
 export type VolumeUnit = 'gal' | 'L';
@@ -444,4 +459,6 @@ export interface Settings {
   demoSeeded?: boolean;
   /** The ingredient categories, in order. Missing means DEFAULT_CATEGORIES. */
   ingredientCategories?: IngredientCategory[];
+  /** ISO 4217 code, such as USD. Missing means the locale's currency. */
+  currency?: string;
 }

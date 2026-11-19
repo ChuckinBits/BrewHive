@@ -3,12 +3,22 @@
 
 import { useState } from 'react';
 import { ConfirmSheet, Fab, Field, Sheet, TopBar, toast } from '../components/ui.tsx';
-import { batches, categoriesOf, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
-import { INGREDIENT_UNITS, unitLabel, type IngredientCategory, type LibraryIngredient } from '../db/types.ts';
+import { batches, categoriesOf, currencyOf, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
+import { INGREDIENT_UNITS, unitLabel, type IngredientCategory, type IngredientCost, type LibraryIngredient } from '../db/types.ts';
 import { categoryOf, filterIngredients, lineIsIngredient } from '../lib/library.ts';
+import { fmtMoney, pricePer, unitsCompatible } from '../lib/cost.ts';
+import { parseNum } from '../lib/format.ts';
 import { Icon } from '../icons/Icon.tsx';
 import { newId, plural } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
+
+/** "$2.08 / lb" when it has a cost (per its default unit if that converts), otherwise its default unit. */
+function priceLabel(item: LibraryIngredient, currency: string): string {
+  if (!item.cost) return item.defaultUnit || 'count';
+  const unit = unitsCompatible(item.defaultUnit, item.cost.unit) ? item.defaultUnit : item.cost.unit;
+  const per = pricePer(unit, item.cost);
+  return per == null ? item.defaultUnit || 'count' : `${fmtMoney(per, currency)} / ${unit || 'each'}`;
+}
 
 export function CategoryChips({
   categories,
@@ -77,7 +87,7 @@ export function IngredientsScreen() {
                     <li key={item.id}>
                       <Link to={`/ingredients/${item.id}`} className="library-row">
                         <span className="library-name">{item.name}</span>
-                        <span className="muted">{item.defaultUnit || 'count'}</span>
+                        <span className="muted">{priceLabel(item, currencyOf(settings))}</span>
                         <Icon name="chevron" size={18} />
                       </Link>
                     </li>
@@ -188,6 +198,12 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
   const [category, setCategory] = useState(item?.category ?? (startCategory && categories.some((c) => c.id === startCategory) ? startCategory : 'other'));
   const [defaultUnit, setDefaultUnit] = useState(item?.defaultUnit ?? '');
   const [notes, setNotes] = useState(item?.notes ?? '');
+  // Cost, as bought: price for an amount. Optional.
+  const [price, setPrice] = useState(item?.cost ? String(item.cost.price) : '');
+  const [costQty, setCostQty] = useState(item?.cost ? String(item.cost.quantity) : '1');
+  const [costUnit, setCostUnit] = useState(item?.cost?.unit ?? item?.defaultUnit ?? '');
+  const settings = useSettings();
+  const currency = currencyOf(settings);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const units = INGREDIENT_UNITS.some((u) => u.id === defaultUnit) ? INGREDIENT_UNITS : [...INGREDIENT_UNITS, { id: defaultUnit, name: defaultUnit }];
@@ -201,10 +217,18 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
     };
   }, [item?.id, item?.name]);
 
+  const priceValue = parseNum(price.replace(/[^0-9.,-]/g, ''));
+  const qtyValue = parseNum(costQty);
+  const cost: IngredientCost | null = priceValue != null && qtyValue != null && qtyValue > 0 ? { price: priceValue, quantity: qtyValue, unit: costUnit } : null;
+  // "= $2.08 per lb": per the default unit when it converts, otherwise per the unit it was bought in.
+  const perUnit = cost ? (unitsCompatible(defaultUnit, cost.unit) ? defaultUnit : cost.unit) : '';
+  const per = cost ? pricePer(perUnit, cost) : null;
+
   const save = async () => {
     if (!name.trim()) return setError('Enter the ingredient, such as Orange blossom honey.');
     if (duplicate) return setError(`${duplicate.name} is already in your ingredients.`);
-    await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim() });
+    if (price.trim() && !cost) return setError('Enter the price and how much it was for, such as 24.99 for 12 lb.');
+    await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim(), cost });
     toast(item ? 'Ingredient saved' : 'Added to your ingredients');
     done();
   };
@@ -242,6 +266,30 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
             </select>
           </Field>
         </div>
+        <fieldset className="cost-fields">
+          <legend className="field-label">Cost (optional)</legend>
+          <div className="cost-row">
+            <Field label={`Price (${currency})`}>
+              <input type="text" inputMode="decimal" value={price} placeholder="24.99" onChange={(e) => setPrice(e.target.value)} />
+            </Field>
+            <span className="cost-for">for</span>
+            <Field label="Amount">
+              <input type="text" inputMode="decimal" value={costQty} placeholder="12" onChange={(e) => setCostQty(e.target.value)} />
+            </Field>
+            <Field label="Unit">
+              <select value={costUnit} onChange={(e) => setCostUnit(e.target.value)}>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.id || 'count'}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <p className="field-hint">
+            {per != null ? `= ${fmtMoney(per, currency)} per ${perUnit || 'one'}. Used for batch and recipe costs.` : 'What you paid and how much it was for. Used for batch and recipe costs.'}
+          </p>
+        </fieldset>
         <Field label="Notes">
           <textarea rows={3} value={notes} placeholder="Where you buy it, how you use it" onChange={(e) => setNotes(e.target.value)} />
         </Field>

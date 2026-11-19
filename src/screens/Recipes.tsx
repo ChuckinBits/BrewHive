@@ -7,6 +7,7 @@ import { IconPicker } from '../components/IconPicker.tsx';
 import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
+import { CostCard } from '../components/CostCard.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
@@ -153,6 +154,8 @@ export function RecipeDetailScreen({ id }: { id: string }) {
           <IngredientsByStage lines={recipe.ingredients} />
         </section>
       )}
+
+      <CostCard lines={recipe.ingredients} volumeL={recipe.batchSizeL} useSaved={false} />
 
       {recipe.steps.length > 0 && (
         <section className="card">
@@ -329,7 +332,8 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
       volumeUnit: draft.volumeUnit,
       targetOG,
       ...target,
-      ingredients: cleanIngredients(draft.ingredients),
+      // Recipes use current prices, so lines don't keep a saved cost.
+      ingredients: cleanIngredients(draft.ingredients).map(({ cost: _cost, ...line }) => line),
       steps: draft.steps
         .split('\n')
         .map((step) => step.trim())

@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
-import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
+import { batches, events, loadSettings, recipes, useQuery, useSettings, ingredients } from '../db/store.ts';
 import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
@@ -12,6 +12,7 @@ import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
+import { currentCost } from '../components/CostCard.tsx';
 import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
@@ -158,6 +159,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';
 
   const save = async () => {
+    const library = await ingredients.list();
     const name = draft.name.trim();
     if (!name) return setError('Give the batch a name.');
     const og = parseNum(draft.og);
@@ -192,7 +194,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       og,
       ...target,
       targetFG: target.targetFG ?? DEFAULT_TARGET_FG,
-      ingredients: cleanIngredients(draft.ingredients),
+      // Each line keeps the price it had when first saved with the batch; new ones take today's.
+      ingredients: cleanIngredients(draft.ingredients).map((line) => (line.cost ? line : { ...line, cost: currentCost(line, library) })),
       icon: draft.icon,
       extraIcons: draft.extraIcons,
       color: draft.color,

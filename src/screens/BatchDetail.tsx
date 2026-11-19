@@ -6,6 +6,7 @@ import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/s
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients } from '../components/StagedIngredients.tsx';
+import { CostCard } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
@@ -245,6 +246,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
           />
         </section>
       )}
+
+      <CostCard lines={batch.ingredients} volumeL={batch.volumeL} useSaved />
 
       {(batch.volumeL != null || data.recipe) && (
         <section className="card">

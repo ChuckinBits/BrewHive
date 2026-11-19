@@ -2250,3 +2250,53 @@ button.library-row {
   flex-direction: column;
   gap: 8px;
 }
+
+/* --- Ingredient costs (v0.2, issue #33) --------------------------------- */
+
+.cost-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cost-fields > legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 700;
+}
+
+.cost-fields .field-hint {
+  margin: 0;
+}
+
+.cost-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 0.8fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.cost-for {
+  padding-bottom: 14px;
+  color: var(--muted);
+}
+
+.cost-total {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-per {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-select {
+  width: auto;
+  min-width: 110px;
+}

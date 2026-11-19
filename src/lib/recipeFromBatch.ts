@@ -25,7 +25,8 @@ export function recipeFieldsFromBatch(batch: Batch, events: BatchEvent[]): Recip
     targetFG: (isFermentationComplete(batch) ? (finalReading(events)?.value ?? finalGravity(events)) : null) ?? targetFinalGravity(batch),
     targetMode: batch.targetMode ?? 'fg',
     targetAbv: batch.targetAbv ?? null,
-    ingredients: batch.ingredients.map((line) => ({ ...line, id: newId(), stage: stageOf(line) })),
+    // A recipe uses current prices, so the batch's saved costs stay with the batch.
+    ingredients: batch.ingredients.map(({ cost: _cost, ...line }) => ({ ...line, id: newId(), stage: stageOf(line) })),
     icon: batch.icon,
     extraIcons: batch.extraIcons ?? [],
     color: batch.color,

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getAll, getOne, putMany, subscribe, type StoreName } from './idb.ts';
 import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
 import { starterIngredients } from './starterIngredients.ts';
+import { localeCurrency } from '../lib/cost.ts';
 import { newId } from '../lib/format.ts';
 
 function collection<T extends Base>(store: StoreName) {
@@ -46,6 +47,11 @@ export const events = collection<BatchEvent>('events');
 export const cellar = collection<CellarEntry>('cellar');
 export const pours = collection<Pour>('pours');
 export const ingredients = collection<LibraryIngredient>('ingredients');
+
+/** The currency for costs: the chosen one, or the locale's. */
+export function currencyOf(settings: Settings): string {
+  return settings.currency ?? localeCurrency(typeof navigator !== 'undefined' ? navigator.language : 'en-US');
+}
 
 /** The ingredient categories, in order. */
 export function categoriesOf(settings: Settings): IngredientCategory[] {

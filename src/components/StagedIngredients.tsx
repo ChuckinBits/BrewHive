@@ -5,10 +5,11 @@
 //   them on the timeline; ones already logged show when they went in.
 
 import { useId, useState } from 'react';
-import { categoriesOf, ingredients, useQuery, useSettings } from '../db/store.ts';
+import { categoriesOf, currencyOf, ingredients, useQuery, useSettings } from '../db/store.ts';
+import { costOf, fmtMoney } from '../lib/cost.ts';
 import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientLine, type IngredientStage, type LibraryIngredient } from '../db/types.ts';
 import { Icon } from '../icons/Icon.tsx';
-import { fmtDateShort, newId } from '../lib/format.ts';
+import { fmtDateShort, newId, parseNum } from '../lib/format.ts';
 import { categoryOf, filterIngredients } from '../lib/library.ts';
 import { groupByStage, ingredientStageLabel, joinAmount, splitAmount } from '../lib/stages.ts';
 import { CategoryChips, LibrarySheet } from '../screens/Ingredients.tsx';
@@ -280,6 +281,13 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, onSave, onRem
             </select>
           </Field>
         </div>
+        {match?.cost && quantity.trim() !== '' && (
+          <p className="field-hint">
+            {costOf(parseNum(quantity) ?? 0, unit, match.cost) != null
+              ? `About ${fmtMoney(costOf(parseNum(quantity) ?? 0, unit, match.cost) as number, currencyOf(settings))} at your price for ${match.name}.`
+              : `Its cost is in ${match.cost.unit || 'a count'}, so this amount isn't priced.`}
+          </p>
+        )}
         <Field label="Stage" hint="What stage this ingredient goes in.">
           <select value={stage} onChange={(e) => setStage(e.target.value as IngredientStage)}>
             {INGREDIENT_STAGES.map((s) => (
