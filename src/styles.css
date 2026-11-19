@@ -2168,6 +2168,35 @@ button.staged-row:hover {
   min-width: 0;
 }
 
+.category-edit-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.category-edit-head .field-hint {
+  margin: 0;
+}
+
+.category-edit li.dragging {
+  position: relative;
+  z-index: 1;
+  border-radius: 10px;
+  background: var(--surface-2, var(--surface));
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+
+.drag-handle {
+  touch-action: none;
+  cursor: grab;
+  color: var(--muted);
+}
+
+.dragging .drag-handle {
+  cursor: grabbing;
+}
+
 .used-in {
   margin-top: 16px;
 }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_CATEGORIES, type IngredientLine, type LibraryIngredient } from '../db/types.ts';
 import { starterIngredients } from '../db/starterIngredients.ts';
-import { categoryOf, filterIngredients, lineIsIngredient } from './library.ts';
+import { categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from './library.ts';
 
 const item = (name: string, category: string): LibraryIngredient =>
   ({ id: name, name, category, defaultUnit: '', notes: '', createdAt: '', updatedAt: '', deletedAt: null }) as LibraryIngredient;
@@ -34,4 +34,15 @@ test('starter ingredients have unique fixed ids and real categories', () => {
   assert.equal(starters.find((s) => s.name === 'Wildflower honey')?.defaultUnit, 'lb');
   assert.equal(starterIngredients(false).find((s) => s.name === 'Wildflower honey')?.defaultUnit, 'kg');
   assert.ok(starters.some((s) => s.name === 'Nagardo'));
+});
+
+test('categories sort A to Z, ignoring case, with Other last', () => {
+  const list = [{ id: 'other', label: 'Other' }, { id: 'y', label: 'yeast' }, { id: 'h', label: 'Honey' }, { id: 't', label: 'Tea' }];
+  assert.deepEqual(sortCategories(list).map((c) => c.label), ['Honey', 'Tea', 'yeast', 'Other']);
+});
+
+test('moveItem moves one item and leaves the rest in order', () => {
+  assert.deepEqual(moveItem(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(moveItem(['a', 'b', 'c', 'd'], 3, 0), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(moveItem(['a', 'b'], 1, 5), ['a', 'b'], 'clamped to the end');
 });

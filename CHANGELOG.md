@@ -17,7 +17,9 @@ a milestone.
 - **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
   Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
   Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
-  remove one (its ingredients move to Other).
+  remove one (its ingredients move to Other). Put them in order with Sort A–Z
+  (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
+  is used for the category chips and the sections of the list.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
   default unit. A new name can be saved to your list with one checkbox, and

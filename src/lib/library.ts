@@ -20,3 +20,21 @@ export function filterIngredients(all: LibraryIngredient[], search: string, cate
 export function lineIsIngredient(line: IngredientLine, item: LibraryIngredient): boolean {
   return line.ingredientId ? line.ingredientId === item.id : line.name.trim().toLowerCase() === item.name.trim().toLowerCase();
 }
+
+/** Categories A to Z by name, with Other kept last. */
+export function sortCategories(list: IngredientCategory[]): IngredientCategory[] {
+  const other = list.filter((c) => c.id === 'other');
+  return [...list.filter((c) => c.id !== 'other').sort((a, b) => a.label.trim().localeCompare(b.label.trim(), undefined, { sensitivity: 'base' })), ...other];
+}
+
+/** The list with the item at `from` moved to `to` (both clamped to the list). */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  const last = list.length - 1;
+  const a = Math.max(0, Math.min(last, from));
+  const b = Math.max(0, Math.min(last, to));
+  if (a === b) return list;
+  const next = list.slice();
+  const [item] = next.splice(a, 1);
+  next.splice(b, 0, item);
+  return next;
+}

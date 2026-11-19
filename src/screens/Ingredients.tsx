@@ -1,11 +1,11 @@
 // The ingredient library (More → Ingredients): what you use, by category, with
 // a default unit for each. Picked from when adding ingredients to a recipe or batch.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConfirmSheet, Fab, Field, Sheet, TopBar, toast } from '../components/ui.tsx';
 import { batches, categoriesOf, currencyOf, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
 import { INGREDIENT_UNITS, unitLabel, type IngredientCategory, type IngredientCost, type LibraryIngredient } from '../db/types.ts';
-import { categoryOf, filterIngredients, lineIsIngredient } from '../lib/library.ts';
+import { categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from '../lib/library.ts';
 import { fmtMoney, pricePer, unitsCompatible } from '../lib/cost.ts';
 import { parseNum } from '../lib/format.ts';
 import { Icon } from '../icons/Icon.tsx';
@@ -104,10 +104,57 @@ export function IngredientsScreen() {
   );
 }
 
-/** Rename, add and remove categories. Removing one moves its ingredients to Other. */
+/** Rename, add, remove and reorder categories. Removing one moves its ingredients to Other. */
 function CategoriesSheet({ categories, counts, onClose }: { categories: IngredientCategory[]; counts: Map<string, number>; onClose: () => void }) {
   const [list, setList] = useState(categories);
   const [added, setAdded] = useState('');
+  const [dragging, setDragging] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const sorted = sortCategories(list).every((c, i) => c.id === list[i].id);
+
+  // While dragging, the row goes where the pointer is: after every other row whose middle is above it.
+  // Listened for on the window, because moving the row in the page drops the handle's pointer capture.
+  useEffect(() => {
+    if (!dragging) return;
+    let edge = 0;
+    let timer = 0;
+    // Near the top or bottom of the sheet, keep scrolling so the row can go anywhere in a long list.
+    const scroller = listRef.current?.closest('.sheet-body') as HTMLElement | null;
+    const autoScroll = () => {
+      if (scroller && edge) scroller.scrollTop += edge;
+      timer = edge ? window.setTimeout(autoScroll, 16) : 0;
+    };
+    const move = (e: PointerEvent) => {
+      e.preventDefault();
+      if (scroller) {
+        const box = scroller.getBoundingClientRect();
+        edge = e.clientY < box.top + 48 ? -8 : e.clientY > box.bottom - 48 ? 8 : 0;
+        if (edge && !timer) autoScroll();
+      }
+      const rows = Array.from(listRef.current?.children ?? []) as HTMLElement[];
+      setList((current) => {
+        const from = current.findIndex((c) => c.id === dragging);
+        let to = 0;
+        rows.forEach((row, i) => {
+          if (i === from) return;
+          const box = row.getBoundingClientRect();
+          if (box.top + box.height / 2 < e.clientY) to++;
+        });
+        return moveItem(current, from, to);
+      });
+    };
+    const stop = () => setDragging(null);
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+  }, [dragging]);
+
   const save = async () => {
     const cleaned = list.map((c) => ({ ...c, label: c.label.trim() || categories.find((o) => o.id === c.id)?.label || 'Category' }));
     await saveSettings({ ingredientCategories: cleaned });
@@ -126,9 +173,35 @@ function CategoriesSheet({ categories, counts, onClose }: { categories: Ingredie
           void save();
         }}
       >
-        <ul className="category-edit">
-          {list.map((c) => (
-            <li key={c.id}>
+        <div className="category-edit-head">
+          <span className="field-hint">Drag ≡ to reorder. This order is used for the chips and the list.</span>
+          <button type="button" className="btn btn-small" disabled={sorted} onClick={() => setList(sortCategories(list))}>
+            Sort A–Z
+          </button>
+        </div>
+        <ul className="category-edit" ref={listRef}>
+          {list.map((c, i) => (
+            <li key={c.id} className={dragging === c.id ? 'dragging' : undefined}>
+              <button
+                type="button"
+                className="icon-btn drag-handle"
+                aria-label={`Reorder ${c.label}. Drag, or use the up and down arrow keys.`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setDragging(c.id);
+                }}
+                onKeyDown={(e) => {
+                  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+                  if (!step) return;
+                  e.preventDefault();
+                  setList(moveItem(list, i, i + step));
+                  // Keep focus on the handle as the row moves.
+                  const target = e.currentTarget;
+                  requestAnimationFrame(() => target.focus());
+                }}
+              >
+                <Icon name="grip" size={18} />
+              </button>
               <input type="text" aria-label={`Name of ${c.label}`} value={c.label} onChange={(e) => setList(list.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)))} />
               {c.id !== 'other' && (
                 <button
