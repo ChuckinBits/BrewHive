@@ -5,6 +5,33 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.0)
+
+### Ingredient library
+
+- **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
+  use by category, with a search box and category chips. Each has a default
+  unit and notes, and shows the recipes and batches that use it. It starts
+  with common mead-making staples (honeys, yeasts, nutrients, stabilizers
+  including Nagardo, fining agents), with no prices.
+- **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
+  Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
+  Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
+  remove one (its ingredients move to Other).
+- **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
+  shows your list as you type, with category chips. Picking one fills in its
+  default unit. A new name can be saved to your list with one checkbox, and
+  "Your ingredients" opens the list without leaving what you're writing.
+- **Costs** ([#33]). Give an ingredient what you paid ("24.99 for 12 lb") and
+  batches and recipes show their ingredient cost: the total, per 750 mL
+  bottle and per gallon or liter. A batch keeps the prices it was made with;
+  recipes use today's. Choose the currency under More.
+
+### Roadmap
+
+- Milestones renumbered: v0.2 Ingredient library, v0.3 Equipment, v0.4 phone
+  apps, v0.5 sync, v0.6 community.
+
 ## v0.1.2 – 2026-11-19
 
 ### Fermentation and the final gravity
@@ -124,3 +151,6 @@ themes; sample data.
 [#24]: https://github.com/ChuckinBits/BrewHive/issues/24
 [#26]: https://github.com/ChuckinBits/BrewHive/issues/26
 [#27]: https://github.com/ChuckinBits/BrewHive/issues/27
+[#31]: https://github.com/ChuckinBits/BrewHive/issues/31
+[#32]: https://github.com/ChuckinBits/BrewHive/issues/32
+[#33]: https://github.com/ChuckinBits/BrewHive/issues/33
