@@ -7,7 +7,7 @@ import { BATCH_STATUSES, type Batch, type BatchEvent } from '../db/types.ts';
 import { Book, Carboy } from '../components/Vessels.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { EmptyState, Fab, TopBar, toast } from '../components/ui.tsx';
-import { batchAbv, fillLevel, isActive } from '../lib/batch.ts';
+import { abvEstimate, batchAbv, fillLevel, isActive } from '../lib/batch.ts';
 import { daysBetween } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, today } from '../lib/format.ts';
 import { iconsOf } from '../icons/FlavorIcon.tsx';
@@ -82,7 +82,9 @@ export function BatchesScreen() {
     });
 
   const items: ShelfEntry[] = visible.map((batch) => {
-    const abv = batchAbv(batch, eventsByBatch.get(batch.id) ?? []);
+    const timeline = eventsByBatch.get(batch.id) ?? [];
+    const abv = batchAbv(batch, timeline);
+    const estimated = abvEstimate(batch, timeline) != null;
     return {
       key: batch.id,
       to: `/batches/${batch.id}`,
@@ -90,7 +92,7 @@ export function BatchesScreen() {
       icons: iconsOf(batch),
       title: batch.name,
       subtitle: batchSubtitle(batch),
-      meta: abv != null && batch.status !== 'planned' ? fmtPercent(abv) : undefined,
+      meta: abv != null && batch.status !== 'planned' ? `${estimated ? '≈ ' : ''}${fmtPercent(abv)}` : undefined,
       rating: batch.rating,
     };
   });

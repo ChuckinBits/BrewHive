@@ -2039,3 +2039,31 @@ button.staged-row:hover {
   border: 0;
   padding: 0;
 }
+
+/* --- Final reading (issue #26) ------------------------------------------ */
+
+.final-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.final-reading > .btn {
+  align-self: flex-start;
+}
+
+.final-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent, #e8a33a);
+  color: #2a1f14;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 2px;
+}
+
+.final-hint {
+  color: var(--ink);
+}

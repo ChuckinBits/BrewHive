@@ -2,7 +2,6 @@
 
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
 import { abv } from './calc.ts';
-import { toLocalMinute } from './format.ts';
 
 /** The final gravity assumed when the user has not set a target: fully dry. */
 export const DEFAULT_TARGET_FG = 1.0;
@@ -35,23 +34,42 @@ export function originalGravity(batch: Batch, events: BatchEvent[]): number | nu
   return gravityPoints(batch, events)[0]?.sg ?? null;
 }
 
+/** Primary and Secondary: the stages where fermentation happens. */
+export function isFermenting(status: BatchStatus): boolean {
+  return status === 'primary' || status === 'secondary';
+}
+
 /**
- * Whether fermentation is finished. Batches saved before this flag existed
- * count as finished when they had a final gravity.
+ * Whether fermentation is finished: the stage decides. Aging and Bottled are done;
+ * an archived batch counts by the stage it was archived from (Bottled if unknown).
  */
 export function isFermentationComplete(batch: Batch): boolean {
-  return batch.fermentationComplete ?? batch.fg != null;
+  const status = batch.status === 'archived' ? (batch.statusBeforeArchive ?? 'bottled') : batch.status;
+  return status === 'aging' || status === 'bottled';
 }
 
 export function targetFinalGravity(batch: Batch): number {
   return batch.targetFG ?? DEFAULT_TARGET_FG;
 }
 
-/** The final gravity once fermentation is complete, otherwise the most recent reading. */
+/** The final gravity reading when one is marked, otherwise the most recent gravity. */
 export function currentGravity(batch: Batch, events: BatchEvent[]): number | null {
-  if (isFermentationComplete(batch) && batch.fg != null) return batch.fg;
+  const marked = finalReading(events);
+  if (marked) return marked.value;
   const points = gravityPoints(batch, events);
   return points.length ? points[points.length - 1].sg : null;
+}
+
+/** The batch's final gravity reading, if one is marked. There is only ever one; the latest wins if old data has more. */
+export function finalReading(events: BatchEvent[]): BatchEvent | null {
+  const marked = readings(events).filter((e) => e.type === 'gravity' && e.final);
+  return marked.length ? marked[marked.length - 1] : null;
+}
+
+/** The latest gravity reading on the timeline (not the OG), or null when there is none. */
+export function finalGravity(events: BatchEvent[]): number | null {
+  const all = readings(events);
+  return all.length ? (all[all.length - 1].value as number) : null;
 }
 
 /** A rise in a plain gravity reading smaller than this is treated as hydrometer wobble, not added sugar. */
@@ -98,86 +116,43 @@ export function sugarFerments(entry: BatchEvent): boolean {
  *     gravity: that entry decides, so "add honey, then take a reading" works.
  *   - On any other plain reading: it counts if it rose by NOISE_RISE or more and the batch
  *     was not stabilized before it. A smaller rise is wobble and is ignored.
- * - The final gravity sits where fermentation was marked complete (completedAt). Without that
- *   date it sits right after the last plain reading, so sugar added after fermentation finished
- *   (backsweetening) comes after it. Either way it never comes after stabilizing or after
- *   backsweetening that isn't meant to ferment, nor after a step feeding or ticked
- *   backsweetening unless a gravity reading follows it or the final gravity was entered after
- *   it was logged.
+ *   A final reading (logged when fermentation ends) never counts as added sugar, and the walk
+ *   stops there: readings after it don't change the ABV.
+ * Every gravity is a timeline entry, so its place is its date: nothing is guessed.
  */
+type Step = BatchEvent;
+
+/** The entries the gravity walk goes through, in timeline order: readings, and feeding or backsweetening entries. */
+export function gravitySteps(batch: Batch, events: BatchEvent[]): Step[] {
+  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  // When there is no OG, the first reading stands in for it.
+  const skip = batch.og == null ? readings(live)[0] : undefined;
+  return live.filter((e) => e !== skip && ((READING_TYPES.has(e.type) && e.value != null) || isSugar(e)));
+}
+
 export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnalysis {
   const og = originalGravity(batch, events);
   const result: GravityAnalysis = { fermented: 0, addedSugar: 0, hasReadings: false };
   if (og == null) return result;
 
-  type Step = { sg: number | null; event: BatchEvent | null };
-  const live = events.filter((e) => !e.deletedAt).sort(byTime);
-  const withValue = readings(live);
-  // When there is no OG, the first reading stands in for it.
-  const skip = batch.og == null ? withValue[0] : undefined;
-  const steps: Step[] = live
-    .filter((e) => e !== skip && ((READING_TYPES.has(e.type) && e.value != null) || isSugar(e)))
-    .map((e) => ({ sg: e.value, event: e }));
-
-  if (isFermentationComplete(batch) && batch.fg != null) {
-    const fgStep: Step = { sg: batch.fg, event: null };
-    let at: number;
-    if (batch.completedAt) {
-      // completedAt is an exact moment (ISO). An entry comes after the final gravity if it is dated
-      // a later minute, or the same minute and was added after fermentation was marked complete.
-      const exact = batch.completedAt.length > 16;
-      const minute = exact ? toLocalMinute(batch.completedAt) : batch.completedAt;
-      at = steps.findIndex(
-        (s) => !!s.event && (s.event.date.slice(0, 16) > minute || (exact && s.event.date.slice(0, 16) === minute && s.event.createdAt > (batch.completedAt as string))),
-      );
-      if (at < 0) at = steps.length;
-    } else {
-      let lastPlain = -1;
-      steps.forEach((s, i) => {
-        if (s.event?.type === 'gravity') lastPlain = i;
-      });
-      at = lastPlain + 1;
-    }
-    // Stabilizing, and backsweetening that isn't meant to ferment, only happen once fermentation
-    // is done. So the final gravity always comes before them, even if fermentation was marked
-    // complete later; otherwise the drop from a sweetened gravity back to the FG would count as alcohol.
-    const stabilizedAt = live.find((e) => e.type === 'stabilize');
-    const finished = steps.findIndex(
-      (s) =>
-        !!s.event &&
-        ((s.event.type === 'backsweeten' && !sugarFerments(s.event)) ||
-          // (Sugar the person says will ferment, such as a ticked backsweetening, is left where it is.)
-          (!!stabilizedAt && !(isSugar(s.event) && sugarFerments(s.event)) && stabilizedBefore([stabilizedAt], s.event.date, s.event.createdAt))),
-    );
-    if (finished >= 0 && finished < at) at = finished;
-    // Sugar that ferments (step feeding, or backsweetening ticked to ferment) only adds to the ABV
-    // once a later measurement shows the drop: a gravity reading after it, or a final gravity
-    // entered after it was logged. A final gravity entered before the sugar was logged was
-    // measured before it, so it comes first.
-    const fgEnteredAt = batch.completedAt && batch.completedAt.length > 16 ? batch.completedAt : null;
-    for (let i = 0; i < at; i++) {
-      const event = steps[i].event;
-      if (!event || !isSugar(event)) continue;
-      const confirmed =
-        steps.slice(i + 1, at).some((s) => s.event?.type === 'gravity' && s.sg != null) || (fgEnteredAt != null && event.createdAt < fgEnteredAt);
-      if (!confirmed) {
-        at = i;
-        break;
-      }
-    }
-    steps.splice(at, 0, fgStep);
-  }
+  const steps = gravitySteps(batch, events);
 
   let level = og;
   // A feeding or backsweetening entry logged without a gravity, waiting for the next reading.
   let pending: (BatchEvent & { type: 'feeding' | 'backsweeten' }) | null = null;
-  for (const { sg, event } of steps) {
+  for (const event of steps) {
+    const sg = event.value;
     if (sg == null) {
       if (event && isSugar(event)) pending = event;
       continue;
     }
     result.hasReadings = true;
-    const source = event && isSugar(event) ? event : pending;
+    const source = isSugar(event) ? event : pending;
+    if (event.type === 'gravity' && event.final) {
+      // The final reading settles the ABV: later readings, up or down, no longer change it.
+      if (sg <= level) result.fermented += level - sg;
+      break;
+    }
     pending = null;
     if (sg <= level) {
       result.fermented += level - sg;
@@ -188,18 +163,35 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
     if (source) {
       if (sugarFerments(source)) result.addedSugar += rise;
       level = sg;
-    } else if (event && rise >= NOISE_RISE - 1e-9) {
-      // A real rise on a plain reading, such as sugar added without logging it.
-      if (!stabilizedBefore(events, event.date, event.createdAt)) result.addedSugar += rise;
+    } else if (rise >= NOISE_RISE - 1e-9) {
+      // A real rise on a plain reading, such as sugar added without logging it. A final reading
+      // is a measurement of where fermentation ended, never added sugar, so it only moves the level.
+      // (A reading that was the final gravity once, final: false, is still a measurement.)
+      if (event.final == null && !stabilizedBefore(events, event.date, event.createdAt)) result.addedSugar += rise;
       level = sg;
     }
-    // Otherwise: wobble (or a final gravity above the level). The level stays where it was.
+    // Otherwise: wobble. The level stays where it was.
   }
   return result;
 }
 
-/** ABV so far. Null until there is a reading after the OG (or an FG), so a new batch shows a dash, not 0%. */
+/**
+ * The estimated ABV: the latest "Estimated ABV" entry, entered when there was no final
+ * reading. A gravity reading logged after it replaces it, and deleting the entry removes it.
+ */
+export function abvEstimate(_batch: Batch, events: BatchEvent[]): number | null {
+  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  const estimates = live.filter((e) => e.type === 'estimate' && e.value != null);
+  const latest = estimates[estimates.length - 1];
+  if (!latest) return null;
+  const after = live.slice(live.indexOf(latest) + 1);
+  return after.some((e) => READING_TYPES.has(e.type) && e.value != null) ? null : latest.value;
+}
+
+/** ABV so far, or the estimate. Null until there is a reading after the OG, so a new batch shows a dash, not 0%. */
 export function batchAbv(batch: Batch, events: BatchEvent[]): number | null {
+  const estimate = abvEstimate(batch, events);
+  if (estimate != null) return estimate;
   const analysis = analyzeGravity(batch, events);
   return analysis.hasReadings ? Math.max(0, analysis.fermented * 131.25) : null;
 }
@@ -222,14 +214,6 @@ export function projectedAbv(og: number | null, targetFG: number): ProjectedAbv 
   if (og == null) return null;
   const isDefault = Math.abs(targetFG - DEFAULT_TARGET_FG) < 0.0005;
   return { potential: abv(og, DEFAULT_TARGET_FG), target: isDefault ? null : abv(og, targetFG) };
-}
-
-/**
- * The stage a batch moves to when fermentation is marked complete: Secondary,
- * if it is still in Planned or Primary. A batch already further along stays put.
- */
-export function stageWhenComplete(status: BatchStatus): BatchStatus {
-  return status === 'planned' || status === 'primary' ? 'secondary' : status;
 }
 
 /** The same calendar day, comparing yyyy-mm-dd or local date-time strings. */

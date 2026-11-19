@@ -60,7 +60,10 @@ test('a batch provides its type, style, size, gravities, staged ingredients, ico
 });
 
 test('once fermentation is complete, the actual final gravity becomes the target FG', () => {
-  assert.equal(recipeFieldsFromBatch(batch({ fermentationComplete: true, fg: 1.004 }), []).targetFG, 1.004);
+  const final: BatchEvent = { ...base, id: 'f', batchId: 'b1', type: 'gravity', date: '2026-11-20T10:00', value: 1.004, note: '', final: true };
+  assert.equal(recipeFieldsFromBatch(batch({ status: 'aging' }), [final]).targetFG, 1.004);
+  // Still fermenting: the batch's target, not the latest reading.
+  assert.notEqual(recipeFieldsFromBatch(batch({ status: 'secondary' }), [final]).targetFG, 1.004);
 });
 
 test('without an OG, the first gravity reading is the target OG', () => {

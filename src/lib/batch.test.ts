@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
 import {
+  abvEstimate,
+  finalReading,
+  analyzeGravity,
   batchAbv,
   currentGravity,
   effectiveOG,
@@ -10,7 +13,6 @@ import {
   planReviewEntry,
   planStatusEntry,
   projectedAbv,
-  stageWhenComplete,
   sugarFerments,
   targetFinalGravity,
 } from './batch.ts';
@@ -28,7 +30,6 @@ const batch = (patch: Partial<Batch> = {}): Batch => ({
   startDate: '2026-11-01',
   volumeL: null,
   og: 1.1,
-  fg: null,
   ingredients: [],
   icon: 'traditional',
   color: '#E8A33A',
@@ -51,6 +52,7 @@ const stageEntry = (id: string, date: string, from: BatchStatus, to: BatchStatus
 });
 
 const reading = (date: string, sg: number): BatchEvent => ({ ...base, id: date, batchId: 'b1', type: 'gravity', date, value: sg, note: '' });
+const final = (date: string, sg: number): BatchEvent => ({ ...reading(date, sg), final: true });
 
 test('potential ABV assumes fermentation to 1.000, with no separate target', () => {
   const p = projectedAbv(1.1, 1.0);
@@ -64,30 +66,22 @@ test('a target FG other than 1.000 adds a target ABV beside the potential', () =
   assert.ok(Math.abs((p?.target ?? 0) - 11.8125) < 1e-9);
 });
 
-test('marking fermentation complete moves Planned and Primary batches to Secondary, never backwards', () => {
-  assert.equal(stageWhenComplete('planned'), 'secondary');
-  assert.equal(stageWhenComplete('primary'), 'secondary');
-  assert.equal(stageWhenComplete('secondary'), 'secondary');
-  assert.equal(stageWhenComplete('aging'), 'aging');
-  assert.equal(stageWhenComplete('bottled'), 'bottled');
-});
-
 test('no projected ABV without an OG', () => {
   assert.equal(projectedAbv(null, 1.0), null);
 });
 
-test('batches saved before the flag existed count as complete when they had an FG', () => {
-  assert.equal(isFermentationComplete(batch({ fg: 0.998 })), true);
-  assert.equal(isFermentationComplete(batch({ fg: null })), false);
-  assert.equal(isFermentationComplete(batch({ fg: 0.998, fermentationComplete: false })), false);
+test('the stage says whether fermentation is done (issue #26)', () => {
+  for (const status of ['planned', 'primary', 'secondary'] as const) assert.equal(isFermentationComplete(batch({ status })), false, status);
+  for (const status of ['aging', 'bottled'] as const) assert.equal(isFermentationComplete(batch({ status })), true, status);
+  assert.equal(isFermentationComplete(batch({ status: 'archived', statusBeforeArchive: 'secondary' })), false);
+  assert.equal(isFermentationComplete(batch({ status: 'archived', statusBeforeArchive: null })), true);
   assert.equal(targetFinalGravity(batch()), 1.0);
 });
 
-test('the FG only counts once fermentation is complete', () => {
-  const events = [reading('2026-11-05T10:00', 1.02)];
-  assert.equal(currentGravity(batch({ fg: 0.998, fermentationComplete: false }), events), 1.02);
-  assert.equal(currentGravity(batch({ fg: 0.998, fermentationComplete: true }), events), 0.998);
-  assert.ok(Math.abs((batchAbv(batch({ fg: 0.998, fermentationComplete: true }), []) ?? 0) - 13.3875) < 1e-9);
+test('the current gravity is the latest reading; a final reading is just a reading', () => {
+  const events = [reading('2026-11-05T10:00', 1.02), final('2026-11-09T10:00', 0.998)];
+  assert.equal(currentGravity(batch(), events), 0.998);
+  near(batchAbv(batch({ status: 'aging' }), events), 13.3875);
 });
 
 test('the first stage tap of the day adds an automatic entry', () => {
@@ -221,28 +215,23 @@ test('sugarFerments: feeding always, backsweetening only when ticked', () => {
 
 // --- Backsweetening after fermentation is complete (follow-up to issue #3) ----
 
-test('complete batch, then stabilized and backsweetened with "This will ferment": counts (no completion date)', () => {
-  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
-  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
-  near(effectiveOG(b, events), 1.115);
-  near(batchAbv(b, events), 13.125);
+test('final reading, then stabilized and backsweetened with "This will ferment": the potential counts it', () => {
+  // Ticking "This will ferment" after the final reading takes its Final tag away (it becomes final: false).
+  const events = [{ ...final('2026-11-09T10:00', 1.0), final: false }, entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  near(effectiveOG(batch({ og: 1.1 }), events), 1.115);
+  near(batchAbv(batch({ og: 1.1 }), events), 13.125);
 });
 
-test('complete batch: the final gravity sits at its completion date', () => {
-  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
-  near(effectiveOG(batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-09T10:00:00.000Z' }), events), 1.115);
-  // Marked complete after the backsweetening fermented out: the FG comes last, and that drop is ABV.
-  const later = batch({ og: 1.1, fermentationComplete: true, fg: 0.998, completedAt: '2026-11-20T10:00:00.000Z' });
-  const refermented = [reading('2026-11-08T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
-  near(effectiveOG(later, refermented), 1.115);
-  near(batchAbv(later, refermented), (0.1 + 0.017) * 131.25);
+test('ticked backsweetening that ferments out: the drop after it is ABV, once a reading shows it', () => {
+  const events = [reading('2026-11-08T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true }), final('2026-11-20T10:00', 0.998)];
+  near(effectiveOG(batch({ og: 1.1 }), events), 1.115);
+  near(batchAbv(batch({ og: 1.1 }), events), (0.1 + 0.017) * 131.25);
 });
 
-test('complete batch, stabilized and backsweetened without ticking the box: the potential stays put', () => {
-  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0 });
-  const events = [entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015)];
-  near(effectiveOG(b, events), 1.1);
-  near(batchAbv(b, events), 13.125);
+test('stabilized and backsweetened without ticking the box: the potential and ABV stay put', () => {
+  const events = [final('2026-11-09T10:00', 1.0), entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015)];
+  near(effectiveOG(batch({ og: 1.1 }), events), 1.1);
+  near(batchAbv(batch({ og: 1.1 }), events), 13.125);
 });
 
 test('a backsweetening entry without a gravity hands its setting to the next reading', () => {
@@ -264,14 +253,6 @@ test('stabilized and backsweetened in the same minute: the order they were added
   const b = batch({ og: 1.1 });
   near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, sweet]), 1.1);
   near(effectiveOG(b, [reading('2026-11-08T10:00', 1.0), stab, { ...sweet, ferments: true }]), 1.115);
-});
-
-test('marked complete, then stabilized and backsweetened in the same minute: the FG comes first', () => {
-  const b = batch({ og: 1.1, fermentationComplete: true, fg: 1.0, completedAt: '2026-11-11T10:00:05.000Z' });
-  const stab = entry('stabilize', '2026-11-11T10:00', null, { createdAt: '2026-11-11T10:00:20.000Z' });
-  const sweet = entry('backsweeten', '2026-11-11T10:00', 1.015, { createdAt: '2026-11-11T10:00:40.000Z', ferments: true });
-  near(effectiveOG(b, [stab, sweet]), 1.115);
-  near(batchAbv(b, [stab, sweet]), 13.125);
 });
 
 // --- Batch rating entries (issue #8) -----------------------------------------
@@ -303,47 +284,72 @@ test('tastings and rating entries edited by hand are never replaced', () => {
   assert.deepEqual(planReviewEntry([tasting], null, '2026-11-18T09:10'), { action: 'none' });
 });
 
-// --- Final gravity and backsweetening ----------------------------------------
+// --- Every gravity is a timeline reading (issue #26) ------------------------
 
-test('backsweetening that does not ferment never adds to the ABV, however fermentation was marked complete', () => {
-  const finished = [reading('2026-11-05T10:00', 1.0), reading('2026-11-06T10:00', 0.998)];
+test('backsweetening that does not ferment never adds to the ABV (Pink Lady Cyser)', () => {
+  const finished = [reading('2026-11-05T10:00', 1.0), final('2026-11-06T10:00', 0.998)];
   const sweet = entry('backsweeten', '2026-11-08T10:00', 1.012);
   const expected = (1.1 - 0.998) * 131.25;
-  const done = (completedAt: string | null) => batch({ status: 'aging', fermentationComplete: true, fg: 0.998, completedAt });
-  // Marked complete after the backsweetening was logged (the restored Pink Lady Cyser).
-  near(batchAbv(done('2026-11-09T18:00:00.000Z'), [...finished, sweet]), expected);
-  // No completion moment recorded, with a reading of the sweetened gravity afterwards.
-  near(batchAbv(done(null), [...finished, sweet, reading('2026-11-09T10:00', 1.012)]), expected);
-  // Sweetened after stabilizing, but logged only as a plain reading.
-  near(batchAbv(done(null), [...finished, entry('stabilize', '2026-11-07T10:00'), reading('2026-11-09T10:00', 1.012)]), expected);
-  // Deleting and re-adding the backsweetening changes nothing.
-  near(batchAbv(done('2026-11-09T18:00:00.000Z'), finished), expected);
+  const b = batch({ status: 'aging' });
+  near(batchAbv(b, [...finished, sweet]), expected);
+  near(batchAbv(b, [...finished, sweet, reading('2026-11-09T10:00', 1.012)]), expected);
+  near(batchAbv(b, finished), expected);
 });
 
-test('backsweetening ticked to ferment still keeps the final gravity after it', () => {
-  const b = batch({ status: 'aging', fermentationComplete: true, fg: 0.998, completedAt: '2026-11-20T18:00:00.000Z' });
-  const events = [reading('2026-11-05T10:00', 1.0), entry('backsweeten', '2026-11-08T10:00', 1.02, { ferments: true })];
-  near(batchAbv(b, events), (1.1 - 1.0 + 1.02 - 0.998) * 131.25);
-});
-
-test('backsweetening ticked to ferment, logged after the final gravity: needs a later reading to count', () => {
-  // The FG was entered on Nov 15; the backsweetening (dated Oct 27) was logged after that.
-  const b = batch({ og: 1.08, status: 'aging', fermentationComplete: true, fg: 0.998, completedAt: '2026-11-15T18:00:00.000Z' });
-  const finished = [reading('2026-10-20T10:00', 1.0), reading('2026-10-25T10:00', 0.998)];
-  const sweet = entry('backsweeten', '2026-10-27T10:00', 1.025, { ferments: true, createdAt: '2026-11-19T04:00:00.000Z' });
+test('ticked backsweetening or step feeding only raise the ABV once a later reading shows the drop', () => {
+  const b = batch({ og: 1.08, status: 'aging' });
+  // Fermenting sugar after the final reading takes its Final tag away (final: false).
+  const finished = [reading('2026-10-20T10:00', 1.0), { ...final('2026-10-25T10:00', 0.998), final: false }];
   const base = (1.08 - 0.998) * 131.25;
+  const sweet = entry('backsweeten', '2026-10-27T10:00', 1.025, { ferments: true });
   near(batchAbv(b, [...finished, sweet]), base);
-  near(batchAbv(b, [...finished, sweet, { ...reading('2026-11-17T10:00', 1.01), createdAt: '2026-11-19T05:00:00.000Z' }]), base + (1.025 - 1.01) * 131.25);
-  near(batchAbv(b, [...finished, sweet, { ...reading('2026-11-18T10:00', 0.998), createdAt: '2026-11-19T05:00:00.000Z' }]), base + (1.025 - 0.998) * 131.25);
-});
-
-test('a step feeding logged after the final gravity needs a later reading to count', () => {
-  const b = batch({ og: 1.08, status: 'aging', fermentationComplete: true, fg: 0.998, completedAt: '2026-11-15T18:00:00.000Z' });
-  const finished = [reading('2026-10-20T10:00', 1.0), reading('2026-10-25T10:00', 0.998)];
-  const feed = entry('feeding', '2026-10-27T10:00', 1.02, { createdAt: '2026-11-19T04:00:00.000Z' });
-  const base = (1.08 - 0.998) * 131.25;
+  near(batchAbv(b, [...finished, sweet, reading('2026-11-17T10:00', 1.01)]), base + (1.025 - 1.01) * 131.25);
+  const feed = entry('feeding', '2026-10-27T10:00', 1.02);
   near(batchAbv(b, [...finished, feed]), base);
-  near(batchAbv(b, [...finished, feed, { ...reading('2026-11-18T10:00', 1.0), createdAt: '2026-11-19T05:00:00.000Z' }]), base + 0.02 * 131.25);
+  near(batchAbv(b, [...finished, feed, reading('2026-11-18T10:00', 1.0)]), base + 0.02 * 131.25);
   // The potential still counts the feeding: it is expected to ferment.
   near(effectiveOG(b, [...finished, feed]), 1.08 + 0.022);
+});
+
+test('Grape Pyment: a reading that was the final gravity is never counted as added sugar', () => {
+  // OG 1.080, readings down to 1.000, final reading 1.010 (untagged once sugar went in),
+  // backsweetened (ticked) to 1.030, reading 1.020, step-fed to 1.040: 20 + 20 points fed, not 50.
+  const events = [
+    reading('2026-10-10T10:00', 1.0),
+    { ...reading('2026-10-15T10:00', 1.01), final: false },
+    entry('backsweeten', '2026-10-20T10:00', 1.03, { ferments: true }),
+    reading('2026-10-25T10:00', 1.02),
+    entry('feeding', '2026-10-26T10:00', 1.04),
+  ];
+  near(analyzeGravity(batch({ og: 1.08, status: 'secondary' }), events).addedSugar, 0.04);
+});
+
+test('the final reading settles the ABV: later readings, up or down, do not change it', () => {
+  const settled = [reading('2026-11-05T10:00', 1.02), final('2026-11-09T10:00', 1.0)];
+  const abv = (1.1 - 1.0) * 131.25;
+  near(batchAbv(batch({ status: 'aging' }), settled), abv);
+  near(batchAbv(batch({ status: 'aging' }), [...settled, reading('2026-11-12T10:00', 0.99)]), abv);
+  near(batchAbv(batch({ status: 'aging' }), [...settled, reading('2026-11-12T10:00', 1.012)]), abv);
+  assert.equal(currentGravity(batch(), [...settled, reading('2026-11-12T10:00', 0.99)]), 1.0, 'the FG stays the final reading');
+});
+
+test('an Estimated ABV entry stands in until a later reading replaces it, or it is deleted', () => {
+  const est = entry('estimate', '2026-11-10T10:00', 12);
+  const events = [reading('2026-11-05T10:00', 1.02), est];
+  assert.equal(abvEstimate(batch(), events), 12);
+  assert.equal(batchAbv(batch({ status: 'bottled' }), events), 12);
+  const later = [...events, reading('2026-11-12T10:00', 1.0)];
+  assert.equal(abvEstimate(batch(), later), null);
+  near(batchAbv(batch({ status: 'bottled' }), later), 13.125);
+  assert.equal(abvEstimate(batch(), [reading('2026-11-05T10:00', 1.02), { ...est, deletedAt: '2026-11-11T00:00:00Z' }]), null);
+  // A reading in the same minute, logged after the estimate, also replaces it.
+  assert.equal(abvEstimate(batch(), [{ ...est, createdAt: 'a' }, { ...reading('2026-11-10T10:00', 1.0), createdAt: 'b' }]), null);
+});
+
+test('finalReading: the marked gravity reading, or null', () => {
+  assert.equal(finalReading([reading('2026-11-05T10:00', 1.02)]), null);
+  const f = final('2026-11-09T10:00', 1.0);
+  assert.equal(finalReading([reading('2026-11-05T10:00', 1.02), f, reading('2026-11-12T10:00', 1.001)]), f);
+  assert.equal(finalReading([{ ...f, deletedAt: '2026-11-10T00:00:00Z' }]), null);
+  assert.equal(finalReading([{ ...f, final: false }]), null, 'a former final is not the final');
 });

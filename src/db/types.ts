@@ -119,9 +119,10 @@ export type EventType =
   | 'moved'
   | 'ingredient'
   | 'review'
+  | 'estimate'
   | 'note';
 
-type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' | 'ingredient' | 'method' | 'rating';
+type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'abv' | 'place' | 'ingredient' | 'method' | 'rating';
 
 /** Event types the user can add by hand: Gravity reading first, as the most common, then A to Z. */
 export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[] = [
@@ -129,6 +130,7 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[]
   ...(
     [
       { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
+      { id: 'estimate', label: 'Estimated ABV', value: 'abv' },
       { id: 'fining', label: 'Fining' },
       { id: 'ingredient', label: 'Ingredient', value: 'ingredient' },
       { id: 'moved', label: 'Moved to', value: 'place' },
@@ -275,19 +277,6 @@ export interface Batch extends Base {
   /** The unit the volume was entered in. Missing means the default from settings. */
   volumeUnit?: VolumeUnit;
   og: number | null;
-  /**
-   * True once fermentation is finished. Until then the batch shows a potential
-   * (or target) ABV. Missing on batches saved by v0.1: see isFermentationComplete.
-   */
-  fermentationComplete?: boolean;
-  /**
-   * When fermentation was marked complete (or the final gravity last changed),
-   * as an exact ISO moment. Places the final gravity on the timeline, so sugar
-   * added afterwards by backsweetening is counted after it.
-   */
-  completedAt?: string | null;
-  /** Final gravity, once fermentation is complete. The latest reading is used if it is left empty. */
-  fg: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
   /** The stage the batch was in when it was archived, so Unarchive can put it back. */
@@ -310,7 +299,7 @@ export interface BatchEvent extends Base {
   type: EventType;
   /** Local date-time, yyyy-mm-ddThh:mm */
   date: string;
-  /** SG for gravity, °C for temperature, pH for ph. */
+  /** SG for gravity, °C for temperature, pH for ph, % for an estimated ABV. */
   value: number | null;
   note: string;
   /** For "status" entries: the stage the batch moved to. */
@@ -331,6 +320,11 @@ export interface BatchEvent extends Base {
    * raises the potential ABV. Off unless ticked. Step feeding always ferments.
    */
   ferments?: boolean;
+  /**
+   * For gravity entries: true for the final reading (one per batch). false for a reading that was
+   * the final one until a newer final reading or a feeding replaced it: still a measurement, never sugar.
+   */
+  final?: boolean;
   /** For "ingredient" entries: what was added, and how much. */
   ingredient?: string;
   amount?: string;
@@ -357,6 +351,8 @@ export interface CellarEntry extends Base {
   bestAfter: string | null;
   location: string;
   abv: number | null;
+  /** True when the ABV came from an estimate at bottling, not from gravity readings. */
+  abvEstimated?: boolean;
   icon: string;
   /** Up to two more icons shown behind the main one, in order. */
   extraIcons?: string[];
