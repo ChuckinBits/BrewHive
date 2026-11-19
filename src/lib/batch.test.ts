@@ -336,3 +336,14 @@ test('backsweetening ticked to ferment, logged after the final gravity: needs a 
   near(batchAbv(b, [...finished, sweet, { ...reading('2026-11-17T10:00', 1.01), createdAt: '2026-11-19T05:00:00.000Z' }]), base + (1.025 - 1.01) * 131.25);
   near(batchAbv(b, [...finished, sweet, { ...reading('2026-11-18T10:00', 0.998), createdAt: '2026-11-19T05:00:00.000Z' }]), base + (1.025 - 0.998) * 131.25);
 });
+
+test('a step feeding logged after the final gravity needs a later reading to count', () => {
+  const b = batch({ og: 1.08, status: 'aging', fermentationComplete: true, fg: 0.998, completedAt: '2026-11-15T18:00:00.000Z' });
+  const finished = [reading('2026-10-20T10:00', 1.0), reading('2026-10-25T10:00', 0.998)];
+  const feed = entry('feeding', '2026-10-27T10:00', 1.02, { createdAt: '2026-11-19T04:00:00.000Z' });
+  const base = (1.08 - 0.998) * 131.25;
+  near(batchAbv(b, [...finished, feed]), base);
+  near(batchAbv(b, [...finished, feed, { ...reading('2026-11-18T10:00', 1.0), createdAt: '2026-11-19T05:00:00.000Z' }]), base + 0.02 * 131.25);
+  // The potential still counts the feeding: it is expected to ferment.
+  near(effectiveOG(b, [...finished, feed]), 1.08 + 0.022);
+});

@@ -101,8 +101,9 @@ export function sugarFerments(entry: BatchEvent): boolean {
  * - The final gravity sits where fermentation was marked complete (completedAt). Without that
  *   date it sits right after the last plain reading, so sugar added after fermentation finished
  *   (backsweetening) comes after it. Either way it never comes after stabilizing or after
- *   backsweetening that isn't meant to ferment, nor after backsweetening that is, unless a
- *   gravity reading follows it or the final gravity was entered after it was logged.
+ *   backsweetening that isn't meant to ferment, nor after a step feeding or ticked
+ *   backsweetening unless a gravity reading follows it or the final gravity was entered after
+ *   it was logged.
  */
 export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnalysis {
   const og = originalGravity(batch, events);
@@ -149,13 +150,14 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
           (!!stabilizedAt && !(isSugar(s.event) && sugarFerments(s.event)) && stabilizedBefore([stabilizedAt], s.event.date, s.event.createdAt))),
     );
     if (finished >= 0 && finished < at) at = finished;
-    // Backsweetening ticked to ferment only adds to the ABV once a later measurement shows the drop:
-    // a gravity reading after it, or a final gravity entered after it was logged. A final gravity
-    // entered before the backsweetening was logged was measured before it, so it comes first.
+    // Sugar that ferments (step feeding, or backsweetening ticked to ferment) only adds to the ABV
+    // once a later measurement shows the drop: a gravity reading after it, or a final gravity
+    // entered after it was logged. A final gravity entered before the sugar was logged was
+    // measured before it, so it comes first.
     const fgEnteredAt = batch.completedAt && batch.completedAt.length > 16 ? batch.completedAt : null;
     for (let i = 0; i < at; i++) {
       const event = steps[i].event;
-      if (event?.type !== 'backsweeten') continue;
+      if (!event || !isSugar(event)) continue;
       const confirmed =
         steps.slice(i + 1, at).some((s) => s.event?.type === 'gravity' && s.sg != null) || (fgEnteredAt != null && event.createdAt < fgEnteredAt);
       if (!confirmed) {
