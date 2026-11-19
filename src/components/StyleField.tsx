@@ -110,25 +110,28 @@ interface Suggestable {
 }
 
 /**
- * Picking an icon fills in the name and style while the name is empty or still
- * the suggestion. Once the person types a name, it's left alone.
+ * Picking an icon fills in the style while it's empty (or still the suggestion),
+ * and the name while that's empty (or still the suggestion). A name or style the
+ * person chose is left alone, and a chosen style is used in a suggested name.
  */
 export function useNameAndStyle<D extends Suggestable>(draft: D, set: (patch: Partial<D>) => void) {
   const [nameAuto, setNameAuto] = useState(draft.name.trim() === '');
   const [styleAuto, setStyleAuto] = useState(false);
-  const suggesting = nameAuto || draft.name.trim() === '';
 
-  /** The name and style for this icon and type, keeping a style the person chose. */
-  const suggestion = (icon: string, type: BeverageType, style: string, styleIsAuto: boolean): Partial<Suggestable> => {
-    const s = suggestFromIcon(icon, type, styleIsAuto ? '' : style);
-    const patch: Partial<Suggestable> = { name: s.name };
-    if (s.style != null && s.style !== style) {
-      patch.style = s.style;
-      setStyleAuto(true);
-    } else if (s.style == null && styleIsAuto) {
-      patch.style = '';
+  /** The suggested name and style for this icon and type, with only the parts that may change. */
+  const suggestion = (icon: string, type: BeverageType, style: string): Partial<Suggestable> => {
+    const styleOpen = styleAuto || style.trim() === '';
+    const s = suggestFromIcon(icon, type, styleOpen ? '' : style);
+    const patch: Partial<Suggestable> = {};
+    if (styleOpen) {
+      // Fill an empty style, or update the one we suggested; clear it when the type has no suggestion.
+      patch.style = s.style ?? '';
+      setStyleAuto(s.style != null);
     }
-    setNameAuto(true);
+    if (nameAuto || draft.name.trim() === '') {
+      patch.name = s.name;
+      setNameAuto(true);
+    }
     return patch;
   };
 
@@ -139,13 +142,14 @@ export function useNameAndStyle<D extends Suggestable>(draft: D, set: (patch: Pa
     },
     onIcon: (next: { icon: string; extraIcons: string[]; color: string }) => {
       const patch: Partial<Suggestable> = { ...next };
-      if (suggesting && next.icon !== draft.icon) Object.assign(patch, suggestion(next.icon, draft.beverageType, draft.style, styleAuto));
+      if (next.icon !== draft.icon) Object.assign(patch, suggestion(next.icon, draft.beverageType, draft.style));
       set(patch as Partial<D>);
     },
     onType: (beverageType: BeverageType) => {
       const style = styleForType(draft.style, beverageType);
-      const patch: Partial<Suggestable> = { beverageType, style };
-      if (nameAuto && draft.name.trim()) Object.assign(patch, suggestion(draft.icon, beverageType, style, styleAuto || style === ''));
+      const patch: Partial<Suggestable> = { beverageType, style, ...suggestion(draft.icon, beverageType, style) };
+      // Switching type only renames a name that was suggested; it never fills in an empty one.
+      if (!(nameAuto && draft.name.trim())) delete patch.name;
       set(patch as Partial<D>);
     },
     onStyle: (style: string) => {
