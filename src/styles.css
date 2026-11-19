@@ -2067,3 +2067,36 @@ button.staged-row:hover {
 .final-hint {
   color: var(--ink);
 }
+
+/* --- Target ABV or FG (issue #27) --------------------------------------- */
+
+.target-reached {
+  margin: 0 0 14px;
+  border: 1px solid var(--accent, #e8a33a);
+  color: var(--ink);
+}
+
+/*
+ * Stat tiles in a row stretch to the tallest one. The number and label sit centered in the space
+ * above the extra line (+20 pts fed, Target 14.0%...), with the extra at the bottom. In a row where
+ * some tile has an extra, tiles without one keep an invisible line in its place, so the numbers
+ * still line up across the row; a taller extra (needs 17-27 pts) leaves the others centered.
+ */
+.stat > .stat-value {
+  margin-top: auto;
+}
+
+.stat > .stat-label {
+  margin-bottom: auto;
+}
+
+.stats:has(.stat-extra) .stat:not(:has(.stat-extra))::after {
+  content: '\00a0';
+  align-self: stretch;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  visibility: hidden;
+}

@@ -6,6 +6,19 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 
 ## Unreleased
 
+- **Aim for an FG or an ABV** ([#27]). The Target field on batches and
+  recipes has an FG / ABV switch. Aiming for an FG works as before: the
+  target ABV rises with step feeding. Aiming for an ABV keeps it fixed and
+  shows the FG it finishes at instead (OG 1.080 + 40 points fed, aiming for
+  14%, finishes around 1.013). Finishing between 0.990 and 1.000 is fine
+  ("drier than most meads get", with the points it would take to finish at
+  1.000); below 0.990 it gives the range of sugar it needs, from finishing at
+  0.990 to finishing at 1.000 ("needs 17–27 pts").
+- **Potential follows a target below 1.000** ([#27]). With a target FG of
+  0.995, Potential is worked out to 0.995 ("Potential 13.8% at 0.995")
+  instead of showing a target higher than the potential. While fermenting, the batch page says "Target reached"
+  once the ABV gets there. Batches and recipes keep the choice when saved
+  from one another.
 - **The stage decides when fermentation is done** ([#26]). The "Fermentation
   is complete" checkbox and the Final gravity field are gone. Moving a batch
   from Primary or Secondary to Aging, or bottling it, asks for the final
@@ -94,3 +107,4 @@ themes; sample data.
 [#23]: https://github.com/ChuckinBits/BrewHive/issues/23
 [#24]: https://github.com/ChuckinBits/BrewHive/issues/24
 [#26]: https://github.com/ChuckinBits/BrewHive/issues/26
+[#27]: https://github.com/ChuckinBits/BrewHive/issues/27

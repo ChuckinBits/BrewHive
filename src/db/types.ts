@@ -235,6 +235,8 @@ export interface IngredientLine {
 }
 
 export type VolumeUnit = 'gal' | 'L';
+/** What a batch or recipe aims for: a final gravity (the ABV follows), or an ABV (the final gravity follows). */
+export type TargetMode = 'fg' | 'abv';
 export type TempUnit = 'F' | 'C';
 
 export interface Recipe extends Base {
@@ -246,6 +248,10 @@ export interface Recipe extends Base {
   volumeUnit?: VolumeUnit;
   targetOG: number | null;
   targetFG: number | null;
+  /** Missing means 'fg', how recipes worked before. */
+  targetMode?: TargetMode;
+  /** The ABV aimed for, in %, when targetMode is 'abv'. */
+  targetAbv?: number | null;
   ingredients: IngredientLine[];
   steps: string[];
   /** Flavor icon id, see src/icons/flavors.ts. */
@@ -279,6 +285,10 @@ export interface Batch extends Base {
   og: number | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
+  /** Missing means 'fg': the target ABV rises with step feeding. 'abv' keeps it fixed and shows the FG it implies. */
+  targetMode?: TargetMode;
+  /** The ABV aimed for, in %, when targetMode is 'abv'. */
+  targetAbv?: number | null;
   /** The stage the batch was in when it was archived, so Unarchive can put it back. */
   statusBeforeArchive?: BatchStatus | null;
   /** "Not now" was chosen when the last bottle was poured; cleared when bottles come back. */

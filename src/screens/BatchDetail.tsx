@@ -11,8 +11,10 @@ import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS,
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
   abvEstimate,
+  fmtPoints,
   batchAbv,
   finalReading,
+  pointsNeeded,
   currentGravity,
   finalGravity,
   gravityPoints,
@@ -21,7 +23,7 @@ import {
   analyzeGravity,
   originalGravity,
   projectedAbv,
-  targetFinalGravity,
+  targetReached,
 } from '../lib/batch.ts';
 import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
@@ -109,7 +111,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const estimated = abvEstimate(batch, data.events) != null;
   const { addedSugar } = analyzeGravity(batch, data.events);
   // Sugar added later by step feeding or backsweetening raises the potential.
-  const projected = projectedAbv(og == null ? null : og + addedSugar, targetFinalGravity(batch));
+  const projected = projectedAbv(og == null ? null : og + addedSugar, batch);
+  const reached = targetReached(batch, data.events);
 
   const currentStage = currentIngredientStage(batch.status);
   const added = addedLines(data.events);
@@ -172,9 +175,38 @@ export function BatchDetailScreen({ id }: { id: string }) {
           label="Potential"
           value={fmtPercent(projected?.potential)}
           highlight
-          extra={projected?.target != null ? `Target ${fmtPercent(projected.target)}` : undefined}
+          extra={
+            projected == null ? undefined : projected.mode === 'abv' && projected.target != null ? (
+              // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show the range of sugar it needs (to 0.990 and to 1.000).
+              <>
+                Target {fmtPercent(projected.target)}
+                <br />
+                {projected.reachable ? (
+                  `FG ${fmtSG(projected.targetFG)}`
+                ) : (
+                  // Its own line, so the range fits a phone-width tile.
+                  <>
+                    needs
+                    <br />
+                    {fmtPoints(pointsNeeded(projected.targetFG))} pts
+                  </>
+                )}
+              </>
+            ) : projected.showTarget && projected.target != null ? (
+              `Target ${fmtPercent(projected.target)}`
+            ) : projected.potentialFG < 0.9995 ? (
+              // Worked out to a target FG below 1.000.
+              `at ${fmtSG(projected.potentialFG)}`
+            ) : undefined
+          }
         />
       </div>
+
+      {reached && projected?.target != null && (
+        <p className="notice-inline target-reached" role="status">
+          <strong>Target reached.</strong> {fmtPercent(abv)} of the {fmtPercent(projected.target)} you aimed for. Time to stabilize?
+        </p>
+      )}
 
       <GravityChart points={gravityPoints(batch, data.events)} />
 

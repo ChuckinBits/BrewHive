@@ -15,6 +15,9 @@ import {
   projectedAbv,
   sugarFerments,
   targetFinalGravity,
+  fmtPoints,
+  pointsNeeded,
+  targetReached,
 } from './batch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
@@ -352,4 +355,71 @@ test('finalReading: the marked gravity reading, or null', () => {
   assert.equal(finalReading([reading('2026-11-05T10:00', 1.02), f, reading('2026-11-12T10:00', 1.001)]), f);
   assert.equal(finalReading([{ ...f, deletedAt: '2026-11-10T00:00:00Z' }]), null);
   assert.equal(finalReading([{ ...f, final: false }]), null, 'a former final is not the final');
+});
+
+// --- Target ABV or target FG (issue #27) ---------------------------------------
+
+test('aiming for an FG: the target ABV rises with added sugar', () => {
+  const p = projectedAbv(1.12, { targetMode: 'fg', targetFG: 1.01 });
+  near(p?.target, (1.12 - 1.01) * 131.25);
+  assert.equal(p?.mode, 'fg');
+});
+
+test('aiming for an ABV: the target stays put and additions raise the FG it finishes at', () => {
+  // OG 1.080 + 40 points fed, aiming for 14%: finishes around 1.013.
+  const p = projectedAbv(1.08 + 0.04, { targetMode: 'abv', targetAbv: 14, targetFG: 1.0 });
+  assert.equal(p?.target, 14);
+  assert.equal(p?.mode, 'abv');
+  assert.equal(Number(p?.targetFG.toFixed(3)), 1.013);
+  near(projectedAbv(1.08, { targetMode: 'abv', targetAbv: 14 })?.target, 14);
+  // Without a target ABV, it falls back to the FG.
+  assert.equal(projectedAbv(1.1, { targetMode: 'abv', targetAbv: null, targetFG: 1.01 })?.mode, 'fg');
+});
+
+test('target reached: while fermenting, once the measured ABV gets to the target', () => {
+  const b = batch({ og: 1.1, status: 'secondary', targetMode: 'abv', targetAbv: 12 });
+  assert.equal(targetReached(b, [reading('2026-11-05T10:00', 1.02)]), false, '10.5% of 12%');
+  assert.equal(targetReached(b, [reading('2026-11-08T10:00', 1.008)]), true, '12.1% of 12%');
+  assert.equal(targetReached({ ...b, status: 'aging' }, [reading('2026-11-08T10:00', 1.008)]), false, 'not once fermentation is done');
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary' }), [reading('2026-11-08T10:00', 0.998)]), false, 'no target besides fully dry');
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary', targetFG: 1.01 }), [reading('2026-11-08T10:00', 1.01)]), true, 'an FG target counts too');
+});
+
+test('a target FG below 1.000: the potential follows it, and the target is not shown twice', () => {
+  const p = projectedAbv(1.1, { targetMode: 'fg', targetFG: 0.995 });
+  near(p?.potential, (1.1 - 0.995) * 131.25);
+  assert.equal(p?.potentialFG, 0.995);
+  assert.equal(p?.showTarget, false);
+  // 1.000 (dry) and above work as before.
+  const dry = projectedAbv(1.1, { targetMode: 'fg', targetFG: 1.0 });
+  near(dry?.potential, 13.125);
+  assert.equal(dry?.showTarget, false);
+  const sweet = projectedAbv(1.1, { targetMode: 'fg', targetFG: 1.01 });
+  near(sweet?.potential, 13.125);
+  assert.equal(sweet?.showTarget, true);
+  // Target reached still works for a target below 1.000.
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary', targetFG: 0.995 }), [reading('2026-11-08T10:00', 0.994)]), true);
+});
+
+test('an ABV target that finishes between 0.990 and 1.000 is reachable; drier is not', () => {
+  // 1.110 aiming for 15%: finishes around 0.996.
+  const near996 = projectedAbv(1.11, { targetMode: 'abv', targetAbv: 15 });
+  assert.equal(near996?.reachable, true);
+  near(near996?.potential, 15);
+  // 1.080 aiming for 14%: would need 0.973, more than it can reach.
+  const tooDry = projectedAbv(1.08, { targetMode: 'abv', targetAbv: 14 });
+  assert.equal(tooDry?.reachable, false);
+  near(tooDry?.potential, 10.5);
+  // Exactly 0.990 counts.
+  assert.equal(projectedAbv(1.09, { targetMode: 'abv', targetAbv: 13.125 })?.reachable, true);
+});
+
+test('points needed: a range from 0.990 to 1.000, or one number when they match', () => {
+  // 1.080 aiming for 14% would finish at 0.9733: 17 points to finish at 0.990, 27 to finish at 1.000.
+  const need = pointsNeeded(1.08 - 14 / 131.25);
+  assert.deepEqual(need, { low: 17, high: 27 });
+  assert.equal(fmtPoints(need), '17–27');
+  assert.equal(fmtPoints({ low: 5, high: 5 }), '5');
+  // Already at 0.993: nothing to reach 0.990, 7 to finish at 1.000.
+  assert.deepEqual(pointsNeeded(1.12 - 0.02 - 14 / 131.25), { low: 0, high: 7 });
 });

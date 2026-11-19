@@ -1,6 +1,6 @@
 // Numbers derived from a batch and its timeline.
 
-import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
+import type { Batch, BatchEvent, BatchStatus, TargetMode } from '../db/types.ts';
 import { abv } from './calc.ts';
 
 /** The final gravity assumed when the user has not set a target: fully dry. */
@@ -202,18 +202,97 @@ export function effectiveOG(batch: Batch, events: BatchEvent[]): number | null {
   return og == null ? null : og + analyzeGravity(batch, events).addedSugar;
 }
 
-export interface ProjectedAbv {
-  /** The ABV if it ferments all the way to 1.000. */
-  potential: number;
-  /** The ABV at the batch's target final gravity. Null when the target is 1.000, so it would only repeat the potential. */
-  target: number | null;
+/**
+ * The driest finish counted as reachable. Meads often go below 1.000, sometimes down to 0.990;
+ * an ABV target that would need to finish lower than this needs more sugar.
+ */
+export const DRIEST_FG = 0.99;
+
+/**
+ * Points of sugar (thousandths of gravity) an ABV target still needs, for a finish below what's
+ * likely: the least if it finishes at DRIEST_FG, and enough to finish at 1.000.
+ */
+export function pointsNeeded(finish: number): { low: number; high: number } {
+  // Counted from the finish as shown (three decimals), so the numbers on screen add up.
+  const shown = Math.round(finish * 1000) / 1000;
+  const points = (to: number) => Math.max(0, Math.round((to - shown) * 1000));
+  return { low: points(DRIEST_FG), high: points(DEFAULT_TARGET_FG) };
 }
 
-/** Where the batch could end up. Shown before and after fermentation completes. Null without an OG. */
-export function projectedAbv(og: number | null, targetFG: number): ProjectedAbv | null {
+/** "17–27", or one number when both ends are the same. */
+export function fmtPoints({ low, high }: { low: number; high: number }): string {
+  return low === high ? String(high) : `${low}–${high}`;
+}
+
+export interface ProjectedAbv {
+  /**
+   * The ABV if it ferments down to 1.000, or to the expected finish when that's below 1.000
+   * (a target FG under 1.000, or an ABV target that finishes between 0.990 and 1.000).
+   */
+  potential: number;
+  /** The gravity the potential is worked out to: 1.000, or the expected finish below it. */
+  potentialFG: number;
+  /** Whether the target is worth showing next to the potential: false when it would only repeat it. */
+  showTarget: boolean;
+  /** For an ABV target: whether it can finish at DRIEST_FG or above. Always true for an FG target. */
+  reachable: boolean;
+  /**
+   * The target ABV. Aiming for an FG: the ABV at that FG, null when it's 1.000 (it would only
+   * repeat the potential). Aiming for an ABV: that ABV, which additions don't change.
+   */
+  target: number | null;
+  /** The final gravity the target implies: the target FG, or for an ABV target the FG it finishes at. */
+  targetFG: number;
+  mode: TargetMode;
+}
+
+export interface TargetSetting {
+  targetMode?: TargetMode;
+  targetFG?: number | null;
+  targetAbv?: number | null;
+}
+
+/**
+ * Where the batch could end up, from the OG plus any sugar added. Null without an OG.
+ * With an ABV target, additions raise the FG it finishes at instead of the target:
+ * OG 1.080 + 40 points fed, aiming for 14%, finishes around 1.120 - 14 / 131.25 = 1.013.
+ */
+export function projectedAbv(og: number | null, setting: TargetSetting | number): ProjectedAbv | null {
   if (og == null) return null;
-  const isDefault = Math.abs(targetFG - DEFAULT_TARGET_FG) < 0.0005;
-  return { potential: abv(og, DEFAULT_TARGET_FG), target: isDefault ? null : abv(og, targetFG) };
+  const target: TargetSetting = typeof setting === 'number' ? { targetFG: setting } : setting;
+  if (target.targetMode === 'abv' && target.targetAbv != null) {
+    const finish = og - target.targetAbv / 131.25;
+    const reachable = finish >= DRIEST_FG - 1e-9;
+    // Finishing between 0.990 and 1.000: the potential goes that low too. Out of reach: it stays at 1.000.
+    const potentialFG = reachable ? Math.min(DEFAULT_TARGET_FG, finish) : DEFAULT_TARGET_FG;
+    return { potential: abv(og, potentialFG), potentialFG, showTarget: true, reachable, target: target.targetAbv, targetFG: finish, mode: 'abv' };
+  }
+  const fg = target.targetFG ?? DEFAULT_TARGET_FG;
+  const isDefault = Math.abs(fg - DEFAULT_TARGET_FG) < 0.0005;
+  // A target FG below 1.000 is where you expect it to finish, so the potential follows it there.
+  const potentialFG = Math.min(DEFAULT_TARGET_FG, fg);
+  return {
+    potential: abv(og, potentialFG),
+    potentialFG,
+    // Below 1.000 the target and potential are the same number: show it once.
+    showTarget: !isDefault && fg > DEFAULT_TARGET_FG,
+    reachable: true,
+    target: isDefault ? null : abv(og, fg),
+    targetFG: fg,
+    mode: 'fg',
+  };
+}
+
+/**
+ * True while fermenting once the measured ABV has reached the target ABV: a cue to stabilize.
+ * Needs a target other than fully dry, and a measured ABV (not an estimate).
+ */
+export function targetReached(batch: Batch, events: BatchEvent[]): boolean {
+  if (!isFermenting(batch.status) || abvEstimate(batch, events) != null) return false;
+  const og = originalGravity(batch, events);
+  const projected = projectedAbv(og == null ? null : og + analyzeGravity(batch, events).addedSugar, batch);
+  const abvNow = batchAbv(batch, events);
+  return projected?.target != null && abvNow != null && abvNow >= projected.target - 0.05;
 }
 
 /** The same calendar day, comparing yyyy-mm-dd or local date-time strings. */

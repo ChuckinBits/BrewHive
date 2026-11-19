@@ -7,7 +7,7 @@ import { fmtSG, newId } from './format.ts';
 import { ingredientStageLabel, stageOf } from './stages.ts';
 
 /** The recipe fields a batch provides. Name, notes, steps and rating are handled separately. */
-export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'volumeUnit' | 'targetOG' | 'targetFG' | 'ingredients' | 'icon' | 'extraIcons' | 'color'>;
+export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'volumeUnit' | 'targetOG' | 'targetFG' | 'targetMode' | 'targetAbv' | 'ingredients' | 'icon' | 'extraIcons' | 'color'>;
 
 /**
  * What a batch puts into its recipe. The target FG is the batch's final
@@ -23,6 +23,8 @@ export function recipeFieldsFromBatch(batch: Batch, events: BatchEvent[]): Recip
     targetOG: originalGravity(batch, events),
     // Once fermentation is done, where it actually finished; until then, the batch's target.
     targetFG: (isFermentationComplete(batch) ? (finalReading(events)?.value ?? finalGravity(events)) : null) ?? targetFinalGravity(batch),
+    targetMode: batch.targetMode ?? 'fg',
+    targetAbv: batch.targetAbv ?? null,
     ingredients: batch.ingredients.map((line) => ({ ...line, id: newId(), stage: stageOf(line) })),
     icon: batch.icon,
     extraIcons: batch.extraIcons ?? [],
@@ -59,6 +61,9 @@ export function recipeChanges(recipe: Recipe, next: RecipeFields, formatVolume: 
   if (!sameNumber(recipe.batchSizeL, next.batchSizeL, 2)) fields.push(`Batch size ${formatVolume(recipe.batchSizeL)} → ${formatVolume(next.batchSizeL)}`);
   if (!sameNumber(recipe.targetOG, next.targetOG, 3)) fields.push(`Target OG ${fmtSG(recipe.targetOG)} → ${fmtSG(next.targetOG)}`);
   if (!sameNumber(recipe.targetFG, next.targetFG, 3)) fields.push(`Target FG ${fmtSG(recipe.targetFG)} → ${fmtSG(next.targetFG)}`);
+  const mode = (m: string | undefined) => (m === 'abv' ? 'ABV' : 'FG');
+  if (mode(recipe.targetMode) !== mode(next.targetMode)) fields.push(`Aims for ${mode(recipe.targetMode)} → ${mode(next.targetMode)}`);
+  if (!sameNumber(recipe.targetAbv ?? null, next.targetAbv ?? null, 1)) fields.push(`Target ABV ${recipe.targetAbv != null ? `${recipe.targetAbv}%` : 'none'} → ${next.targetAbv != null ? `${next.targetAbv}%` : 'none'}`);
   if (recipe.icon !== next.icon) fields.push('Icon');
   if (recipe.color.toLowerCase() !== next.color.toLowerCase()) fields.push('Color');
 
