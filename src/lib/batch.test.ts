@@ -15,6 +15,7 @@ import {
   projectedAbv,
   sugarFerments,
   targetFinalGravity,
+  targetReached,
 } from './batch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
@@ -352,4 +353,32 @@ test('finalReading: the marked gravity reading, or null', () => {
   assert.equal(finalReading([reading('2026-11-05T10:00', 1.02), f, reading('2026-11-12T10:00', 1.001)]), f);
   assert.equal(finalReading([{ ...f, deletedAt: '2026-11-10T00:00:00Z' }]), null);
   assert.equal(finalReading([{ ...f, final: false }]), null, 'a former final is not the final');
+});
+
+// --- Target ABV or target FG (issue #27) ---------------------------------------
+
+test('aiming for an FG: the target ABV rises with added sugar', () => {
+  const p = projectedAbv(1.12, { targetMode: 'fg', targetFG: 1.01 });
+  near(p?.target, (1.12 - 1.01) * 131.25);
+  assert.equal(p?.mode, 'fg');
+});
+
+test('aiming for an ABV: the target stays put and additions raise the FG it finishes at', () => {
+  // OG 1.080 + 40 points fed, aiming for 14%: finishes around 1.013.
+  const p = projectedAbv(1.08 + 0.04, { targetMode: 'abv', targetAbv: 14, targetFG: 1.0 });
+  assert.equal(p?.target, 14);
+  assert.equal(p?.mode, 'abv');
+  assert.equal(Number(p?.targetFG.toFixed(3)), 1.013);
+  near(projectedAbv(1.08, { targetMode: 'abv', targetAbv: 14 })?.target, 14);
+  // Without a target ABV, it falls back to the FG.
+  assert.equal(projectedAbv(1.1, { targetMode: 'abv', targetAbv: null, targetFG: 1.01 })?.mode, 'fg');
+});
+
+test('target reached: while fermenting, once the measured ABV gets to the target', () => {
+  const b = batch({ og: 1.1, status: 'secondary', targetMode: 'abv', targetAbv: 12 });
+  assert.equal(targetReached(b, [reading('2026-11-05T10:00', 1.02)]), false, '10.5% of 12%');
+  assert.equal(targetReached(b, [reading('2026-11-08T10:00', 1.008)]), true, '12.1% of 12%');
+  assert.equal(targetReached({ ...b, status: 'aging' }, [reading('2026-11-08T10:00', 1.008)]), false, 'not once fermentation is done');
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary' }), [reading('2026-11-08T10:00', 0.998)]), false, 'no target besides fully dry');
+  assert.equal(targetReached(batch({ og: 1.1, status: 'secondary', targetFG: 1.01 }), [reading('2026-11-08T10:00', 1.01)]), true, 'an FG target counts too');
 });

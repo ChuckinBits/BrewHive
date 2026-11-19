@@ -1,6 +1,6 @@
 // Numbers derived from a batch and its timeline.
 
-import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
+import type { Batch, BatchEvent, BatchStatus, TargetMode } from '../db/types.ts';
 import { abv } from './calc.ts';
 
 /** The final gravity assumed when the user has not set a target: fully dry. */
@@ -205,15 +205,49 @@ export function effectiveOG(batch: Batch, events: BatchEvent[]): number | null {
 export interface ProjectedAbv {
   /** The ABV if it ferments all the way to 1.000. */
   potential: number;
-  /** The ABV at the batch's target final gravity. Null when the target is 1.000, so it would only repeat the potential. */
+  /**
+   * The target ABV. Aiming for an FG: the ABV at that FG, null when it's 1.000 (it would only
+   * repeat the potential). Aiming for an ABV: that ABV, which additions don't change.
+   */
   target: number | null;
+  /** The final gravity the target implies: the target FG, or for an ABV target the FG it finishes at. */
+  targetFG: number;
+  mode: TargetMode;
 }
 
-/** Where the batch could end up. Shown before and after fermentation completes. Null without an OG. */
-export function projectedAbv(og: number | null, targetFG: number): ProjectedAbv | null {
+export interface TargetSetting {
+  targetMode?: TargetMode;
+  targetFG?: number | null;
+  targetAbv?: number | null;
+}
+
+/**
+ * Where the batch could end up, from the OG plus any sugar added. Null without an OG.
+ * With an ABV target, additions raise the FG it finishes at instead of the target:
+ * OG 1.080 + 40 points fed, aiming for 14%, finishes around 1.120 - 14 / 131.25 = 1.013.
+ */
+export function projectedAbv(og: number | null, setting: TargetSetting | number): ProjectedAbv | null {
   if (og == null) return null;
-  const isDefault = Math.abs(targetFG - DEFAULT_TARGET_FG) < 0.0005;
-  return { potential: abv(og, DEFAULT_TARGET_FG), target: isDefault ? null : abv(og, targetFG) };
+  const target: TargetSetting = typeof setting === 'number' ? { targetFG: setting } : setting;
+  const potential = abv(og, DEFAULT_TARGET_FG);
+  if (target.targetMode === 'abv' && target.targetAbv != null) {
+    return { potential, target: target.targetAbv, targetFG: og - target.targetAbv / 131.25, mode: 'abv' };
+  }
+  const fg = target.targetFG ?? DEFAULT_TARGET_FG;
+  const isDefault = Math.abs(fg - DEFAULT_TARGET_FG) < 0.0005;
+  return { potential, target: isDefault ? null : abv(og, fg), targetFG: fg, mode: 'fg' };
+}
+
+/**
+ * True while fermenting once the measured ABV has reached the target ABV: a cue to stabilize.
+ * Needs a target other than fully dry, and a measured ABV (not an estimate).
+ */
+export function targetReached(batch: Batch, events: BatchEvent[]): boolean {
+  if (!isFermenting(batch.status) || abvEstimate(batch, events) != null) return false;
+  const og = originalGravity(batch, events);
+  const projected = projectedAbv(og == null ? null : og + analyzeGravity(batch, events).addedSugar, batch);
+  const abvNow = batchAbv(batch, events);
+  return projected?.target != null && abvNow != null && abvNow >= projected.target - 0.05;
 }
 
 /** The same calendar day, comparing yyyy-mm-dd or local date-time strings. */

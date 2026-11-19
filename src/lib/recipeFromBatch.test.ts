@@ -105,3 +105,13 @@ test('other batches from the same recipe are found, not counting this one or del
   const all = [batch({ id: 'b1', recipeId: 'r1' }), batch({ id: 'b2', recipeId: 'r1' }), batch({ id: 'b3', recipeId: 'r1', deletedAt: 'x' }), batch({ id: 'b4', recipeId: 'r2' })];
   assert.deepEqual(otherBatchesFrom('r1', all, 'b1').map((b) => b.id), ['b2']);
 });
+
+test('a recipe keeps the batch\'s target ABV, and the update lists a change of target', () => {
+  const fields = recipeFieldsFromBatch(batch({ targetMode: 'abv', targetAbv: 14 }), []);
+  assert.equal(fields.targetMode, 'abv');
+  assert.equal(fields.targetAbv, 14);
+  const recipe = { ...fields, id: 'r', name: 'R', steps: [], notes: '', rating: null, isPublished: false, createdAt: '', updatedAt: '', deletedAt: null, targetMode: 'fg' as const, targetAbv: null };
+  const changes = recipeChanges(recipe, fields, () => '');
+  assert.ok(changes.fields.includes('Aims for FG → ABV'));
+  assert.ok(changes.fields.includes('Target ABV none → 14%'));
+});

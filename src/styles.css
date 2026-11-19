@@ -2067,3 +2067,11 @@ button.staged-row:hover {
 .final-hint {
   color: var(--ink);
 }
+
+/* --- Target ABV or FG (issue #27) --------------------------------------- */
+
+.target-reached {
+  margin: 0 0 14px;
+  border: 1px solid var(--accent, #e8a33a);
+  color: var(--ink);
+}

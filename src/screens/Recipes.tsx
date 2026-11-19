@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
-import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings, type VolumeUnit } from '../db/types.ts';
+import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
+import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
@@ -23,7 +24,9 @@ const SORTS = [
   { id: 'newest', label: 'Newest' },
 ];
 
-const estimatedAbv = (recipe: Recipe) => (recipe.targetOG != null && recipe.targetFG != null ? abv(recipe.targetOG, recipe.targetFG) : null);
+/** The ABV the recipe aims for: its target ABV, or what its OG and FG give. */
+const estimatedAbv = (recipe: Recipe) =>
+  recipe.targetMode === 'abv' && recipe.targetAbv != null ? recipe.targetAbv : recipe.targetOG != null && recipe.targetFG != null ? abv(recipe.targetOG, recipe.targetFG) : null;
 
 export function RecipesScreen() {
   const { view, sort, setView, setSort } = usePrefs('recipes', 'name');
@@ -124,12 +127,20 @@ export function RecipeDetailScreen({ id }: { id: string }) {
         </Link>
       </section>
 
-      {(recipe.targetOG != null || recipe.targetFG != null) && (
+      {recipe.targetMode === 'abv' && recipe.targetAbv != null ? (
         <div className="stats stats-3">
           <Stat label="Target OG" value={fmtSG(recipe.targetOG)} />
-          <Stat label="Target FG" value={fmtSG(recipe.targetFG)} />
-          <Stat label="Est. ABV" value={fmtPercent(est)} />
+          <Stat label="Target ABV" value={fmtPercent(recipe.targetAbv)} />
+          <Stat label="Finishes ≈" value={recipe.targetOG != null ? fmtSG(recipe.targetOG - recipe.targetAbv / 131.25) : '–'} />
         </div>
+      ) : (
+        (recipe.targetOG != null || recipe.targetFG != null) && (
+          <div className="stats stats-3">
+            <Stat label="Target OG" value={fmtSG(recipe.targetOG)} />
+            <Stat label="Target FG" value={fmtSG(recipe.targetFG)} />
+            <Stat label="Est. ABV" value={fmtPercent(est)} />
+          </div>
+        )
       )}
 
       <section className="card">
@@ -208,7 +219,9 @@ interface Draft {
   batchSize: string;
   volumeUnit: VolumeUnit;
   targetOG: string;
+  targetMode: TargetMode;
   targetFG: string;
+  targetAbv: string;
   ingredients: IngredientLine[];
   steps: string;
   icon: string;
@@ -236,7 +249,9 @@ export function RecipeFormScreen({ id }: { id?: string }) {
           batchSize: volumeToInput(volumeUnit === 'gal' ? 3.785411784 : 4, volumeUnit),
           volumeUnit,
           targetOG: '',
+          targetMode: 'fg',
           targetFG: '',
+          targetAbv: '',
           ingredients: [],
           steps: '',
           icon: DEFAULT_FLAVOR,
@@ -257,7 +272,9 @@ export function RecipeFormScreen({ id }: { id?: string }) {
         batchSize: volumeToInput(recipe.batchSizeL, recipe.volumeUnit ?? volumeUnit),
         volumeUnit: recipe.volumeUnit ?? volumeUnit,
         targetOG: recipe.targetOG != null ? fmtSG(recipe.targetOG) : '',
+        targetMode: recipe.targetMode ?? 'fg',
         targetFG: recipe.targetFG != null ? fmtSG(recipe.targetFG) : '',
+        targetAbv: recipe.targetAbv != null ? String(recipe.targetAbv) : '',
         ingredients: recipe.ingredients,
         steps: recipe.steps.join('\n'),
         icon: recipe.icon,
@@ -295,11 +312,10 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
     const name = draft.name.trim();
     if (!name) return setError('Give the recipe a name.');
     const targetOG = parseNum(draft.targetOG);
-    const targetFG = parseNum(draft.targetFG);
-    for (const [label, value, text] of [
-      ['Target OG', targetOG, draft.targetOG],
-      ['Target FG', targetFG, draft.targetFG],
-    ] as const) {
+    const targetProblem = targetError(draft);
+    if (targetProblem) return setError(targetProblem);
+    const target = targetValues(draft, null);
+    for (const [label, value, text] of [['Target OG', targetOG, draft.targetOG]] as const) {
       if (text.trim() !== '' && (value == null || value < 0.98 || value > 1.2)) {
         return setError(`${label} should be a gravity between 0.980 and 1.200, such as 1.100.`);
       }
@@ -312,7 +328,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
       batchSizeL: volumeFromInput(draft.batchSize, draft.volumeUnit),
       volumeUnit: draft.volumeUnit,
       targetOG,
-      targetFG,
+      ...target,
       ingredients: cleanIngredients(draft.ingredients),
       steps: draft.steps
         .split('\n')
@@ -365,14 +381,10 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
           onUnit={(volumeUnit) => set({ volumeUnit })}
         />
 
-        <div className="form-pair">
-          <Field label="Target OG">
-            <input type="text" inputMode="decimal" value={draft.targetOG} placeholder="1.100" onChange={(e) => set({ targetOG: e.target.value })} />
-          </Field>
-          <Field label="Target FG">
-            <input type="text" inputMode="decimal" value={draft.targetFG} placeholder="1.000" onChange={(e) => set({ targetFG: e.target.value })} />
-          </Field>
-        </div>
+        <Field label="Target OG">
+          <input type="text" inputMode="decimal" value={draft.targetOG} placeholder="1.100" onChange={(e) => set({ targetOG: e.target.value })} />
+        </Field>
+        <TargetField value={draft} onChange={set} og={parseNum(draft.targetOG)} />
 
         <fieldset className="ingredient-editor">
           <legend className="field-label">Ingredients</legend>

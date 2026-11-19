@@ -21,7 +21,7 @@ import {
   analyzeGravity,
   originalGravity,
   projectedAbv,
-  targetFinalGravity,
+  targetReached,
 } from '../lib/batch.ts';
 import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
@@ -109,7 +109,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const estimated = abvEstimate(batch, data.events) != null;
   const { addedSugar } = analyzeGravity(batch, data.events);
   // Sugar added later by step feeding or backsweetening raises the potential.
-  const projected = projectedAbv(og == null ? null : og + addedSugar, targetFinalGravity(batch));
+  const projected = projectedAbv(og == null ? null : og + addedSugar, batch);
+  const reached = targetReached(batch, data.events);
 
   const currentStage = currentIngredientStage(batch.status);
   const added = addedLines(data.events);
@@ -172,9 +173,26 @@ export function BatchDetailScreen({ id }: { id: string }) {
           label="Potential"
           value={fmtPercent(projected?.potential)}
           highlight
-          extra={projected?.target != null ? `Target ${fmtPercent(projected.target)}` : undefined}
+          extra={
+            projected?.target == null ? undefined : projected.mode === 'abv' ? (
+              // Two lines, so it fits a phone. Below 1.000 can't happen: show how much more sugar the target needs instead.
+              <>
+                Target {fmtPercent(projected.target)}
+                <br />
+                {projected.targetFG < 0.9995 ? `needs +${Math.ceil((1 - projected.targetFG) * 1000)} pts` : `FG ${fmtSG(projected.targetFG)}`}
+              </>
+            ) : (
+              `Target ${fmtPercent(projected.target)}`
+            )
+          }
         />
       </div>
+
+      {reached && projected?.target != null && (
+        <p className="notice-inline target-reached" role="status">
+          <strong>Target reached.</strong> {fmtPercent(abv)} of the {fmtPercent(projected.target)} you aimed for. Time to stabilize?
+        </p>
+      )}
 
       <GravityChart points={gravityPoints(batch, data.events)} />
 

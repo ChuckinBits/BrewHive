@@ -6,6 +6,14 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 
 ## Unreleased
 
+- **Aim for an FG or an ABV** ([#27]). The Target field on batches and
+  recipes has an FG / ABV switch. Aiming for an FG works as before: the
+  target ABV rises with step feeding. Aiming for an ABV keeps it fixed and
+  shows the FG it finishes at instead (OG 1.080 + 40 points fed, aiming for
+  14%, finishes around 1.013), or how many more points it needs when the OG
+  can't reach it. While fermenting, the batch page says "Target reached"
+  once the ABV gets there. Batches and recipes keep the choice when saved
+  from one another.
 - **The stage decides when fermentation is done** ([#26]). The "Fermentation
   is complete" checkbox and the Final gravity field are gone. Moving a batch
   from Primary or Secondary to Aging, or bottling it, asks for the final
@@ -94,3 +102,4 @@ themes; sample data.
 [#23]: https://github.com/ChuckinBits/BrewHive/issues/23
 [#24]: https://github.com/ChuckinBits/BrewHive/issues/24
 [#26]: https://github.com/ChuckinBits/BrewHive/issues/26
+[#27]: https://github.com/ChuckinBits/BrewHive/issues/27

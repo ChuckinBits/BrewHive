@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type VolumeUnit } from '../db/types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
 import { Icon } from '../icons/Icon.tsx';
@@ -12,6 +12,7 @@ import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
+import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
@@ -29,7 +30,9 @@ interface Draft {
   og: string;
   /** Asked for when the batch is past fermentation and wasn't before. */
   final: FinalReading;
+  targetMode: TargetMode;
   targetFG: string;
+  targetAbv: string;
   ingredients: IngredientLine[];
   icon: string;
   extraIcons: string[];
@@ -67,7 +70,9 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
           volumeUnit: batch.volumeUnit ?? volumeUnit,
           og: batch.og != null ? fmtSG(batch.og) : '',
           final: NO_FINAL_READING,
+          targetMode: batch.targetMode ?? 'fg',
           targetFG: fmtSG(targetFinalGravity(batch)),
+          targetAbv: batch.targetAbv != null ? String(batch.targetAbv) : '',
           ingredients: batch.ingredients,
           icon: batch.icon,
           extraIcons: batch.extraIcons ?? [],
@@ -92,7 +97,9 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
         volumeUnit: recipe?.volumeUnit ?? volumeUnit,
         og: '',
         final: NO_FINAL_READING,
+        targetMode: recipe?.targetMode ?? 'fg',
         targetFG: fmtSG(recipe?.targetFG ?? DEFAULT_TARGET_FG),
+        targetAbv: recipe?.targetAbv != null ? String(recipe.targetAbv) : '',
         // Fresh ids, so editing the batch never changes the recipe's own lines.
         ingredients: (recipe?.ingredients ?? []).map((line) => ({ ...line, id: newId() })),
         icon: recipe?.icon ?? DEFAULT_FLAVOR,
@@ -139,7 +146,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const preview = { ...(loaded.existing ?? loaded.draft), og: validOg, startDate: draft.startDate } as Batch;
   const previewEvents = finalEntry ? [...loaded.timeline, { ...finalEntry, id: 'final', createdAt: '\uffff', updatedAt: '', deletedAt: null } as BatchEvent] : loaded.timeline;
   const { addedSugar } = analyzeGravity(preview, previewEvents);
-  const projected = projectedAbv(validOg == null ? null : validOg + addedSugar, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
+  const effectiveOg = validOg == null ? null : validOg + addedSugar;
+  const projected = projectedAbv(effectiveOg, targetValues(draft, DEFAULT_TARGET_FG));
   const abvParts: string[] = [];
   const finalAbv = validOg != null && asksFinal ? batchAbv(preview, previewEvents) : null;
   if (finalAbv != null) abvParts.push(`ABV ${draft.final.mode === 'estimate' ? '≈ ' : ''}${fmtPercent(finalAbv)}`);
@@ -153,11 +161,10 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
     const name = draft.name.trim();
     if (!name) return setError('Give the batch a name.');
     const og = parseNum(draft.og);
-    const targetFG = parseNum(draft.targetFG);
-    for (const [label, value, text] of [
-      ['Original gravity', og, draft.og],
-      ['Target final gravity', targetFG, draft.targetFG],
-    ] as const) {
+    const target = targetValues(draft, DEFAULT_TARGET_FG);
+    const targetProblem = targetError(draft);
+    if (targetProblem) return setError(targetProblem);
+    for (const [label, value, text] of [['Original gravity', og, draft.og]] as const) {
       if (text.trim() !== '' && (value == null || value < 0.98 || value > 1.2)) {
         return setError(`${label} should be a gravity between 0.980 and 1.200, such as 1.100.`);
       }
@@ -183,7 +190,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       volumeL: volumeFromInput(draft.volume, draft.volumeUnit),
       volumeUnit: draft.volumeUnit,
       og,
-      targetFG: targetFG ?? DEFAULT_TARGET_FG,
+      ...target,
+      targetFG: target.targetFG ?? DEFAULT_TARGET_FG,
       ingredients: cleanIngredients(draft.ingredients),
       icon: draft.icon,
       extraIcons: draft.extraIcons,
@@ -260,9 +268,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
         </div>
 
         <div className="gravity-group">
-          <Field label="Target final gravity" hint="Where you expect fermentation to stop. 1.000 is fully dry.">
-            <input type="text" inputMode="decimal" value={draft.targetFG} placeholder="1.000" onChange={(e) => set({ targetFG: e.target.value })} />
-          </Field>
+          <TargetField value={draft} onChange={set} og={effectiveOg} />
           {asksFinal && (
             <>
               <h3 className="stage-divider">Final reading</h3>
