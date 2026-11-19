@@ -208,6 +208,22 @@ export function effectiveOG(batch: Batch, events: BatchEvent[]): number | null {
  */
 export const DRIEST_FG = 0.99;
 
+/**
+ * Points of sugar (thousandths of gravity) an ABV target still needs, for a finish below what's
+ * likely: the least if it finishes at DRIEST_FG, and enough to finish at 1.000.
+ */
+export function pointsNeeded(finish: number): { low: number; high: number } {
+  // Counted from the finish as shown (three decimals), so the numbers on screen add up.
+  const shown = Math.round(finish * 1000) / 1000;
+  const points = (to: number) => Math.max(0, Math.round((to - shown) * 1000));
+  return { low: points(DRIEST_FG), high: points(DEFAULT_TARGET_FG) };
+}
+
+/** "17–27", or one number when both ends are the same. */
+export function fmtPoints({ low, high }: { low: number; high: number }): string {
+  return low === high ? String(high) : `${low}–${high}`;
+}
+
 export interface ProjectedAbv {
   /**
    * The ABV if it ferments down to 1.000, or to the expected finish when that's below 1.000

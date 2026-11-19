@@ -2,7 +2,7 @@
 // or an ABV (the final gravity follows), with a switch between them.
 
 import type { TargetMode } from '../db/types.ts';
-import { DRIEST_FG } from '../lib/batch.ts';
+import { DRIEST_FG, fmtPoints, pointsNeeded } from '../lib/batch.ts';
 import { abv } from '../lib/calc.ts';
 import { fmtPercent, fmtSG, parseNum } from '../lib/format.ts';
 import { UnitField } from './ui.tsx';
@@ -56,11 +56,13 @@ export function TargetField({ value, onChange, og }: Props) {
     if (isAbv && valid(abvTarget, 0.1, 25) != null) {
       const finish = og - (abvTarget as number) / 131.25;
       // Meads can finish below 1.000, down to about 0.990. Lower than that, the target needs more sugar.
+      const need = pointsNeeded(finish);
       follows =
         finish < DRIEST_FG - 1e-9
-          ? `More than this OG can reach (${fmtPercent(abv(og, DRIEST_FG))} even at ${fmtSG(DRIEST_FG)}). It needs about ${Math.ceil((DRIEST_FG - finish) * 1000 - 1e-6)} more points of sugar, such as step feeding.`
+          ? `More than this OG can reach (${fmtPercent(abv(og, DRIEST_FG))} even at ${fmtSG(DRIEST_FG)}). It needs about ${fmtPoints(need)} more points of sugar` +
+            (need.low === need.high ? '.' : `: ${need.low} if it finishes at ${fmtSG(DRIEST_FG)}, ${need.high} to finish at 1.000.`)
           : finish < 0.9995
-            ? `Finishes around ${fmtSG(finish)}, drier than most meads get. Step feeding raises this, not the target.`
+            ? `Finishes around ${fmtSG(finish)}, drier than most meads get; about ${need.high} more points would let it finish at 1.000.`
             : `Finishes around ${fmtSG(finish)}. Step feeding raises this, not the target.`;
     }
     if (!isAbv && valid(fg, 0.98, 1.2) != null) follows = `≈ ${fmtPercent(abv(og, fg as number))} ABV. Step feeding raises this.`;

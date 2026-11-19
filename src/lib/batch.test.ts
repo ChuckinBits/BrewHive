@@ -15,6 +15,8 @@ import {
   projectedAbv,
   sugarFerments,
   targetFinalGravity,
+  fmtPoints,
+  pointsNeeded,
   targetReached,
 } from './batch.ts';
 
@@ -410,4 +412,14 @@ test('an ABV target that finishes between 0.990 and 1.000 is reachable; drier is
   near(tooDry?.potential, 10.5);
   // Exactly 0.990 counts.
   assert.equal(projectedAbv(1.09, { targetMode: 'abv', targetAbv: 13.125 })?.reachable, true);
+});
+
+test('points needed: a range from 0.990 to 1.000, or one number when they match', () => {
+  // 1.080 aiming for 14% would finish at 0.9733: 17 points to finish at 0.990, 27 to finish at 1.000.
+  const need = pointsNeeded(1.08 - 14 / 131.25);
+  assert.deepEqual(need, { low: 17, high: 27 });
+  assert.equal(fmtPoints(need), '17–27');
+  assert.equal(fmtPoints({ low: 5, high: 5 }), '5');
+  // Already at 0.993: nothing to reach 0.990, 7 to finish at 1.000.
+  assert.deepEqual(pointsNeeded(1.12 - 0.02 - 14 / 131.25), { low: 0, high: 7 });
 });

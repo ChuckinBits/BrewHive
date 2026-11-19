@@ -10,10 +10,11 @@ import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
-  DRIEST_FG,
   abvEstimate,
+  fmtPoints,
   batchAbv,
   finalReading,
+  pointsNeeded,
   currentGravity,
   finalGravity,
   gravityPoints,
@@ -176,11 +177,20 @@ export function BatchDetailScreen({ id }: { id: string }) {
           highlight
           extra={
             projected == null ? undefined : projected.mode === 'abv' && projected.target != null ? (
-              // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show how much more sugar it needs.
+              // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show the range of sugar it needs (to 0.990 and to 1.000).
               <>
                 Target {fmtPercent(projected.target)}
                 <br />
-                {projected.reachable ? `FG ${fmtSG(projected.targetFG)}` : `needs +${Math.ceil((DRIEST_FG - projected.targetFG) * 1000 - 1e-6)} pts`}
+                {projected.reachable ? (
+                  `FG ${fmtSG(projected.targetFG)}`
+                ) : (
+                  // Its own line, so the range fits a phone-width tile.
+                  <>
+                    needs
+                    <br />
+                    {fmtPoints(pointsNeeded(projected.targetFG))} pts
+                  </>
+                )}
               </>
             ) : projected.showTarget && projected.target != null ? (
               `Target ${fmtPercent(projected.target)}`
