@@ -4,7 +4,7 @@ All notable changes to BrewHive are listed here. Versions follow the roadmap:
 minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 0.5 community) and patch versions are releases within a milestone.
 
-## Unreleased (v0.1.1)
+## v0.1.1 – 2026-11-18
 
 ### Batches
 
