@@ -62,14 +62,14 @@ export function FlavorStack({ icons, size = 40, x = 0, y = 0 }: StackProps) {
   if (!left) return <FlavorIcon id={main} size={size} x={x} y={y} />;
   const cx = x + size / 2;
   const cy = y + size / 2;
+  // The main icon keeps its full size and place; the others sit behind it and peek out.
   const small = size * 0.62;
-  const big = size * 0.86;
   const side = size * 0.42;
   return (
     <g>
-      <FlavorIcon id={left} size={small} x={cx - side - small / 2} y={cy - size * 0.12 - small / 2} />
-      {right && <FlavorIcon id={right} size={small} x={cx + side - small / 2} y={cy - size * 0.12 - small / 2} />}
-      <FlavorIcon id={main} size={big} x={cx - big / 2} y={cy + size * 0.06 - big / 2} />
+      <FlavorIcon id={left} size={small} x={cx - side - small / 2} y={cy - size * 0.1 - small / 2} />
+      {right && <FlavorIcon id={right} size={small} x={cx + side - small / 2} y={cy - size * 0.1 - small / 2} />}
+      <FlavorIcon id={main} size={size} x={x} y={y} />
     </g>
   );
 }
