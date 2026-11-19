@@ -12,6 +12,7 @@ import { Icon, type IconName } from '../icons/Icon.tsx';
 import {
   abvEstimate,
   batchAbv,
+  finalReading,
   currentGravity,
   finalGravity,
   gravityPoints,
@@ -115,7 +116,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
     if (status === batch.status) return;
     // Bottling asks how many bottles first, then fills the cellar.
     if (status === 'bottled') return setBottling(true);
-    if (status === 'aging' && !complete) return setFinishing(true);
+    if (status === 'aging' && !complete && !finalReading(data.events)) return setFinishing(true);
     await changeStatus(batch, status);
   };
 
@@ -273,6 +274,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
                           <span>
                             {eventTitle(event)}
                             {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
+                            {event.type === 'gravity' && event.final && (
+                              <>
+                                {' '}
+                                <span className="final-chip">Final</span>
+                              </>
+                            )}
                           </span>
                           {(event.type === 'tasting' || event.type === 'review') && <RatingBadge rating={event.rating} small />}
                         </strong>
@@ -413,6 +420,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Backsweetening: off unless ticked. Step feeding always ferments, so it has no checkbox.
   const [ferments, setFerments] = useState(existing?.ferments === true);
+  // Gravity readings: whether this is the final gravity. Off unless ticked; a batch has only one.
+  const [isFinal, setIsFinal] = useState(existing?.final === true);
   const [ingredient, setIngredient] = useState(existing?.ingredient ?? '');
   // New ingredient entries also add the ingredient to the batch's list, ticked off, in the current stage.
   const [addToList, setAddToList] = useState(!existing);
@@ -427,6 +436,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const knownTasters = [...new Set((allEntries ?? []).map((e) => e.taster?.trim()).filter((t): t is string => !!t))].sort();
 
   const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
+  // The batch's current final gravity reading, other than this one.
+  const otherFinal = finalReading((allEntries ?? []).filter((e) => e.batchId === batch.id && e.id !== existing?.id));
 
   const save = async () => {
     let parsed: number | null = null;
@@ -463,6 +474,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
       tempUnit: kind === 'temp' ? tempUnit : undefined,
+      final: type === 'gravity' && isFinal ? true : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -481,6 +493,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     }
     // "Set as the batch rating": updates the batch only. The tasting itself is the timeline record,
     // so no separate "Batch rating" entry is added or replaced.
+    // Only one final gravity: a new one takes over from the old.
+    if (fields.final && otherFinal) await events.save({ ...otherFinal, final: undefined });
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
     toast(rateBatch ? 'Saved, and the batch rating updated' : existing ? 'Entry updated' : 'Added to the timeline');
@@ -531,6 +545,23 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
           <Field label="Specific gravity" hint="Read it off your hydrometer, for example 1.045.">
             <input type="text" inputMode="decimal" value={value} placeholder="1.045" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
           </Field>
+        )}
+        {type === 'gravity' && !isStage && (
+          <>
+            <label className="check-field">
+              <input type="checkbox" checked={isFinal} onChange={(e) => setIsFinal(e.target.checked)} />
+              Final gravity reading
+            </label>
+            <p className={otherFinal ? 'field-hint final-hint' : 'field-hint'}>
+              {otherFinal
+                ? isFinal
+                  ? `This reading will become your new final gravity, replacing ${fmtSG(otherFinal.value)} from ${fmtDateShort(otherFinal.date)}.`
+                  : `This batch already has a final gravity reading: ${fmtSG(otherFinal.value)} on ${fmtDateShort(otherFinal.date)}.`
+                : isFinal
+                  ? 'Where fermentation ended. Moving to Aging or bottling won\'t ask for it again.'
+                  : 'Tick this for the reading where fermentation ended.'}
+            </p>
+          </>
         )}
         {kind === 'temp' && (
           <UnitField
@@ -723,7 +754,7 @@ const UNIT_START_SIZE: Record<BottleUnit, string> = { ml: '750', floz: '12', cup
 
 function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: BatchEvent[]; onClose: () => void }) {
   // Bottled straight from fermenting: ask for the final reading too.
-  const asksFinal = !isFermentationComplete(batch);
+  const asksFinal = !isFermentationComplete(batch) && !finalReading(timeline);
   const [final, setFinal] = useState<FinalReading>(NO_FINAL_READING);
   const volumeMl = batch.volumeL != null ? batch.volumeL * 1000 : null;
   const [lines, setLines] = useState<BottleLine[]>(() => [newLine(volumeMl)]);

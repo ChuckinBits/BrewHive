@@ -12,7 +12,7 @@ import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
-import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
+import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, finalReadingPatch, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
 import { navigate } from '../lib/router.tsx';
@@ -131,7 +131,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const inRange = (n: number | null) => (n != null && n >= 0.98 && n <= 1.2 ? n : null);
   const validOg = inRange(parseNum(draft.og));
   // Moving a batch past fermentation (or entering one that already is) asks for the final reading.
-  const asksFinal = isFermentationComplete({ status: draft.status } as Batch) && !(loaded.existing && isFermentationComplete(loaded.existing));
+  // ...unless the timeline already has a final gravity reading.
+  const asksFinal = isFermentationComplete({ status: draft.status } as Batch) && !(loaded.existing && isFermentationComplete(loaded.existing)) && !finalReading(loaded.timeline);
   const finalEntry = asksFinal ? finalReadingEntry(loaded.existing?.id ?? '', draft.final, nowLocal()) : null;
 
   // Work the numbers out from the draft as typed, with the batch's timeline, so step feedings count.

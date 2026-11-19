@@ -160,7 +160,6 @@ export function statusLabel(status: BatchStatus): string {
 
 /** The heading a timeline entry shows, such as "Moved to Secondary" or "Moved to Basement". */
 export function eventTitle(event: BatchEvent): string {
-  if (event.type === 'gravity' && event.final) return 'Final gravity';
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
     if (event.toStatus === 'archived') return 'Archived';

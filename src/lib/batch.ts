@@ -58,6 +58,12 @@ export function currentGravity(batch: Batch, events: BatchEvent[]): number | nul
   return points.length ? points[points.length - 1].sg : null;
 }
 
+/** The batch's final gravity reading, if one is marked. There is only ever one; the latest wins if old data has more. */
+export function finalReading(events: BatchEvent[]): BatchEvent | null {
+  const marked = readings(events).filter((e) => e.type === 'gravity' && e.final);
+  return marked.length ? marked[marked.length - 1] : null;
+}
+
 /** The latest gravity reading on the timeline (not the OG), or null when there is none. */
 export function finalGravity(events: BatchEvent[]): number | null {
   const all = readings(events);

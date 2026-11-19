@@ -9,7 +9,9 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 - **The stage decides when fermentation is done** ([#26]). The "Fermentation
   is complete" checkbox and the Final gravity field are gone. Moving a batch
   from Primary or Secondary to Aging, or bottling it, asks for the final
-  reading, which goes on the timeline as a "Final gravity" entry. Without a
+  reading, which goes on the timeline as a gravity reading marked Final.
+  Any gravity reading can be ticked as the final gravity (only one per batch;
+  a newer one replaces it), and then those moves don't ask. Without a
   reading, an estimated ABV can be entered instead; it shows with ≈ and a
   later reading replaces it. A backsweetening ticked "This will ferment"
   after fermentation is done offers to move the batch back to Secondary.

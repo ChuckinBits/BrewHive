@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, BatchStatus } from '../db/types.ts';
 import {
   abvEstimate,
+  finalReading,
   analyzeGravity,
   batchAbv,
   currentGravity,
@@ -335,4 +336,11 @@ test('a reading in the same minute as the estimate, logged after it, replaces it
   const b = batch({ status: 'bottled', abvEstimate: 12, abvEstimateAt: '2026-11-10T10:00', abvEstimateSavedAt: '2026-11-10T17:00:10.000Z' });
   assert.equal(abvEstimate(b, [{ ...reading('2026-11-10T10:00', 1.0), createdAt: '2026-11-10T17:00:30.000Z' }]), null);
   assert.equal(abvEstimate(b, [{ ...reading('2026-11-10T10:00', 1.0), createdAt: '2026-11-10T16:59:00.000Z' }]), 12);
+});
+
+test('finalReading: the marked gravity reading, or null', () => {
+  assert.equal(finalReading([reading('2026-11-05T10:00', 1.02)]), null);
+  const f = final('2026-11-09T10:00', 1.0);
+  assert.equal(finalReading([reading('2026-11-05T10:00', 1.02), f, reading('2026-11-12T10:00', 1.001)]), f);
+  assert.equal(finalReading([{ ...f, deletedAt: '2026-11-10T00:00:00Z' }]), null);
 });
