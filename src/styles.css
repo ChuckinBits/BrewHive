@@ -1134,6 +1134,7 @@ a.shelf-item:hover .shelf-visual {
 }
 
 input[type='text'],
+input[type='search'],
 input[type='date'],
 input[type='datetime-local'],
 select,
@@ -2099,4 +2100,89 @@ button.staged-row:hover {
   font-size: 11.5px;
   font-weight: 600;
   visibility: hidden;
+}
+
+/* --- Ingredient library (v0.2, issue #31) ------------------------------- */
+
+.page-intro {
+  margin: 0 0 12px;
+}
+
+.search {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.chips-scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 8px;
+  padding-bottom: 2px;
+}
+
+.chips-scroll .chip {
+  flex: none;
+}
+
+.library-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.library-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.library-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.category-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category-edit li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.category-edit input {
+  flex: 1;
+  min-width: 0;
+}
+
+.used-in {
+  margin-top: 16px;
+}
+
+.more-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.more-link-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }

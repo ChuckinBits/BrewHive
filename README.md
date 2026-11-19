@@ -86,10 +86,11 @@ The app has only two runtime dependencies, React and React DOM. Volumes are stor
 | Version | Focus |
 | --- | --- |
 | **v0.1 (this release)** | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
-| v0.2 | Equipment screen (ingredient stock and vessels), calculators, photos, reminders, Simple / Advanced mode |
-| v0.3 | iOS and Android apps with Capacitor |
-| v0.4 | Optional sync through a self-hosted server |
-| v0.5 | Community recipes on Nostr, with zaps |
+| v0.2 | Ingredient library: categories, default units, costs and batch totals |
+| v0.3 | Equipment screen (vessels and ingredient inventory), calculators, photos, reminders, Simple / Advanced mode |
+| v0.4 | iOS and Android apps with Capacitor |
+| v0.5 | Optional sync through a self-hosted server |
+| v0.6 | Community recipes on Nostr, with zaps |
 | Later | Smart hydrometers, BeerXML import, printable labels |
 
 ## Contributing

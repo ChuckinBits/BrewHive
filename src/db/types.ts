@@ -232,6 +232,46 @@ export interface IngredientLine {
   unit?: string;
   /** When it goes in. Missing means Primary. Recipes set it too, and batches started from a recipe keep it. */
   stage?: IngredientStage;
+  /**
+   * The library ingredient this line was picked from, if any. Only a pointer: the line keeps its own
+   * name and amount, so renaming or deleting the library item never changes an old batch.
+   */
+  ingredientId?: string;
+}
+
+// --- Ingredient library (v0.2) ------------------------------------------------
+
+export interface IngredientCategory {
+  id: string;
+  label: string;
+}
+
+/** The categories every library starts with. They can be renamed, and more can be added. */
+export const DEFAULT_CATEGORIES: IngredientCategory[] = [
+  { id: 'honey', label: 'Honey' },
+  { id: 'fruit', label: 'Fruit' },
+  { id: 'juice', label: 'Juice & concentrate' },
+  { id: 'sweetener', label: 'Sweeteners' },
+  { id: 'spice', label: 'Spices' },
+  { id: 'herb', label: 'Herbs & flowers' },
+  { id: 'yeast', label: 'Yeast' },
+  { id: 'nutrient', label: 'Nutrients' },
+  { id: 'additive', label: 'Additives' },
+  { id: 'fining', label: 'Fining & clarifiers' },
+  { id: 'oak', label: 'Oak & wood' },
+  { id: 'grain', label: 'Grains & malt' },
+  { id: 'hops', label: 'Hops' },
+  { id: 'other', label: 'Other' },
+];
+
+/** An ingredient in the library: what it is, how it's usually measured, and (optionally) what it costs. */
+export interface LibraryIngredient extends Base {
+  name: string;
+  /** An IngredientCategory id. Unknown ids show under Other. */
+  category: string;
+  /** The unit a new line starts with when this ingredient is picked. One of INGREDIENT_UNITS. */
+  defaultUnit: string;
+  notes: string;
 }
 
 export type VolumeUnit = 'gal' | 'L';
@@ -402,4 +442,6 @@ export interface Settings {
   sorts: Record<string, string>;
   /** Set once a hosted preview has loaded its sample data. Unused in the real app. */
   demoSeeded?: boolean;
+  /** The ingredient categories, in order. Missing means DEFAULT_CATEGORIES. */
+  ingredientCategories?: IngredientCategory[];
 }

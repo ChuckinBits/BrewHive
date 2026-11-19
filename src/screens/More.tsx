@@ -10,12 +10,14 @@ import { Icon, type IconName } from '../icons/Icon.tsx';
 import { isDemo } from '../lib/demo.ts';
 import { plural } from '../lib/format.ts';
 import { APP_VERSION, REPO_URL } from '../lib/version.ts';
+import { Link } from '../lib/router.tsx';
 
 const ROADMAP: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'honey', title: 'Equipment', text: 'Ingredient stock and vessels, with a pantry shelf. Planned for v0.2.' },
-  { icon: 'sparkle', title: 'Calculators and reminders', text: 'ABV, backsweetening and nutrient schedules. Planned for v0.2.' },
-  { icon: 'upload', title: 'Sync between devices', text: 'Through a server you host yourself. Planned for v0.4.' },
-  { icon: 'people', title: 'Community recipes', text: 'Share, rate and tip recipes over Nostr. Planned for v0.5.' },
+  { icon: 'honey', title: 'Ingredient library', text: 'Your ingredients by category, with costs and batch totals. Planned for v0.2.' },
+  { icon: 'rack', title: 'Equipment and inventory', text: 'Vessels and ingredient stock. Planned for v0.3.' },
+  { icon: 'sparkle', title: 'Calculators and reminders', text: 'ABV, backsweetening and nutrient schedules. Planned for v0.3.' },
+  { icon: 'upload', title: 'Sync between devices', text: 'Through a server you host yourself. Planned for v0.5.' },
+  { icon: 'people', title: 'Community recipes', text: 'Share, rate and tip recipes over Nostr. Planned for v0.6.' },
 ];
 
 export function MoreScreen() {
@@ -49,6 +51,17 @@ export function MoreScreen() {
   return (
     <>
       <TopBar title="More" />
+
+      <Link to="/ingredients" className="card more-link">
+        <span className="timeline-icon">
+          <Icon name="honey" size={20} />
+        </span>
+        <span className="more-link-text">
+          <strong>Ingredients</strong>
+          <span className="muted">Your ingredient library: categories and default units.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </Link>
 
       <section className="card">
         <h2>Units</h2>

@@ -5,7 +5,7 @@ import { getAll, putMany, type StoreName } from './idb.ts';
 import { rememberTheme } from './store.ts';
 import type { Settings } from './types.ts';
 
-const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours'];
+const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
 
 export interface BackupFile {
   app: 'brewhive';

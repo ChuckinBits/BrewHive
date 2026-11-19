@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { getAll, getOne, putMany, subscribe, type StoreName } from './idb.ts';
-import type { Base, Batch, BatchEvent, CellarEntry, Pour, Recipe, Settings, ViewMode } from './types.ts';
+import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
+import { starterIngredients } from './starterIngredients.ts';
 import { newId } from '../lib/format.ts';
 
 function collection<T extends Base>(store: StoreName) {
@@ -44,6 +45,22 @@ export const batches = collection<Batch>('batches');
 export const events = collection<BatchEvent>('events');
 export const cellar = collection<CellarEntry>('cellar');
 export const pours = collection<Pour>('pours');
+export const ingredients = collection<LibraryIngredient>('ingredients');
+
+/** The ingredient categories, in order. */
+export function categoriesOf(settings: Settings): IngredientCategory[] {
+  return settings.ingredientCategories?.length ? settings.ingredientCategories : DEFAULT_CATEGORIES;
+}
+
+/**
+ * Adds the starter ingredients the device has never had. They have fixed ids, so one you deleted
+ * stays deleted (its record is still there, flagged) and restoring a backup never duplicates them.
+ */
+export async function ensureStarterIngredients(): Promise<void> {
+  const known = new Set((await getAll<LibraryIngredient>('ingredients')).map((i) => i.id));
+  const missing = starterIngredients(usesImperial()).filter((i) => !known.has(i.id));
+  for (const item of missing) await ingredients.save(item);
+}
 
 // --- Settings ---------------------------------------------------------------
 
