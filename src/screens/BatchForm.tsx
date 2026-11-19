@@ -14,7 +14,7 @@ import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
-import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, finalReadingPatch, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
+import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
 import { navigate } from '../lib/router.tsx';
 
 interface Draft {
@@ -136,7 +136,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const finalEntry = asksFinal ? finalReadingEntry(loaded.existing?.id ?? '', draft.final, nowLocal()) : null;
 
   // Work the numbers out from the draft as typed, with the batch's timeline, so step feedings count.
-  const preview = { ...(loaded.existing ?? loaded.draft), og: validOg, startDate: draft.startDate, ...(asksFinal ? finalReadingPatch(draft.final, nowLocal()) : {}) } as Batch;
+  const preview = { ...(loaded.existing ?? loaded.draft), og: validOg, startDate: draft.startDate } as Batch;
   const previewEvents = finalEntry ? [...loaded.timeline, { ...finalEntry, id: 'final', createdAt: '\uffff', updatedAt: '', deletedAt: null } as BatchEvent] : loaded.timeline;
   const { addedSugar } = analyzeGravity(preview, previewEvents);
   const projected = projectedAbv(validOg == null ? null : validOg + addedSugar, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
@@ -189,13 +189,12 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
-      ...(asksFinal ? finalReadingPatch(draft.final, finishedAt) : {}),
     });
 
     if (loaded.existing && loaded.existing.status !== saved.status) {
       await recordStatusEntry(saved.id, loaded.existing.status, saved.status);
     }
-    // The estimate (if any) is already on the batch; a final gravity goes on the timeline.
+    // The final gravity or the estimate goes on the timeline.
     if (asksFinal) await saveFinalReading(saved.id, draft.final, finishedAt);
     toast(isNew ? 'Batch started' : 'Batch saved');
     navigate(`/batches/${saved.id}`, { replace: true });
@@ -268,7 +267,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
             <>
               <h3 className="stage-divider">Final reading</h3>
               <p className="field-hint">{isNew ? 'This batch is past fermentation.' : `Moving to ${draft.status === 'aging' ? 'Aging' : 'a finished stage'} means fermentation is done.`}</p>
-              <FinalReadingFields value={draft.final} onChange={(final) => set({ final })} />
+              <FinalReadingFields value={draft.final} onChange={(final) => set({ final })} abvSoFar={validOg != null ? batchAbv(preview, loaded.timeline) : null} />
             </>
           )}
           {abvLine && <p className="projection" aria-live="polite">{abvLine}</p>}

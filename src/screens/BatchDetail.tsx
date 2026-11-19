@@ -42,6 +42,7 @@ const EVENT_ICONS: Record<EventType, IconName> = {
   fining: 'sparkle',
   tasting: 'glass',
   pitch: 'yeast',
+  estimate: 'flask',
   status: 'flag',
   moved: 'pin',
   ingredient: 'plus',
@@ -59,6 +60,7 @@ function eventValue(event: BatchEvent, settings: Settings): string {
   if (event.type === 'temperature') return fmtTempBoth(event.value, event.tempUnit, settings.tempUnit);
   // The title already says pH, so only the number.
   if (event.type === 'ph') return event.value.toFixed(2);
+  if (event.type === 'estimate') return `≈ ${fmtPercent(event.value)}`;
   return String(event.value);
 }
 
@@ -164,7 +166,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <div className="stats">
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
-        <Stat label={complete ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
+        <Stat label={complete || finalReading(data.events) ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
         <Stat label={complete ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} extra={estimated ? 'Estimated' : undefined} />
         <Stat
           label="Potential"
@@ -438,6 +440,9 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
   // The batch's current final gravity reading, other than this one.
   const otherFinal = finalReading((allEntries ?? []).filter((e) => e.batchId === batch.id && e.id !== existing?.id));
+  // A step feeding, or a backsweetening ticked to ferment, logged after the final reading.
+  const fermentingSugar = type === 'feeding' || (type === 'backsweeten' && ferments);
+  const removesFinal = !!otherFinal && fermentingSugar && (date || nowLocal()) >= otherFinal.date.slice(0, 16);
 
   const save = async () => {
     let parsed: number | null = null;
@@ -450,6 +455,9 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     } else if (kind === 'ph') {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0 || parsed > 14) return setError('Enter a pH between 0 and 14.');
+    } else if (kind === 'abv') {
+      parsed = parseNum(value.replace('%', ''));
+      if (parsed == null || parsed < 0 || parsed > 25) return setError('Enter an ABV between 0 and 25, such as 12.');
     } else if (kind === 'sg-after' && value.trim() !== '') {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter the gravity after adding, between 0.980 and 1.200, or leave it empty.');
@@ -474,7 +482,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
       tempUnit: kind === 'temp' ? tempUnit : undefined,
-      final: type === 'gravity' && isFinal ? true : undefined,
+      // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
+      final: type === 'gravity' ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -494,7 +503,9 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     // "Set as the batch rating": updates the batch only. The tasting itself is the timeline record,
     // so no separate "Batch rating" entry is added or replaced.
     // Only one final gravity: a new one takes over from the old.
-    if (fields.final && otherFinal) await events.save({ ...otherFinal, final: undefined });
+    if (fields.final && otherFinal) await events.save({ ...otherFinal, final: false });
+    // Sugar that ferments after the final reading means fermentation isn't over: that reading stops being final.
+    if (removesFinal && otherFinal) await events.save({ ...otherFinal, final: false });
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
     toast(rateBatch ? 'Saved, and the batch rating updated' : existing ? 'Entry updated' : 'Added to the timeline');
@@ -652,6 +663,16 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             )}
           </>
         )}
+        {kind === 'abv' && (
+          <Field label="Estimated ABV (%)" hint="Shown with ≈. A gravity reading logged after it replaces it.">
+            <input type="text" inputMode="decimal" value={value} placeholder="12" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
+          </Field>
+        )}
+        {removesFinal && otherFinal && (
+          <p className="warning" role="note">
+            This will remove the Final tag from the {fmtSG(otherFinal.value)} gravity reading on {fmtDateShort(otherFinal.date)}, since fermentation isn't over yet.
+          </p>
+        )}
         {kind === 'place' && (
           <Field label="Where to?" hint="Somewhere you keep batches, such as Basement or Closet shelf.">
             <input type="text" value={place} placeholder="Basement" autoFocus={!existing} onChange={(e) => setPlace(e.target.value)} />
@@ -713,8 +734,8 @@ function FinishSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
   const save = async () => {
     const problem = finalReadingError(final);
     if (problem) return setError(problem);
-    const patch = await saveFinalReading(batch.id, final, nowLocal());
-    await changeStatus(batch, 'aging', patch);
+    await saveFinalReading(batch.id, final, nowLocal());
+    await changeStatus(batch, 'aging');
     toast('Moved to Aging');
     onClose();
   };
@@ -735,6 +756,7 @@ function FinishSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
             setFinal(next);
           }}
           latest={finalGravity(timeline)}
+          abvSoFar={batchAbv(batch, timeline)}
         />
         {error && (
           <p className="form-error" role="alert">
@@ -784,9 +806,9 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
     if (problem) return setError(problem);
     const now = nowLocal();
     // The final reading goes on the timeline first, so the bottles get the ABV it gives.
-    const patch = asksFinal ? await saveFinalReading(batch.id, final, now) : {};
+    if (asksFinal) await saveFinalReading(batch.id, final, now);
     const latest = (await events.list()).filter((e) => e.batchId === batch.id);
-    const abv = batchAbv({ ...batch, ...patch }, latest);
+    const abv = batchAbv(batch, latest);
     const saved = [];
     for (const line of lines) {
       saved.push(
@@ -800,7 +822,7 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
           bestAfter: bestAfter || null,
           location: location.trim(),
           abv: abv != null ? Number(abv.toFixed(1)) : null,
-          abvEstimated: abvEstimate({ ...batch, ...patch }, latest) != null,
+          abvEstimated: abvEstimate(batch, latest) != null,
           icon: batch.icon,
           extraIcons: batch.extraIcons ?? [],
           color: batch.color,
@@ -809,7 +831,7 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
         }),
       );
     }
-    await batches.save({ ...batch, ...patch, status: 'bottled' });
+    await batches.save({ ...batch, status: 'bottled' });
     // A bottling entry records real bottles, so it is never replaced by a later stage tap.
     await events.save({
       batchId: batch.id,
@@ -840,7 +862,7 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
         {asksFinal && (
           <>
             <h3 className="stage-divider">Final reading</h3>
-            <FinalReadingFields value={final} onChange={(next) => { setError(''); setFinal(next); }} latest={finalGravity(timeline)} />
+            <FinalReadingFields value={final} onChange={(next) => { setError(''); setFinal(next); }} latest={finalGravity(timeline)} abvSoFar={batchAbv(batch, timeline)} />
             <h3 className="stage-divider">Bottles</h3>
           </>
         )}

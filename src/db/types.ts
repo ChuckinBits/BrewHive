@@ -119,9 +119,10 @@ export type EventType =
   | 'moved'
   | 'ingredient'
   | 'review'
+  | 'estimate'
   | 'note';
 
-type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'place' | 'ingredient' | 'method' | 'rating';
+type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'abv' | 'place' | 'ingredient' | 'method' | 'rating';
 
 /** Event types the user can add by hand: Gravity reading first, as the most common, then A to Z. */
 export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[] = [
@@ -129,6 +130,7 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[]
   ...(
     [
       { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
+      { id: 'estimate', label: 'Estimated ABV', value: 'abv' },
       { id: 'fining', label: 'Fining' },
       { id: 'ingredient', label: 'Ingredient', value: 'ingredient' },
       { id: 'moved', label: 'Moved to', value: 'place' },
@@ -275,12 +277,6 @@ export interface Batch extends Base {
   /** The unit the volume was entered in. Missing means the default from settings. */
   volumeUnit?: VolumeUnit;
   og: number | null;
-  /** An estimated ABV, entered when fermentation ended without a final reading. A later reading replaces it. */
-  abvEstimate?: number | null;
-  /** When the estimate was entered (local date-time): readings dated after it replace it. */
-  abvEstimateAt?: string | null;
-  /** When the estimate was saved (ISO), so a reading in the same minute but logged after it still replaces it. */
-  abvEstimateSavedAt?: string | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
   /** The stage the batch was in when it was archived, so Unarchive can put it back. */
@@ -303,7 +299,7 @@ export interface BatchEvent extends Base {
   type: EventType;
   /** Local date-time, yyyy-mm-ddThh:mm */
   date: string;
-  /** SG for gravity, °C for temperature, pH for ph. */
+  /** SG for gravity, °C for temperature, pH for ph, % for an estimated ABV. */
   value: number | null;
   note: string;
   /** For "status" entries: the stage the batch moved to. */
@@ -324,7 +320,10 @@ export interface BatchEvent extends Base {
    * raises the potential ABV. Off unless ticked. Step feeding always ferments.
    */
   ferments?: boolean;
-  /** For gravity entries: the final reading, logged when fermentation ended. */
+  /**
+   * For gravity entries: true for the final reading (one per batch). false for a reading that was
+   * the final one until a newer final reading or a feeding replaced it: still a measurement, never sugar.
+   */
   final?: boolean;
   /** For "ingredient" entries: what was added, and how much. */
   ingredient?: string;

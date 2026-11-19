@@ -12,8 +12,11 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
   reading, which goes on the timeline as a gravity reading marked Final.
   Any gravity reading can be ticked as the final gravity (only one per batch;
   a newer one replaces it), and then those moves don't ask. Without a
-  reading, an estimated ABV can be entered instead; it shows with ≈ and a
-  later reading replaces it. A backsweetening ticked "This will ferment"
+  reading, an estimated ABV can be entered instead (it starts at the ABV so
+  far). It goes on the timeline as an "Estimated ABV" entry and shows with ≈;
+  deleting the entry or logging a later reading removes it. The final reading
+  settles the ABV: later readings don't change it, and a step feeding or
+  ticked backsweetening after it warns that it will remove the Final tag. A backsweetening ticked "This will ferment"
   after fermentation is done offers to move the batch back to Secondary.
   Final gravities entered in the old field are no longer used: log them as
   a reading.

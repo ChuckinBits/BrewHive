@@ -52,8 +52,10 @@ export function targetFinalGravity(batch: Batch): number {
   return batch.targetFG ?? DEFAULT_TARGET_FG;
 }
 
-/** The most recent gravity: the final gravity once fermentation is complete. */
+/** The final gravity reading when one is marked, otherwise the most recent gravity. */
 export function currentGravity(batch: Batch, events: BatchEvent[]): number | null {
+  const marked = finalReading(events);
+  if (marked) return marked.value;
   const points = gravityPoints(batch, events);
   return points.length ? points[points.length - 1].sg : null;
 }
@@ -114,7 +116,8 @@ export function sugarFerments(entry: BatchEvent): boolean {
  *     gravity: that entry decides, so "add honey, then take a reading" works.
  *   - On any other plain reading: it counts if it rose by NOISE_RISE or more and the batch
  *     was not stabilized before it. A smaller rise is wobble and is ignored.
- *   A final reading (logged when fermentation ends) never counts as added sugar.
+ *   A final reading (logged when fermentation ends) never counts as added sugar, and the walk
+ *   stops there: readings after it don't change the ABV.
  * Every gravity is a timeline entry, so its place is its date: nothing is guessed.
  */
 type Step = BatchEvent;
@@ -145,6 +148,11 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
     }
     result.hasReadings = true;
     const source = isSugar(event) ? event : pending;
+    if (event.type === 'gravity' && event.final) {
+      // The final reading settles the ABV: later readings, up or down, no longer change it.
+      if (sg <= level) result.fermented += level - sg;
+      break;
+    }
     pending = null;
     if (sg <= level) {
       result.fermented += level - sg;
@@ -158,7 +166,8 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
     } else if (rise >= NOISE_RISE - 1e-9) {
       // A real rise on a plain reading, such as sugar added without logging it. A final reading
       // is a measurement of where fermentation ended, never added sugar, so it only moves the level.
-      if (!event.final && !stabilizedBefore(events, event.date, event.createdAt)) result.addedSugar += rise;
+      // (A reading that was the final gravity once, final: false, is still a measurement.)
+      if (event.final == null && !stabilizedBefore(events, event.date, event.createdAt)) result.addedSugar += rise;
       level = sg;
     }
     // Otherwise: wobble. The level stays where it was.
@@ -167,15 +176,16 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
 }
 
 /**
- * The estimated ABV, when one was entered (no final reading was taken) and no gravity
- * reading has been logged since: a later reading replaces it.
+ * The estimated ABV: the latest "Estimated ABV" entry, entered when there was no final
+ * reading. A gravity reading logged after it replaces it, and deleting the entry removes it.
  */
-export function abvEstimate(batch: Batch, events: BatchEvent[]): number | null {
-  if (batch.abvEstimate == null) return null;
-  const since = batch.abvEstimateAt ?? '';
-  const savedAt = batch.abvEstimateSavedAt ?? '';
-  const measuredLater = readings(events).some((e) => e.date > since || (e.date === since && e.createdAt > savedAt));
-  return measuredLater ? null : batch.abvEstimate;
+export function abvEstimate(_batch: Batch, events: BatchEvent[]): number | null {
+  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  const estimates = live.filter((e) => e.type === 'estimate' && e.value != null);
+  const latest = estimates[estimates.length - 1];
+  if (!latest) return null;
+  const after = live.slice(live.indexOf(latest) + 1);
+  return after.some((e) => READING_TYPES.has(e.type) && e.value != null) ? null : latest.value;
 }
 
 /** ABV so far, or the estimate. Null until there is a reading after the OG, so a new batch shows a dash, not 0%. */

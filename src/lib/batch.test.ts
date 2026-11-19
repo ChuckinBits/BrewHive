@@ -216,7 +216,8 @@ test('sugarFerments: feeding always, backsweetening only when ticked', () => {
 // --- Backsweetening after fermentation is complete (follow-up to issue #3) ----
 
 test('final reading, then stabilized and backsweetened with "This will ferment": the potential counts it', () => {
-  const events = [final('2026-11-09T10:00', 1.0), entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  // Ticking "This will ferment" after the final reading takes its Final tag away (it becomes final: false).
+  const events = [{ ...final('2026-11-09T10:00', 1.0), final: false }, entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
   near(effectiveOG(batch({ og: 1.1 }), events), 1.115);
   near(batchAbv(batch({ og: 1.1 }), events), 13.125);
 });
@@ -297,7 +298,8 @@ test('backsweetening that does not ferment never adds to the ABV (Pink Lady Cyse
 
 test('ticked backsweetening or step feeding only raise the ABV once a later reading shows the drop', () => {
   const b = batch({ og: 1.08, status: 'aging' });
-  const finished = [reading('2026-10-20T10:00', 1.0), final('2026-10-25T10:00', 0.998)];
+  // Fermenting sugar after the final reading takes its Final tag away (final: false).
+  const finished = [reading('2026-10-20T10:00', 1.0), { ...final('2026-10-25T10:00', 0.998), final: false }];
   const base = (1.08 - 0.998) * 131.25;
   const sweet = entry('backsweeten', '2026-10-27T10:00', 1.025, { ferments: true });
   near(batchAbv(b, [...finished, sweet]), base);
@@ -309,12 +311,12 @@ test('ticked backsweetening or step feeding only raise the ABV once a later read
   near(effectiveOG(b, [...finished, feed]), 1.08 + 0.022);
 });
 
-test('Grape Pyment: a final reading above an earlier reading is never counted as added sugar', () => {
-  // OG 1.080, readings down to 1.000, final reading 1.010, backsweetened (ticked) to 1.030,
-  // reading 1.020, step-fed to 1.040: 20 + 20 points fed, not 50.
+test('Grape Pyment: a reading that was the final gravity is never counted as added sugar', () => {
+  // OG 1.080, readings down to 1.000, final reading 1.010 (untagged once sugar went in),
+  // backsweetened (ticked) to 1.030, reading 1.020, step-fed to 1.040: 20 + 20 points fed, not 50.
   const events = [
     reading('2026-10-10T10:00', 1.0),
-    final('2026-10-15T10:00', 1.01),
+    { ...reading('2026-10-15T10:00', 1.01), final: false },
     entry('backsweeten', '2026-10-20T10:00', 1.03, { ferments: true }),
     reading('2026-10-25T10:00', 1.02),
     entry('feeding', '2026-10-26T10:00', 1.04),
@@ -322,20 +324,26 @@ test('Grape Pyment: a final reading above an earlier reading is never counted as
   near(analyzeGravity(batch({ og: 1.08, status: 'secondary' }), events).addedSugar, 0.04);
 });
 
-test('an estimated ABV stands in until a later reading replaces it', () => {
-  const events = [reading('2026-11-05T10:00', 1.02)];
-  const b = batch({ status: 'bottled', abvEstimate: 12, abvEstimateAt: '2026-11-10T10:00' });
-  assert.equal(abvEstimate(b, events), 12);
-  assert.equal(batchAbv(b, events), 12);
-  const later = [...events, reading('2026-11-12T10:00', 1.0)];
-  assert.equal(abvEstimate(b, later), null);
-  near(batchAbv(b, later), 13.125);
+test('the final reading settles the ABV: later readings, up or down, do not change it', () => {
+  const settled = [reading('2026-11-05T10:00', 1.02), final('2026-11-09T10:00', 1.0)];
+  const abv = (1.1 - 1.0) * 131.25;
+  near(batchAbv(batch({ status: 'aging' }), settled), abv);
+  near(batchAbv(batch({ status: 'aging' }), [...settled, reading('2026-11-12T10:00', 0.99)]), abv);
+  near(batchAbv(batch({ status: 'aging' }), [...settled, reading('2026-11-12T10:00', 1.012)]), abv);
+  assert.equal(currentGravity(batch(), [...settled, reading('2026-11-12T10:00', 0.99)]), 1.0, 'the FG stays the final reading');
 });
 
-test('a reading in the same minute as the estimate, logged after it, replaces it', () => {
-  const b = batch({ status: 'bottled', abvEstimate: 12, abvEstimateAt: '2026-11-10T10:00', abvEstimateSavedAt: '2026-11-10T17:00:10.000Z' });
-  assert.equal(abvEstimate(b, [{ ...reading('2026-11-10T10:00', 1.0), createdAt: '2026-11-10T17:00:30.000Z' }]), null);
-  assert.equal(abvEstimate(b, [{ ...reading('2026-11-10T10:00', 1.0), createdAt: '2026-11-10T16:59:00.000Z' }]), 12);
+test('an Estimated ABV entry stands in until a later reading replaces it, or it is deleted', () => {
+  const est = entry('estimate', '2026-11-10T10:00', 12);
+  const events = [reading('2026-11-05T10:00', 1.02), est];
+  assert.equal(abvEstimate(batch(), events), 12);
+  assert.equal(batchAbv(batch({ status: 'bottled' }), events), 12);
+  const later = [...events, reading('2026-11-12T10:00', 1.0)];
+  assert.equal(abvEstimate(batch(), later), null);
+  near(batchAbv(batch({ status: 'bottled' }), later), 13.125);
+  assert.equal(abvEstimate(batch(), [reading('2026-11-05T10:00', 1.02), { ...est, deletedAt: '2026-11-11T00:00:00Z' }]), null);
+  // A reading in the same minute, logged after the estimate, also replaces it.
+  assert.equal(abvEstimate(batch(), [{ ...est, createdAt: 'a' }, { ...reading('2026-11-10T10:00', 1.0), createdAt: 'b' }]), null);
 });
 
 test('finalReading: the marked gravity reading, or null', () => {
@@ -343,4 +351,5 @@ test('finalReading: the marked gravity reading, or null', () => {
   const f = final('2026-11-09T10:00', 1.0);
   assert.equal(finalReading([reading('2026-11-05T10:00', 1.02), f, reading('2026-11-12T10:00', 1.001)]), f);
   assert.equal(finalReading([{ ...f, deletedAt: '2026-11-10T00:00:00Z' }]), null);
+  assert.equal(finalReading([{ ...f, final: false }]), null, 'a former final is not the final');
 });
