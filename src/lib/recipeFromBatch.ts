@@ -2,7 +2,7 @@
 
 import type { Batch, BatchEvent, IngredientLine, Recipe } from '../db/types.ts';
 import { BEVERAGE_TYPES } from '../db/types.ts';
-import { isFermentationComplete, originalGravity, targetFinalGravity } from './batch.ts';
+import { finalGravity, isFermentationComplete, originalGravity, targetFinalGravity } from './batch.ts';
 import { fmtSG, newId } from './format.ts';
 import { ingredientStageLabel, stageOf } from './stages.ts';
 
@@ -21,7 +21,8 @@ export function recipeFieldsFromBatch(batch: Batch, events: BatchEvent[]): Recip
     batchSizeL: batch.volumeL,
     volumeUnit: batch.volumeUnit,
     targetOG: originalGravity(batch, events),
-    targetFG: isFermentationComplete(batch) && batch.fg != null ? batch.fg : targetFinalGravity(batch),
+    // Once fermentation is done, where it actually finished; until then, the batch's target.
+    targetFG: (isFermentationComplete(batch) ? finalGravity(events) : null) ?? targetFinalGravity(batch),
     ingredients: batch.ingredients.map((line) => ({ ...line, id: newId(), stage: stageOf(line) })),
     icon: batch.icon,
     extraIcons: batch.extraIcons ?? [],

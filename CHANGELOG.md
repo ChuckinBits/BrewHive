@@ -6,6 +6,15 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
 
 ## Unreleased
 
+- **The stage decides when fermentation is done** ([#26]). The "Fermentation
+  is complete" checkbox and the Final gravity field are gone. Moving a batch
+  from Primary or Secondary to Aging, or bottling it, asks for the final
+  reading, which goes on the timeline as a "Final gravity" entry. Without a
+  reading, an estimated ABV can be entered instead; it shows with ≈ and a
+  later reading replaces it. A backsweetening ticked "This will ferment"
+  after fermentation is done offers to move the batch back to Secondary.
+  Final gravities entered in the old field are no longer used: log them as
+  a reading.
 - **No automatic Yeast pitched entry** ([#23]). Starting a batch no longer adds
   one; add it yourself from Add entry. Non-alcoholic brews never need it.
 - **Fixed: backsweetening raised the ABV** ([#24]). Backsweetening that isn't
@@ -79,3 +88,4 @@ themes; sample data.
 [#20]: https://github.com/ChuckinBits/BrewHive/issues/20
 [#23]: https://github.com/ChuckinBits/BrewHive/issues/23
 [#24]: https://github.com/ChuckinBits/BrewHive/issues/24
+[#26]: https://github.com/ChuckinBits/BrewHive/issues/26

@@ -2039,3 +2039,15 @@ button.staged-row:hover {
   border: 0;
   padding: 0;
 }
+
+/* --- Final reading (issue #26) ------------------------------------------ */
+
+.final-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.final-reading > .btn {
+  align-self: flex-start;
+}

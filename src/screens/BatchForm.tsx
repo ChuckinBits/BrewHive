@@ -12,8 +12,9 @@ import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
-import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
-import { fmtPercent, fmtSG, newId, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
+import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, finalReadingPatch, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
 import { navigate } from '../lib/router.tsx';
 
 interface Draft {
@@ -26,8 +27,8 @@ interface Draft {
   volumeUnit: VolumeUnit;
   volume: string;
   og: string;
-  complete: boolean;
-  fg: string;
+  /** Asked for when the batch is past fermentation and wasn't before. */
+  final: FinalReading;
   targetFG: string;
   ingredients: IngredientLine[];
   icon: string;
@@ -65,8 +66,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
           volume: volumeToInput(batch.volumeL, batch.volumeUnit ?? volumeUnit),
           volumeUnit: batch.volumeUnit ?? volumeUnit,
           og: batch.og != null ? fmtSG(batch.og) : '',
-          complete: isFermentationComplete(batch),
-          fg: batch.fg != null ? fmtSG(batch.fg) : '',
+          final: NO_FINAL_READING,
           targetFG: fmtSG(targetFinalGravity(batch)),
           ingredients: batch.ingredients,
           icon: batch.icon,
@@ -91,8 +91,7 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
         volume: volumeToInput(recipe?.batchSizeL ?? null, recipe?.volumeUnit ?? volumeUnit),
         volumeUnit: recipe?.volumeUnit ?? volumeUnit,
         og: '',
-        complete: false,
-        fg: '',
+        final: NO_FINAL_READING,
         targetFG: fmtSG(recipe?.targetFG ?? DEFAULT_TARGET_FG),
         // Fresh ids, so editing the batch never changes the recipe's own lines.
         ingredients: (recipe?.ingredients ?? []).map((line) => ({ ...line, id: newId() })),
@@ -131,41 +130,21 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   // The ABV line updates as the gravities are typed.
   const inRange = (n: number | null) => (n != null && n >= 0.98 && n <= 1.2 ? n : null);
   const validOg = inRange(parseNum(draft.og));
-  const validFg = inRange(parseNum(draft.fg));
-  // Date the final gravity when fermentation is first marked complete, or when the FG changes,
-  // so sugar added before that point counts before it and backsweetening afterwards counts after it.
-  const completionDate = (complete: boolean, fg: number | null): string | null => {
-    const wasComplete = loaded.existing ? isFermentationComplete(loaded.existing) : false;
-    if (!complete) return null;
-    if (!wasComplete || fg !== loaded.existing?.fg) return new Date().toISOString();
-    return loaded.existing?.completedAt ?? null;
-  };
+  // Moving a batch past fermentation (or entering one that already is) asks for the final reading.
+  const asksFinal = isFermentationComplete({ status: draft.status } as Batch) && !(loaded.existing && isFermentationComplete(loaded.existing));
+  const finalEntry = asksFinal ? finalReadingEntry(loaded.existing?.id ?? '', draft.final, nowLocal()) : null;
 
   // Work the numbers out from the draft as typed, with the batch's timeline, so step feedings count.
-  const preview = {
-    ...(loaded.existing ?? loaded.draft),
-    og: validOg,
-    fg: validFg,
-    fermentationComplete: draft.complete,
-    completedAt: completionDate(draft.complete, validFg),
-    startDate: draft.startDate,
-  } as Batch;
-  const { addedSugar } = analyzeGravity(preview, loaded.timeline);
+  const preview = { ...(loaded.existing ?? loaded.draft), og: validOg, startDate: draft.startDate, ...(asksFinal ? finalReadingPatch(draft.final, nowLocal()) : {}) } as Batch;
+  const previewEvents = finalEntry ? [...loaded.timeline, { ...finalEntry, id: 'final', createdAt: '\uffff', updatedAt: '', deletedAt: null } as BatchEvent] : loaded.timeline;
+  const { addedSugar } = analyzeGravity(preview, previewEvents);
   const projected = projectedAbv(validOg == null ? null : validOg + addedSugar, inRange(parseNum(draft.targetFG)) ?? DEFAULT_TARGET_FG);
   const abvParts: string[] = [];
-  if (validOg != null && draft.complete && validFg != null) abvParts.push(`ABV ${fmtPercent(batchAbv(preview, loaded.timeline))}`);
+  const finalAbv = validOg != null && asksFinal ? batchAbv(preview, previewEvents) : null;
+  if (finalAbv != null) abvParts.push(`ABV ${draft.final.mode === 'estimate' ? '≈ ' : ''}${fmtPercent(finalAbv)}`);
   if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}`);
-  if (projected?.target != null && !draft.complete) abvParts.push(`Target ${fmtPercent(projected.target)}`);
+  if (projected?.target != null) abvParts.push(`Target ${fmtPercent(projected.target)}`);
   const abvLine = abvParts.join(' · ');
-
-  // Marking fermentation complete moves a Planned or Primary batch on to Secondary.
-  const setComplete = (complete: boolean) => {
-    const original = loaded.draft.status;
-    if (complete) set({ complete, status: stageWhenComplete(draft.status) });
-    // Unchecking undoes the automatic move, if the user has not picked a stage since.
-    else set({ complete, status: draft.status === stageWhenComplete(original) && original !== draft.status ? original : draft.status });
-  };
-  const movedToSecondary = draft.complete && !loaded.draft.complete && draft.status !== loaded.draft.status && draft.status === 'secondary';
 
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';
 
@@ -173,12 +152,10 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
     const name = draft.name.trim();
     if (!name) return setError('Give the batch a name.');
     const og = parseNum(draft.og);
-    let fg = parseNum(draft.fg);
     const targetFG = parseNum(draft.targetFG);
     for (const [label, value, text] of [
       ['Original gravity', og, draft.og],
-      ['Final gravity', fg, draft.complete ? draft.fg : ''],
-      ['Target final gravity', targetFG, draft.complete ? '' : draft.targetFG],
+      ['Target final gravity', targetFG, draft.targetFG],
     ] as const) {
       if (text.trim() !== '' && (value == null || value < 0.98 || value > 1.2)) {
         return setError(`${label} should be a gravity between 0.980 and 1.200, such as 1.100.`);
@@ -188,14 +165,11 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       return setError('Volume should be a number, such as 1 or 5.');
     }
 
-    // Fermentation is done but no FG was typed: use the latest gravity reading.
-    if (draft.complete && fg == null && loaded.existing) {
-      const timeline = (await events.list()).filter((e) => e.batchId === loaded.existing?.id);
-      const points = gravityPoints({ ...loaded.existing, og: null }, timeline);
-      fg = points.length ? points[points.length - 1].sg : null;
+    if (asksFinal) {
+      const problem = finalReadingError(draft.final);
+      if (problem) return setError(problem);
     }
-
-    const completedAt = completionDate(draft.complete, fg);
+    const finishedAt = nowLocal();
 
     const saved = await batches.save({
       ...(loaded.existing ?? { rating: null }),
@@ -208,20 +182,20 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       volumeL: volumeFromInput(draft.volume, draft.volumeUnit),
       volumeUnit: draft.volumeUnit,
       og,
-      fermentationComplete: draft.complete,
-      completedAt,
-      fg,
       targetFG: targetFG ?? DEFAULT_TARGET_FG,
       ingredients: cleanIngredients(draft.ingredients),
       icon: draft.icon,
       extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
+      ...(asksFinal ? finalReadingPatch(draft.final, finishedAt) : {}),
     });
 
     if (loaded.existing && loaded.existing.status !== saved.status) {
       await recordStatusEntry(saved.id, loaded.existing.status, saved.status);
     }
+    // The estimate (if any) is already on the batch; a final gravity goes on the timeline.
+    if (asksFinal) await saveFinalReading(saved.id, draft.final, finishedAt);
     toast(isNew ? 'Batch started' : 'Batch saved');
     navigate(`/batches/${saved.id}`, { replace: true });
   };
@@ -286,19 +260,15 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
         </div>
 
         <div className="gravity-group">
-          <label className="check-field">
-            <input type="checkbox" checked={draft.complete} onChange={(e) => setComplete(e.target.checked)} />
-            Fermentation completed
-          </label>
-          {movedToSecondary && <p className="field-hint">Status moved to Secondary.</p>}
-          {draft.complete ? (
-            <Field label="Final gravity" hint="Leave it empty to use your latest gravity reading.">
-              <input type="text" inputMode="decimal" value={draft.fg} placeholder="1.000" onChange={(e) => set({ fg: e.target.value })} />
-            </Field>
-          ) : (
-            <Field label="Target final gravity" hint="Where you expect fermentation to stop. 1.000 is fully dry.">
-              <input type="text" inputMode="decimal" value={draft.targetFG} placeholder="1.000" onChange={(e) => set({ targetFG: e.target.value })} />
-            </Field>
+          <Field label="Target final gravity" hint="Where you expect fermentation to stop. 1.000 is fully dry.">
+            <input type="text" inputMode="decimal" value={draft.targetFG} placeholder="1.000" onChange={(e) => set({ targetFG: e.target.value })} />
+          </Field>
+          {asksFinal && (
+            <>
+              <h3 className="stage-divider">Final reading</h3>
+              <p className="field-hint">{isNew ? 'This batch is past fermentation.' : `Moving to ${draft.status === 'aging' ? 'Aging' : 'a finished stage'} means fermentation is done.`}</p>
+              <FinalReadingFields value={draft.final} onChange={(final) => set({ final })} />
+            </>
           )}
           {abvLine && <p className="projection" aria-live="polite">{abvLine}</p>}
         </div>

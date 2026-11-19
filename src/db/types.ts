@@ -160,6 +160,7 @@ export function statusLabel(status: BatchStatus): string {
 
 /** The heading a timeline entry shows, such as "Moved to Secondary" or "Moved to Basement". */
 export function eventTitle(event: BatchEvent): string {
+  if (event.type === 'gravity' && event.final) return 'Final gravity';
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
     if (event.toStatus === 'archived') return 'Archived';
@@ -275,19 +276,12 @@ export interface Batch extends Base {
   /** The unit the volume was entered in. Missing means the default from settings. */
   volumeUnit?: VolumeUnit;
   og: number | null;
-  /**
-   * True once fermentation is finished. Until then the batch shows a potential
-   * (or target) ABV. Missing on batches saved by v0.1: see isFermentationComplete.
-   */
-  fermentationComplete?: boolean;
-  /**
-   * When fermentation was marked complete (or the final gravity last changed),
-   * as an exact ISO moment. Places the final gravity on the timeline, so sugar
-   * added afterwards by backsweetening is counted after it.
-   */
-  completedAt?: string | null;
-  /** Final gravity, once fermentation is complete. The latest reading is used if it is left empty. */
-  fg: number | null;
+  /** An estimated ABV, entered when fermentation ended without a final reading. A later reading replaces it. */
+  abvEstimate?: number | null;
+  /** When the estimate was entered (local date-time): readings dated after it replace it. */
+  abvEstimateAt?: string | null;
+  /** When the estimate was saved (ISO), so a reading in the same minute but logged after it still replaces it. */
+  abvEstimateSavedAt?: string | null;
   /** The gravity fermentation is expected to finish at. Missing means 1.000. */
   targetFG?: number | null;
   /** The stage the batch was in when it was archived, so Unarchive can put it back. */
@@ -331,6 +325,8 @@ export interface BatchEvent extends Base {
    * raises the potential ABV. Off unless ticked. Step feeding always ferments.
    */
   ferments?: boolean;
+  /** For gravity entries: the final reading, logged when fermentation ended. */
+  final?: boolean;
   /** For "ingredient" entries: what was added, and how much. */
   ingredient?: string;
   amount?: string;
@@ -357,6 +353,8 @@ export interface CellarEntry extends Base {
   bestAfter: string | null;
   location: string;
   abv: number | null;
+  /** True when the ABV came from an estimate at bottling, not from gravity readings. */
+  abvEstimated?: boolean;
   icon: string;
   /** Up to two more icons shown behind the main one, in order. */
   extraIcons?: string[];

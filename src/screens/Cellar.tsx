@@ -163,7 +163,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
       <div className="stats">
         <Stat label={entry.count === 1 ? 'Bottle left' : 'Bottles left'} value={entry.count} />
         <Stat label="Size" value={fmtBottle(entry.bottleSizeMl)} />
-        <Stat label="ABV" value={fmtPercent(entry.abv)} />
+        <Stat label="ABV" value={entry.abvEstimated && entry.abv != null ? `≈ ${fmtPercent(entry.abv)}` : fmtPercent(entry.abv)} extra={entry.abvEstimated && entry.abv != null ? 'Estimated' : undefined} />
         <Stat label="Bottled" value={fmtDateShort(entry.bottledDate)} />
       </div>
 
@@ -494,6 +494,8 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
       bestAfter: draft.bestAfter || null,
       location: draft.location.trim(),
       abv,
+      // A typed ABV is the person's own number, no longer the estimate from bottling.
+      abvEstimated: existing?.abvEstimated && abv === existing.abv ? true : undefined,
       icon: draft.icon,
       extraIcons: draft.extraIcons,
       color: draft.color,
