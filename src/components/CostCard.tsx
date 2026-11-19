@@ -37,32 +37,65 @@ interface Props {
   useSaved: boolean;
 }
 
-export function CostCard({ lines, volumeL, useSaved }: Props) {
+/** The figures to show, or null when no ingredient has a cost. */
+function useCost(lines: IngredientLine[], volumeL: number | null, useSaved: boolean) {
   const settings = useSettings();
   const library = useQuery(() => ingredients.list()) ?? [];
   const summary = costSummary(lines, lineCostFrom(library, useSaved));
   if (summary.counted === 0) return null;
   const currency = currencyOf(settings);
   const money = (n: number) => fmtMoney(n, currency);
-  const perVolume = settings.volumeUnit === 'gal' ? 3.785411784 : 1;
+  const gallons = settings.volumeUnit === 'gal';
+  const perVolume = gallons ? 3.785411784 : 1;
+  const hasVolume = volumeL != null && volumeL > 0;
+  return {
+    total: money(summary.total),
+    perBottle: hasVolume ? money(summary.total / ((volumeL as number) / 0.75)) : null,
+    perVolume: hasVolume ? money((summary.total / (volumeL as number)) * perVolume) : null,
+    perVolumeName: gallons ? 'gallon' : 'liter',
+    perVolumeShort: fmtVolume(perVolume, settings.volumeUnit).replace(/^1 /, ''),
+    notCounted: summary.missing.length > 0 ? `Not counted: ${summary.missing.map((m) => `${m.name} (${WHY[m.reason]})`).join(', ')}.` : null,
+  };
+}
 
+/** The cost card, under a recipe's ingredients. */
+export function CostCard({ lines, volumeL, useSaved }: Props) {
+  const cost = useCost(lines, volumeL, useSaved);
+  if (!cost) return null;
   return (
     <section className="card cost-card" aria-label="Ingredient cost">
       <div className="card-head">
         <h2>Ingredient cost</h2>
-        <span className="cost-total">{money(summary.total)}</span>
+        <span className="cost-total">{cost.total}</span>
       </div>
-      {volumeL != null && volumeL > 0 && (
+      {cost.perBottle && (
         <p className="cost-per">
-          {money(summary.total / (volumeL / 0.75))} per 750 mL bottle · {money((summary.total / volumeL) * perVolume)} per {fmtVolume(perVolume, settings.volumeUnit).replace(/^1 /, '')}
+          {cost.perBottle} per 750 mL bottle · {cost.perVolume} per {cost.perVolumeShort}
         </p>
       )}
-      {summary.missing.length > 0 && (
-        <p className="field-hint">
-          Not counted: {summary.missing.map((m) => `${m.name} (${WHY[m.reason]})`).join(', ')}.
-        </p>
-      )}
+      {cost.notCounted && <p className="field-hint">{cost.notCounted}</p>}
       {!useSaved && <p className="field-hint">At today's prices from your ingredients.</p>}
     </section>
+  );
+}
+
+/** The cost as rows of a batch's Details list, followed by what isn't counted. */
+export function CostFacts({ lines, volumeL }: { lines: IngredientLine[]; volumeL: number | null }) {
+  const cost = useCost(lines, volumeL, true);
+  if (!cost) return null;
+  return (
+    <>
+      <dt>Ingredient cost</dt>
+      <dd>{cost.total}</dd>
+      {cost.perBottle && (
+        <>
+          <dt>Per bottle</dt>
+          <dd>{cost.perBottle} (750 mL)</dd>
+          <dt>Per {cost.perVolumeName}</dt>
+          <dd>{cost.perVolume}</dd>
+        </>
+      )}
+      {cost.notCounted && <dd className="facts-note">{cost.notCounted}</dd>}
+    </>
   );
 }

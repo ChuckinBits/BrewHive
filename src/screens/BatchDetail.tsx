@@ -6,7 +6,7 @@ import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/s
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients } from '../components/StagedIngredients.tsx';
-import { CostCard } from '../components/CostCard.tsx';
+import { CostFacts } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
@@ -215,6 +215,29 @@ export function BatchDetailScreen({ id }: { id: string }) {
         <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
       </section>
 
+      <section className="card">
+        <h2>Details</h2>
+        <dl className="facts">
+          {batch.volumeL != null && (
+            <>
+              <dt>Volume</dt>
+              <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
+            </>
+          )}
+          <dt>Started</dt>
+          <dd>{fmtDate(batch.startDate)}</dd>
+          {data.recipe && (
+            <>
+              <dt>Recipe</dt>
+              <dd>
+                <Link to={`/recipes/${data.recipe.id}`}>{data.recipe.name}</Link>
+              </dd>
+            </>
+          )}
+          <CostFacts lines={batch.ingredients} volumeL={batch.volumeL} />
+        </dl>
+      </section>
+
       {batch.ingredients.length > 0 && (
         <section className="card">
           <div className="card-head">
@@ -244,32 +267,6 @@ export function BatchDetailScreen({ id }: { id: string }) {
               toast(`${line.name} logged on the timeline`);
             }}
           />
-        </section>
-      )}
-
-      <CostCard lines={batch.ingredients} volumeL={batch.volumeL} useSaved />
-
-      {(batch.volumeL != null || data.recipe) && (
-        <section className="card">
-          <h2>Details</h2>
-          <dl className="facts">
-            {batch.volumeL != null && (
-              <>
-                <dt>Volume</dt>
-                <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
-              </>
-            )}
-            <dt>Started</dt>
-            <dd>{fmtDate(batch.startDate)}</dd>
-            {data.recipe && (
-              <>
-                <dt>Recipe</dt>
-                <dd>
-                  <Link to={`/recipes/${data.recipe.id}`}>{data.recipe.name}</Link>
-                </dd>
-              </>
-            )}
-          </dl>
         </section>
       )}
 

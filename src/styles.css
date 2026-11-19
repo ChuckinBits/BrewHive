@@ -869,6 +869,13 @@ a.shelf-item:hover .shelf-visual {
   text-align: right;
 }
 
+.facts .facts-note {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
 .ingredient-list,
 .link-list {
   display: flex;

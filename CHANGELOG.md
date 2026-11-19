@@ -26,8 +26,15 @@ a milestone.
   "Your ingredients" opens the list without leaving what you're writing.
 - **Costs** ([#33]). Give an ingredient what you paid ("24.99 for 12 lb") and
   batches and recipes show their ingredient cost: the total, per 750 mL
-  bottle and per gallon or liter. A batch keeps the prices it was made with;
+  bottle and per gallon or liter. On a batch it's part of Details; recipes
+  show it under their ingredients. A batch keeps the prices it was made with;
   recipes use today's. Choose the currency under More.
+
+### Batches
+
+- **Details first.** The Details section (volume, start date, recipe and now
+  cost) moves above Ingredients, as the overview of the batch, and always
+  shows.
 
 ### Roadmap
 
