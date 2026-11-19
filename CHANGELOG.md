@@ -10,7 +10,9 @@ minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
   one; add it yourself from Add entry. Non-alcoholic brews never need it.
 - **Fixed: backsweetening raised the ABV** ([#24]). Backsweetening that isn't
   set to ferment no longer adds to the ABV, even when fermentation was marked
-  complete after it was logged.
+  complete after it was logged. Backsweetening ticked to ferment adds to the
+  ABV only once a later gravity reading (or a final gravity entered after it)
+  shows it fermenting.
 
 ## v0.1.1 – 2026-11-18
 
