@@ -13,7 +13,7 @@ import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, gravityPoints, isFermentationComplete, projectedAbv, stageWhenComplete, targetFinalGravity } from '../lib/batch.ts';
-import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { fmtPercent, fmtSG, newId, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { navigate } from '../lib/router.tsx';
 
 interface Draft {
@@ -219,11 +219,6 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       notes: draft.notes.trim(),
     });
 
-    if (isNew && saved.status !== 'planned') {
-      // Started today: pitched now. Another day: noon, as the time isn't known.
-      const pitchedAt = saved.startDate === today() ? nowLocal() : `${saved.startDate}T12:00`;
-      await events.save({ batchId: saved.id, type: 'pitch', date: pitchedAt, value: null, note: '' });
-    }
     if (loaded.existing && loaded.existing.status !== saved.status) {
       await recordStatusEntry(saved.id, loaded.existing.status, saved.status);
     }

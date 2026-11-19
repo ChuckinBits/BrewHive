@@ -100,7 +100,10 @@ export function sugarFerments(entry: BatchEvent): boolean {
  *     was not stabilized before it. A smaller rise is wobble and is ignored.
  * - The final gravity sits where fermentation was marked complete (completedAt). Without that
  *   date it sits right after the last plain reading, so sugar added after fermentation finished
- *   (backsweetening) comes after it.
+ *   (backsweetening) comes after it. Either way it never comes after stabilizing or after
+ *   backsweetening that isn't meant to ferment, nor after a step feeding or ticked
+ *   backsweetening unless a gravity reading follows it or the final gravity was entered after
+ *   it was logged.
  */
 export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnalysis {
   const og = originalGravity(batch, events);
@@ -134,6 +137,33 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
         if (s.event?.type === 'gravity') lastPlain = i;
       });
       at = lastPlain + 1;
+    }
+    // Stabilizing, and backsweetening that isn't meant to ferment, only happen once fermentation
+    // is done. So the final gravity always comes before them, even if fermentation was marked
+    // complete later; otherwise the drop from a sweetened gravity back to the FG would count as alcohol.
+    const stabilizedAt = live.find((e) => e.type === 'stabilize');
+    const finished = steps.findIndex(
+      (s) =>
+        !!s.event &&
+        ((s.event.type === 'backsweeten' && !sugarFerments(s.event)) ||
+          // (Sugar the person says will ferment, such as a ticked backsweetening, is left where it is.)
+          (!!stabilizedAt && !(isSugar(s.event) && sugarFerments(s.event)) && stabilizedBefore([stabilizedAt], s.event.date, s.event.createdAt))),
+    );
+    if (finished >= 0 && finished < at) at = finished;
+    // Sugar that ferments (step feeding, or backsweetening ticked to ferment) only adds to the ABV
+    // once a later measurement shows the drop: a gravity reading after it, or a final gravity
+    // entered after it was logged. A final gravity entered before the sugar was logged was
+    // measured before it, so it comes first.
+    const fgEnteredAt = batch.completedAt && batch.completedAt.length > 16 ? batch.completedAt : null;
+    for (let i = 0; i < at; i++) {
+      const event = steps[i].event;
+      if (!event || !isSugar(event)) continue;
+      const confirmed =
+        steps.slice(i + 1, at).some((s) => s.event?.type === 'gravity' && s.sg != null) || (fgEnteredAt != null && event.createdAt < fgEnteredAt);
+      if (!confirmed) {
+        at = i;
+        break;
+      }
     }
     steps.splice(at, 0, fgStep);
   }
