@@ -257,24 +257,26 @@ export interface IngredientCost {
 export interface IngredientCategory {
   id: string;
   label: string;
+  /** One of CATEGORY_ICONS, '' for no icon. Missing on categories saved before icons: those use their default. */
+  icon?: string;
 }
 
 /** The categories every library starts with. They can be renamed, and more can be added. */
 export const DEFAULT_CATEGORIES: IngredientCategory[] = [
-  { id: 'honey', label: 'Honey' },
-  { id: 'fruit', label: 'Fruit' },
-  { id: 'juice', label: 'Juice & concentrate' },
-  { id: 'sweetener', label: 'Sweeteners' },
-  { id: 'spice', label: 'Spices' },
-  { id: 'herb', label: 'Herbs & flowers' },
-  { id: 'yeast', label: 'Yeast' },
-  { id: 'nutrient', label: 'Nutrients' },
-  { id: 'additive', label: 'Additives' },
-  { id: 'fining', label: 'Fining & clarifiers' },
-  { id: 'oak', label: 'Oak & wood' },
-  { id: 'grain', label: 'Grains & malt' },
-  { id: 'hops', label: 'Hops' },
-  { id: 'other', label: 'Other' },
+  { id: 'honey', label: 'Honey', icon: 'honey' },
+  { id: 'fruit', label: 'Fruit', icon: 'fruit' },
+  { id: 'juice', label: 'Juice & concentrate', icon: 'juice' },
+  { id: 'sweetener', label: 'Sweeteners', icon: 'sweetener' },
+  { id: 'spice', label: 'Spices', icon: 'spice' },
+  { id: 'herb', label: 'Herbs & flowers', icon: 'herb' },
+  { id: 'yeast', label: 'Yeast', icon: 'yeast' },
+  { id: 'nutrient', label: 'Nutrients', icon: 'nutrient' },
+  { id: 'additive', label: 'Additives', icon: 'additive' },
+  { id: 'fining', label: 'Fining & clarifiers', icon: 'fining' },
+  { id: 'oak', label: 'Oak & wood', icon: 'oak' },
+  { id: 'grain', label: 'Grains & malt', icon: 'grain' },
+  { id: 'hops', label: 'Hops', icon: 'hops' },
+  { id: 'other', label: 'Other', icon: 'jar' },
 ];
 
 /** An ingredient in the library: what it is, how it's usually measured, and (optionally) what it costs. */

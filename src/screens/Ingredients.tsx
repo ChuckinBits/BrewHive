@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfirmSheet, Fab, Field, Sheet, TopBar, toast } from '../components/ui.tsx';
 import { batches, categoriesOf, currencyOf, ingredients, recipes, restoreStarterIngredients, saveSettings, useQuery, useSettings } from '../db/store.ts';
 import { INGREDIENT_UNITS, unitLabel, type IngredientCategory, type IngredientCost, type LibraryIngredient } from '../db/types.ts';
-import { categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from '../lib/library.ts';
+import { categoryIcon, categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from '../lib/library.ts';
+import { CategoryIcon } from '../icons/CategoryIcon.tsx';
+import { CATEGORY_ICONS } from '../icons/categoryIcons.ts';
 import { fmtMoney, pricePer, unitsCompatible } from '../lib/cost.ts';
 import { parseNum } from '../lib/format.ts';
 import { Icon } from '../icons/Icon.tsx';
@@ -81,7 +83,10 @@ export function IngredientsScreen() {
             if (items.length === 0) return null;
             return (
               <section key={c.id} aria-label={c.label}>
-                <h3 className="stage-divider">{c.label}</h3>
+                <h3 className="stage-divider">
+                  <CategoryIcon id={categoryIcon(c)} className="category-icon" />
+                  {c.label}
+                </h3>
                 <ul className="library-list">
                   {items.map((item) => (
                     <li key={item.id}>
@@ -122,6 +127,8 @@ function CategoriesSheet({ categories, counts, onClose }: { categories: Ingredie
   const [list, setList] = useState(categories);
   const [added, setAdded] = useState('');
   const [dragging, setDragging] = useState<string | null>(null);
+  // The category whose icon is being picked.
+  const [picking, setPicking] = useState<IngredientCategory | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const sorted = sortCategories(list).every((c, i) => c.id === list[i].id);
 
@@ -215,6 +222,14 @@ function CategoriesSheet({ categories, counts, onClose }: { categories: Ingredie
               >
                 <Icon name="grip" size={18} />
               </button>
+              <button
+                type="button"
+                className={categoryIcon(c) ? 'category-icon-btn' : 'category-icon-btn category-icon-none'}
+                aria-label={categoryIcon(c) ? `Icon for ${c.label}: ${iconLabel(categoryIcon(c))}. Change it` : `Choose an icon for ${c.label}`}
+                onClick={() => setPicking(c)}
+              >
+                {categoryIcon(c) ? <CategoryIcon id={categoryIcon(c)} size={22} strokeWidth={1.75} /> : <Icon name="plus" size={18} />}
+              </button>
               <input type="text" aria-label={`Name of ${c.label}`} value={c.label} onChange={(e) => setList(list.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)))} />
               {c.id !== 'other' && (
                 <button
@@ -237,7 +252,7 @@ function CategoriesSheet({ categories, counts, onClose }: { categories: Ingredie
             className="btn btn-small"
             disabled={!added.trim()}
             onClick={() => {
-              setList([...list.filter((c) => c.id !== 'other'), { id: newId(), label: added.trim() }, ...list.filter((c) => c.id === 'other')]);
+              setList([...list.filter((c) => c.id !== 'other'), { id: newId(), label: added.trim(), icon: '' }, ...list.filter((c) => c.id === 'other')]);
               setAdded('');
             }}
           >
@@ -249,6 +264,45 @@ function CategoriesSheet({ categories, counts, onClose }: { categories: Ingredie
           Save categories
         </button>
       </form>
+      {picking && (
+        <IconPickerSheet
+          category={picking}
+          onPick={(icon) => {
+            setList(list.map((x) => (x.id === picking.id ? { ...x, icon } : x)));
+            setPicking(null);
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
+    </Sheet>
+  );
+}
+
+const iconLabel = (id: string | null) => CATEGORY_ICONS.find((i) => i.id === id)?.label ?? '';
+
+/** Picks a category's icon from all of them, or None. */
+function IconPickerSheet({ category, onPick, onClose }: { category: IngredientCategory; onPick: (icon: string) => void; onClose: () => void }) {
+  const current = categoryIcon(category);
+  return (
+    <Sheet title={`Icon for ${category.label.trim() || 'this category'}`} onClose={onClose}>
+      <div className="icon-pick-grid" role="group" aria-label="Icons">
+        <button type="button" className={current ? 'icon-pick' : 'icon-pick icon-pick-on'} aria-pressed={!current} onClick={() => onPick('')}>
+          None
+        </button>
+        {CATEGORY_ICONS.map((icon) => (
+          <button
+            key={icon.id}
+            type="button"
+            className={current === icon.id ? 'icon-pick icon-pick-on' : 'icon-pick'}
+            aria-pressed={current === icon.id}
+            aria-label={icon.label}
+            title={icon.label}
+            onClick={() => onPick(icon.id)}
+          >
+            <CategoryIcon id={icon.id} size={24} strokeWidth={1.75} />
+          </button>
+        ))}
+      </div>
     </Sheet>
   );
 }

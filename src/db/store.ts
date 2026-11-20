@@ -65,7 +65,13 @@ export function categoriesOf(settings: Settings): IngredientCategory[] {
 export async function ensureStarterIngredients(): Promise<void> {
   const known = new Set((await getAll<LibraryIngredient>('ingredients')).map((i) => i.id));
   const missing = starterIngredients(usesImperial()).filter((i) => !known.has(i.id));
-  for (const item of missing) await ingredients.save(item);
+  await putMany('ingredients', missing.map(fresh));
+}
+
+/** A new record with its timestamps, for writing several in one go. */
+function fresh<T extends object>(data: T): T & Base {
+  const now = new Date().toISOString();
+  return { ...data, createdAt: now, updatedAt: now, deletedAt: null } as T & Base;
 }
 
 /**
@@ -76,7 +82,7 @@ export async function restoreStarterIngredients(): Promise<number> {
   const live = new Set((await getAll<LibraryIngredient>('ingredients')).filter((i) => !i.deletedAt).map((i) => i.id));
   const missing = starterIngredients(usesImperial()).filter((i) => !live.has(i.id));
   // Saved fresh, so a deleted one comes back as it started, with no price.
-  for (const item of missing) await ingredients.save(item);
+  await putMany('ingredients', missing.map(fresh));
   return missing.length;
 }
 

@@ -22,6 +22,11 @@ a milestone.
   remove one (its ingredients move to Other). Put them in order with Sort A–Z
   (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
   is used for the category chips and the sections of the list.
+- **Category icons** ([#36]). Each category in the ingredient list has a
+  line icon: honeycomb, fruit, juice, sugar cubes, star anise, flower, yeast,
+  nutrients, test tube, funnel, oak, wheat, hops and a jar for Other. In
+  Categories, tap a category's icon to pick another (also water, leaf and a
+  spice jar) or None. Categories you add start with no icon.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
   default unit. A name that isn't on the list can be used once, or saved
@@ -186,3 +191,4 @@ themes; sample data.
 [#32]: https://github.com/ChuckinBits/BrewHive/issues/32
 [#33]: https://github.com/ChuckinBits/BrewHive/issues/33
 [#35]: https://github.com/ChuckinBits/BrewHive/issues/35
+[#36]: https://github.com/ChuckinBits/BrewHive/issues/36
