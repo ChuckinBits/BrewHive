@@ -261,20 +261,23 @@ interface FormProps {
   all: LibraryIngredient[];
   categories: IngredientCategory[];
   startCategory?: string;
-  /** In a sheet: called when saved or deleted, instead of going back to the Ingredients screen. */
-  onDone?: () => void;
+  /** For a new ingredient: the name and default unit to start with. */
+  startName?: string;
+  startUnit?: string;
+  /** In a sheet: called when saved (with the saved ingredient) or deleted, instead of going back to the Ingredients screen. */
+  onDone?: (saved?: LibraryIngredient) => void;
 }
 
-export function IngredientForm({ item, all, categories, startCategory, onDone }: FormProps) {
-  const done = () => (onDone ? onDone() : navigate('/ingredients'));
-  const [name, setName] = useState(item?.name ?? '');
+export function IngredientForm({ item, all, categories, startCategory, startName, startUnit, onDone }: FormProps) {
+  const done = (saved?: LibraryIngredient) => (onDone ? onDone(saved) : navigate('/ingredients'));
+  const [name, setName] = useState(item?.name ?? startName ?? '');
   const [category, setCategory] = useState(item?.category ?? (startCategory && categories.some((c) => c.id === startCategory) ? startCategory : 'other'));
-  const [defaultUnit, setDefaultUnit] = useState(item?.defaultUnit ?? '');
+  const [defaultUnit, setDefaultUnit] = useState(item?.defaultUnit ?? startUnit ?? '');
   const [notes, setNotes] = useState(item?.notes ?? '');
   // Cost, as bought: price for an amount. Optional.
   const [price, setPrice] = useState(item?.cost ? String(item.cost.price) : '');
   const [costQty, setCostQty] = useState(item?.cost ? String(item.cost.quantity) : '1');
-  const [costUnit, setCostUnit] = useState(item?.cost?.unit ?? item?.defaultUnit ?? '');
+  const [costUnit, setCostUnit] = useState(item?.cost?.unit ?? item?.defaultUnit ?? startUnit ?? '');
   const settings = useSettings();
   const currency = currencyOf(settings);
   const [error, setError] = useState('');
@@ -301,9 +304,9 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
     if (!name.trim()) return setError('Enter the ingredient, such as Orange blossom honey.');
     if (duplicate) return setError(`${duplicate.name} is already in your ingredients.`);
     if (price.trim() && !cost) return setError('Enter the price and how much it was for, such as 24.99 for 12 lb.');
-    await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim(), cost });
+    const saved = await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim(), cost });
     toast(item ? 'Ingredient saved' : 'Added to your ingredients');
-    done();
+    done(saved);
   };
 
   return (
@@ -372,7 +375,7 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
           </p>
         )}
         <button type="submit" className="btn btn-primary btn-block">
-          {item ? 'Save ingredient' : 'Add ingredient'}
+          {item ? 'Save ingredient' : onDone ? 'Save new ingredient' : 'Add ingredient'}
         </button>
       </form>
 
@@ -428,48 +431,5 @@ export function IngredientForm({ item, all, categories, startCategory, onDone }:
         />
       )}
     </>
-  );
-}
-
-/**
- * The library in a sheet, opened from the ingredient sheet so the batch or recipe being edited
- * isn't left behind. Tap an ingredient to edit it, or add one.
- */
-export function LibrarySheet({ onClose }: { onClose: () => void }) {
-  const settings = useSettings();
-  const categories = categoriesOf(settings);
-  const all = useQuery(() => ingredients.list()) ?? [];
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
-  const [editing, setEditing] = useState<LibraryIngredient | 'new' | null>(null);
-  const shown = filterIngredients(all, search, category, categories);
-
-  if (editing) {
-    return (
-      <Sheet title={editing === 'new' ? 'New ingredient' : 'Edit ingredient'} onClose={() => setEditing(null)}>
-        <IngredientForm item={editing === 'new' ? null : editing} all={all} categories={categories} startCategory={category ?? undefined} onDone={() => setEditing(null)} />
-      </Sheet>
-    );
-  }
-  return (
-    <Sheet title="Your ingredients" onClose={onClose}>
-      <input type="search" className="search" placeholder="Search ingredients" aria-label="Search your ingredients" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <CategoryChips categories={categories} value={category} onChange={setCategory} />
-      <ul className="library-list library-list-sheet">
-        {shown.map((item) => (
-          <li key={item.id}>
-            <button type="button" className="library-row" onClick={() => setEditing(item)}>
-              <span className="library-name">{item.name}</span>
-              <span className="muted">{categoryOf(item, categories).label}</span>
-              <Icon name="edit" size={18} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      <button type="button" className="btn btn-block" onClick={() => setEditing('new')}>
-        <Icon name="plus" size={20} />
-        Add ingredient
-      </button>
-    </Sheet>
   );
 }

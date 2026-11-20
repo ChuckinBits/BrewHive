@@ -2245,11 +2245,6 @@ button.library-row {
   cursor: pointer;
 }
 
-.library-list-sheet {
-  max-height: 50vh;
-  overflow-y: auto;
-}
-
 /* --- Ingredient picker (v0.2, issue #32) -------------------------------- */
 
 .picker {
@@ -2290,14 +2285,19 @@ button.library-row {
 
 .picker-foot {
   display: flex;
+  gap: 8px;
+  align-items: flex-start;
   justify-content: space-between;
   margin-top: 6px;
 }
 
-.save-to-library {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.picker-foot .btn:first-child {
+  min-width: 0;
+  text-align: left;
+}
+
+.picker-foot .btn:last-child {
+  flex: none;
 }
 
 /* --- Ingredient costs (v0.2, issue #33) --------------------------------- */

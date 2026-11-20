@@ -22,8 +22,10 @@ a milestone.
   is used for the category chips and the sections of the list.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
-  default unit. A new name can be saved to your list with one checkbox, and
-  "Your ingredients" opens the list without leaving what you're writing.
+  default unit. A name that isn't on the list can be used once, or saved
+  with "Save as a new ingredient", which opens the New ingredient form
+  (category, default unit, cost) on top of what you're writing and picks it
+  when saved.
 - **Timeline ingredient entries** ([#35]) use the same form: pick from your
   ingredients, quantity and unit, the cost hint, with When in place of Stage.
   An entry and the batch ingredient it logged stay in step: editing the

@@ -12,8 +12,8 @@ import { Icon } from '../icons/Icon.tsx';
 import { fmtDateShort, fmtDateTime, newId, parseNum } from '../lib/format.ts';
 import { categoryOf, filterIngredients } from '../lib/library.ts';
 import { groupByStage, ingredientStageLabel, joinAmount, splitAmount } from '../lib/stages.ts';
-import { CategoryChips, LibrarySheet } from '../screens/Ingredients.tsx';
-import { Field, Sheet, toast } from './ui.tsx';
+import { CategoryChips, IngredientForm } from '../screens/Ingredients.tsx';
+import { Field, Sheet } from './ui.tsx';
 
 interface EditableProps {
   lines: IngredientLine[];
@@ -148,9 +148,8 @@ export function useIngredientFields(start: { name: string; amount: string; quant
   const [linkedId, setLinkedId] = useState(start?.ingredientId);
   const [picking, setPicking] = useState(false);
   const [pickCategory, setPickCategory] = useState<string | null>(null);
-  const [saveToLibrary, setSaveToLibrary] = useState(true);
-  const [newCategory, setNewCategory] = useState('other');
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  // "Save as new ingredient" opens the full New ingredient form on top, then picks what it saved.
+  const [creating, setCreating] = useState(false);
   // The library item this name is: the one picked, or one with exactly this name.
   const match =
     library.find((i) => i.id === linkedId && i.name.trim().toLowerCase() === name.trim().toLowerCase()) ??
@@ -158,9 +157,6 @@ export function useIngredientFields(start: { name: string; amount: string; quant
   const isNew = name.trim() !== '' && !match;
   // A name already picked from the list shows the whole list again, to switch to another.
   const suggestions = filterIngredients(library, match ? '' : name, pickCategory, categories);
-  // Offer to save a new name only once it's clearly new: nothing in the list matches, or the list is closed.
-  // (Typing "clov" on the way to Clover honey shouldn't ask.) Only a choice that was shown gets saved.
-  const offerSave = isNew && (!picking || suggestions.length === 0);
 
   const pick = (item: LibraryIngredient) => {
     setName(item.name);
@@ -173,13 +169,7 @@ export function useIngredientFields(start: { name: string; amount: string; quant
   const units = INGREDIENT_UNITS.some((u) => u.id === unit) ? INGREDIENT_UNITS : [...INGREDIENT_UNITS, { id: unit, name: unit }];
 
   const commit = async (): Promise<IngredientValue> => {
-    let ingredientId = match?.id;
-    if (offerSave && saveToLibrary) {
-      // A new name, saved for next time with this unit as its default.
-      const saved = await ingredients.save({ name: name.trim(), category: newCategory, defaultUnit: unit, notes: '' });
-      ingredientId = saved.id;
-      toast(`${saved.name} added to your ingredients`);
-    }
+    const ingredientId = match?.id;
     return { name: match ? match.name : name.trim(), quantity: quantity.trim(), unit, amount: joinAmount(quantity, unit), ...(ingredientId ? { ingredientId } : {}) };
   };
 
@@ -218,32 +208,14 @@ export function useIngredientFields(start: { name: string; amount: string; quant
             {suggestions.length === 0 && <li className="muted picker-empty">{name.trim() ? `No ingredient called "${name.trim()}" yet.` : 'No ingredients here yet.'}</li>}
           </ul>
           <div className="picker-foot">
-            <button type="button" className="btn btn-quiet btn-small" onClick={() => setLibraryOpen(true)}>
-              Your ingredients
+            <button type="button" className="btn btn-quiet btn-small" onClick={() => setCreating(true)}>
+              <Icon name="plus" size={18} />
+              {isNew ? `Save "${name.trim()}" as a new ingredient` : 'New ingredient'}
             </button>
             <button type="button" className="btn btn-quiet btn-small" onClick={() => setPicking(false)}>
               Close list
             </button>
           </div>
-        </div>
-      )}
-      {offerSave && (
-        <div className="save-to-library">
-          <label className="check-field">
-            <input type="checkbox" checked={saveToLibrary} onChange={(e) => setSaveToLibrary(e.target.checked)} />
-            Save to my ingredients
-          </label>
-          {saveToLibrary && (
-            <Field label="Category">
-              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
         </div>
       )}
       <div className="form-pair">
@@ -269,7 +241,22 @@ export function useIngredientFields(start: { name: string; amount: string; quant
       )}
     </>
   );
-  const sheet = libraryOpen ? <LibrarySheet onClose={() => setLibraryOpen(false)} /> : null;
+  const sheet = creating ? (
+    <Sheet title="New ingredient" onClose={() => setCreating(false)}>
+      <IngredientForm
+        item={null}
+        all={library}
+        categories={categories}
+        startCategory={pickCategory ?? undefined}
+        startName={isNew ? name.trim() : ''}
+        startUnit={unit}
+        onDone={(saved) => {
+          setCreating(false);
+          if (saved) pick(saved);
+        }}
+      />
+    </Sheet>
+  ) : null;
   return { fields, sheet, name, commit };
 }
 
