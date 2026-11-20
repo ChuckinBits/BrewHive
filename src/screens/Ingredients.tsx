@@ -83,7 +83,7 @@ export function IngredientsScreen() {
             if (items.length === 0) return null;
             return (
               <section key={c.id} aria-label={c.label}>
-                <h3 className="stage-divider">
+                <h3 className="stage-divider category-divider">
                   <CategoryIcon id={categoryIcon(c)} className="category-icon" />
                   {c.label}
                 </h3>

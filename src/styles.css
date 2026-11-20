@@ -2352,6 +2352,15 @@ button.library-row {
 
 /* --- Category icons (v0.2, issue #36) ----------------------------------- */
 
+/* Category names in the ingredient list stand out in the accent, like the selected chip. */
+.category-divider {
+  color: var(--accent-ink);
+}
+
+.category-divider::after {
+  background: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
 .stage-divider .category-icon {
   flex: none;
   margin-right: -2px;

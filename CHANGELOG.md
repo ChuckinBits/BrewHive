@@ -26,7 +26,8 @@ a milestone.
   line icon: honeycomb, fruit, juice, sugar cubes, star anise, flower, yeast,
   nutrients, test tube, funnel, oak, wheat, hops and a jar for Other. In
   Categories, tap a category's icon to pick another (also water, leaf and a
-  spice jar) or None. Categories you add start with no icon.
+  spice jar) or None. Categories you add start with no icon. Category names
+  in the list are in the accent color, like the selected chip.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
   default unit. A name that isn't on the list can be used once, or saved
