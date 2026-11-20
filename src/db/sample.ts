@@ -16,9 +16,9 @@ const SAMPLE_INGREDIENTS: Pick<LibraryIngredient, 'id' | 'name' | 'category' | '
   { id: 'sample-oranges', name: 'Oranges', category: 'fruit', defaultUnit: '', notes: '', cost: { price: 0.89, quantity: 1, unit: '' } },
 ];
 
-// What the sample batches paid for the starter ingredients, kept on their lines the way any batch keeps
-// its prices. The starter ingredients themselves stay unpriced.
-const PAID: Record<string, IngredientCost> = {
+// Prices for the starter ingredients the samples use. Loading sample data gives them these prices,
+// only where an ingredient has no price yet, so a price you set is never replaced.
+const SAMPLE_PRICES: Record<string, IngredientCost> = {
   'Wildflower honey': { price: 24.99, quantity: 12, unit: 'lb' },
   'Clover honey': { price: 19.99, quantity: 12, unit: 'lb' },
   'Orange blossom honey': { price: 29.99, quantity: 12, unit: 'lb' },
@@ -41,8 +41,9 @@ const stamp = () => {
 const staged = (from: IngredientLine[], stages: Record<string, IngredientStage> = {}): IngredientLine[] =>
   from.map((line) => ({ ...line, id: newId(), stage: stages[line.name] ?? 'primary' }));
 
-/** Library ids by name, filled in when the sample data loads. */
+/** Library ids and prices by name, filled in when the sample data loads. */
 let libraryIds = new Map<string, string>();
+let libraryCosts = new Map<string, IngredientCost>();
 
 /** One ingredient line, linked to the library ingredient of that name: name, quantity, unit and an optional note on the amount. */
 const line = (name: string, quantity: string, unit: string, note = ''): IngredientLine => {
@@ -51,10 +52,10 @@ const line = (name: string, quantity: string, unit: string, note = ''): Ingredie
 };
 const lines = (...items: Parameters<typeof line>[]): IngredientLine[] => items.map((args) => line(...args));
 
-/** Batch lines carry the price they were bought at. */
+/** Batch lines keep the price they were bought at: the library's price, as when any batch is saved. */
 const priced = (from: IngredientLine[]): IngredientLine[] =>
   from.map((l) => {
-    const cost = PAID[l.name] ?? SAMPLE_INGREDIENTS.find((i) => i.name === l.name)?.cost;
+    const cost = libraryCosts.get(l.name.toLowerCase());
     return cost ? { ...l, cost } : l;
   });
 
@@ -65,7 +66,14 @@ export async function loadSampleData(): Promise<void> {
   await ensureStarterIngredients();
   const existing = await ingredients.list();
   for (const item of SAMPLE_INGREDIENTS) if (!existing.some((i) => i.id === item.id)) await ingredients.save(item);
-  libraryIds = new Map((await ingredients.list()).map((i) => [i.name.toLowerCase(), i.id]));
+  // Starter ingredients the samples use get a price, unless they already have one.
+  for (const item of await ingredients.list()) {
+    const price = SAMPLE_PRICES[item.name];
+    if (price && !item.cost) await ingredients.save({ ...item, cost: price });
+  }
+  const library = await ingredients.list();
+  libraryIds = new Map(library.map((i) => [i.name.toLowerCase(), i.id]));
+  libraryCosts = new Map(library.filter((i) => i.cost).map((i) => [i.name.toLowerCase(), i.cost as IngredientCost]));
 
   const recipe = (data: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'isPublished'>): Recipe => ({
     ...data,

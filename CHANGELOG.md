@@ -45,9 +45,10 @@ a milestone.
 
 - **Sample data uses the library.** Its recipes and batches use the starter
   ingredients plus five of their own (spring water, blackberries,
-  strawberries, cloves, oranges) with prices. Sample batches carry what they
-  paid, so they show a full cost; your own ingredients and the starter
-  ingredients are never priced or changed.
+  strawberries, cloves, oranges). Everything the samples use gets a price,
+  unless you've already priced it, so recipes, batches and your ingredient
+  list all show the same costs. Starter ingredients the samples don't use
+  stay unpriced.
 - **Erase everything** now also erases ingredients, and puts the starter
   ingredients back, like a fresh install.
 
