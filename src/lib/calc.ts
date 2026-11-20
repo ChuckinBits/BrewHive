@@ -21,7 +21,8 @@ export function brixToSg(brix: number): number {
   return 1 + brix / (258.6 - (brix / 258.2) * 227.1);
 }
 
-const L_PER_GAL = 3.785411784;
+/** Liters in a US gallon. */
+export const L_PER_GAL = 3.785411784;
 
 export function litersToGallons(liters: number): number {
   return liters / L_PER_GAL;

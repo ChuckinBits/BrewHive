@@ -14,7 +14,7 @@ import { Book } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
-import { abv } from '../lib/calc.ts';
+import { L_PER_GAL, abv } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
@@ -249,7 +249,7 @@ export function RecipeFormScreen({ id }: { id?: string }) {
           name: '',
           beverageType: 'mead',
           style: '',
-          batchSize: volumeToInput(volumeUnit === 'gal' ? 3.785411784 : 4, volumeUnit),
+          batchSize: volumeToInput(volumeUnit === 'gal' ? L_PER_GAL : 4, volumeUnit),
           volumeUnit,
           targetOG: '',
           targetMode: 'fg',

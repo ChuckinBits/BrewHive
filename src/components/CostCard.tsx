@@ -5,6 +5,7 @@ import { currencyOf, ingredients, useQuery, useSettings } from '../db/store.ts';
 import type { IngredientCost, IngredientLine, LibraryIngredient } from '../db/types.ts';
 import { costSummary, fmtMoney, type MissingReason } from '../lib/cost.ts';
 import { fmtVolume } from '../lib/format.ts';
+import { L_PER_GAL } from '../lib/calc.ts';
 
 /** The library ingredient a line is: by its link, or (older lines) by name. */
 function libraryItemFor(line: IngredientLine, library: LibraryIngredient[]): LibraryIngredient | undefined {
@@ -46,12 +47,13 @@ function useCost(lines: IngredientLine[], volumeL: number | null, useSaved: bool
   const currency = currencyOf(settings);
   const money = (n: number) => fmtMoney(n, currency);
   const gallons = settings.volumeUnit === 'gal';
-  const perVolume = gallons ? 3.785411784 : 1;
+  const perVolume = gallons ? L_PER_GAL : 1;
   const hasVolume = volumeL != null && volumeL > 0;
   return {
     total: money(summary.total),
     perBottle: hasVolume ? money(summary.total / ((volumeL as number) / 0.75)) : null,
-    perVolume: hasVolume ? money((summary.total / (volumeL as number)) * perVolume) : null,
+    // Divided by the volume in the display unit (rounded past any float noise), so 1 gal gives exactly the total.
+    perVolume: hasVolume ? money(summary.total / (Math.round(((volumeL as number) / perVolume) * 1e6) / 1e6)) : null,
     perVolumeName: gallons ? 'gallon' : 'liter',
     perVolumeShort: fmtVolume(perVolume, settings.volumeUnit).replace(/^1 /, ''),
     notCounted: summary.missing.length > 0 ? `Not counted: ${summary.missing.map((m) => `${m.name} (${WHY[m.reason]})`).join(', ')}.` : null,

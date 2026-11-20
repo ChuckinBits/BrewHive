@@ -4,6 +4,7 @@
 import { putMany } from './idb.ts';
 import { ensureStarterIngredients, ingredients } from './store.ts';
 import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientCost, IngredientLine, IngredientStage, LibraryIngredient, Pour, Recipe } from './types.ts';
+import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 import { entryFromLine, joinAmount } from '../lib/stages.ts';
 
@@ -86,7 +87,7 @@ export async function loadSampleData(): Promise<void> {
     name: 'First Traditional',
     beverageType: 'mead',
     style: 'Traditional',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.1,
     targetFG: 1.0,
     ingredients: lines(['Wildflower honey', '3', 'lb'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin 71B', '1', 'packet'], ['Fermaid O', '4', 'g', 'split in 3']),
@@ -107,7 +108,7 @@ export async function loadSampleData(): Promise<void> {
     name: 'Bramble Melomel',
     beverageType: 'mead',
     style: 'Melomel',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.115,
     targetFG: 1.01,
     ingredients: lines(['Clover honey', '3', 'lb'], ['Blackberries, frozen', '2', 'lb'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin EC-1118', '1', 'packet'], ['Pectic enzyme', '0.5', 'tsp']),
@@ -128,7 +129,7 @@ export async function loadSampleData(): Promise<void> {
     name: 'Orchard Cyser',
     beverageType: 'mead',
     style: 'Cyser',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.09,
     targetFG: 1.005,
     ingredients: lines(['Apple juice', '1', 'gal', 'no preservatives'], ['Orange blossom honey', '1.5', 'lb'], ['Cinnamon sticks', '1', ''], ['Lalvin D47', '1', 'packet']).map((l) =>
@@ -150,7 +151,7 @@ export async function loadSampleData(): Promise<void> {
     style: 'Melomel',
     status: 'primary',
     startDate: daysFromToday(-9),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.114,
     targetFG: 1.01,
     ingredients: priced([...staged(blackberry.ingredients), { ...line('Oak cubes', '1', 'oz', 'medium toast'), stage: 'aging' }]),
@@ -166,7 +167,7 @@ export async function loadSampleData(): Promise<void> {
     style: 'Cyser',
     status: 'secondary',
     startDate: daysFromToday(-34),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.092,
     targetFG: 1.0,
     ingredients: priced(staged(cyser.ingredients, { 'Cinnamon sticks': 'secondary' })),
@@ -182,7 +183,7 @@ export async function loadSampleData(): Promise<void> {
     style: 'Metheglin',
     status: 'aging',
     startDate: daysFromToday(-120),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.105,
     targetFG: 1.0,
     ingredients: priced(lines(['Wildflower honey', '3', 'lb'], ['Cinnamon sticks', '2', ''], ['Cloves', '4', ''], ['Oranges', '1', '', 'zest only'])),
@@ -198,7 +199,7 @@ export async function loadSampleData(): Promise<void> {
     style: 'Melomel',
     status: 'planned',
     startDate: daysFromToday(7),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: null,
     targetFG: 1.0,
     ingredients: priced(lines(['Clover honey', '2.5', 'lb'], ['Strawberries', '3', 'lb'])),
@@ -214,7 +215,7 @@ export async function loadSampleData(): Promise<void> {
     style: 'Traditional',
     status: 'bottled',
     startDate: daysFromToday(-210),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.1,
     targetFG: 1.0,
     ingredients: priced(staged(traditional.ingredients)),
