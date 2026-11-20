@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtTempBoth, fmtVolumeBoth, tempToInput } from './format.ts';
+import { fmtDateTime, fmtTempBoth, fmtVolumeBoth, tempToInput } from './format.ts';
 
 test('a record in the default unit shows one value', () => {
   assert.equal(fmtVolumeBoth(3.785411784, 'gal', 'gal'), '1 gal');
@@ -17,4 +17,12 @@ test('a record in the other unit shows both, default in brackets', () => {
 test('temperature inputs start in the entry unit', () => {
   assert.equal(tempToInput(20, 'F'), '68');
   assert.equal(tempToInput(20, 'C'), '20');
+});
+
+test('fmtDateTime gives the day and a 12-hour time', () => {
+  const year = new Date().getFullYear();
+  assert.equal(fmtDateTime(`${year}-11-03T14:05`), 'Nov 3, 2:05 PM');
+  assert.equal(fmtDateTime(`${year}-11-03T00:30`), 'Nov 3, 12:30 AM');
+  assert.equal(fmtDateTime('2020-01-02T12:00'), 'Jan 2, 2020, 12:00 PM');
+  assert.equal(fmtDateTime('2020-01-02'), 'Jan 2, 2020');
 });

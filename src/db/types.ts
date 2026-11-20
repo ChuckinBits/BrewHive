@@ -390,9 +390,14 @@ export interface BatchEvent extends Base {
    * the final one until a newer final reading or a feeding replaced it: still a measurement, never sugar.
    */
   final?: boolean;
-  /** For "ingredient" entries: what was added, and how much. */
+  /** For "ingredient" entries: what was added, and how much ("3 lb"). */
   ingredient?: string;
   amount?: string;
+  /** For "ingredient" entries: the amount's number and unit, as on an ingredient line. Older entries have only `amount`. */
+  quantity?: string;
+  unit?: string;
+  /** For "ingredient" entries: the library ingredient it was picked from, if any. */
+  ingredientId?: string;
   /** For "ingredient" entries: the line in the batch's ingredient list this entry ticks off. */
   ingredientLineId?: string;
   /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */

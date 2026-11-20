@@ -58,6 +58,15 @@ export function fmtDateShort(value: string | null | undefined): string {
   return y === new Date().getFullYear() ? `${MONTHS[m - 1]} ${d}` : `${MONTHS[m - 1]} ${d}, ${y}`;
 }
 
+/** "Nov 16, 2:15 PM" (the year added when it isn't this year) from a local yyyy-mm-ddThh:mm string. */
+export function fmtDateTime(value: string | null | undefined): string {
+  if (!value) return '';
+  const day = fmtDateShort(value);
+  const [h, min] = value.slice(11, 16).split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(min) || value.length < 16) return day;
+  return `${day}, ${h % 12 || 12}:${String(min).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
 export function fmtSG(sg: number | null | undefined): string {
   return sg == null ? '–' : sg.toFixed(3);
 }

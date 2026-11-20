@@ -55,6 +55,8 @@ export function addedLines(events: BatchEvent[]): Map<string, BatchEvent> {
 
 /** Joins a quantity and unit into the amount shown, such as "3 lb". */
 export function joinAmount(quantity: string, unit: string): string {
+  // A unit with no quantity says nothing ("lb"), so there's no amount.
+  if (!quantity.trim()) return '';
   return [quantity.trim(), unit.trim()].filter(Boolean).join(' ');
 }
 
@@ -68,6 +70,17 @@ export function splitAmount(line: IngredientLine): { quantity: string; unit: str
   // Keep units we offer as they are; anything else stays as written (for example "to 1 gal").
   if (unit === '' || INGREDIENT_UNITS.some((u) => u.id === unit)) return { quantity: match[1].trim(), unit };
   return { quantity: text, unit: '' };
+}
+
+/** What a timeline entry takes from the ingredient it logs: name, amount and library link. */
+export function entryFromLine(line: IngredientLine): Pick<BatchEvent, 'ingredient' | 'amount' | 'quantity' | 'unit' | 'ingredientId'> {
+  return { ingredient: line.name, amount: line.amount, quantity: line.quantity, unit: line.unit, ingredientId: line.ingredientId };
+}
+
+/** An ingredient line updated from a timeline entry. The line keeps its stage; its saved price stays unless it's now another ingredient. */
+export function lineFromEntry(line: IngredientLine, entry: Pick<BatchEvent, 'ingredient' | 'amount' | 'quantity' | 'unit' | 'ingredientId'>): IngredientLine {
+  const sameItem = line.ingredientId === entry.ingredientId;
+  return { ...line, name: entry.ingredient ?? line.name, amount: entry.amount ?? '', quantity: entry.quantity, unit: entry.unit, ingredientId: entry.ingredientId, cost: sameItem ? line.cost : undefined };
 }
 
 // --- Timeline sections --------------------------------------------------------

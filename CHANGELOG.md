@@ -24,6 +24,13 @@ a milestone.
   shows your list as you type, with category chips. Picking one fills in its
   default unit. A new name can be saved to your list with one checkbox, and
   "Your ingredients" opens the list without leaving what you're writing.
+- **Timeline ingredient entries** ([#35]) use the same form: pick from your
+  ingredients, quantity and unit, the cost hint, with When in place of Stage.
+  An entry and the batch ingredient it logged stay in step: editing the
+  entry offers "Also update batch ingredients", and editing the ingredient
+  in Batch Edit offers "Also update the timeline entry", both ticked.
+  Removing a batch ingredient keeps its timeline entry.
+- **Fixed:** an amount with a unit but no quantity showed as just "lb".
 - **Costs** ([#33]). Give an ingredient what you paid ("24.99 for 12 lb") and
   batches and recipes show their ingredient cost: the total, per 750 mL
   bottle and per gallon or liter. On a batch it's part of Details; recipes
@@ -163,3 +170,4 @@ themes; sample data.
 [#31]: https://github.com/ChuckinBits/BrewHive/issues/31
 [#32]: https://github.com/ChuckinBits/BrewHive/issues/32
 [#33]: https://github.com/ChuckinBits/BrewHive/issues/33
+[#35]: https://github.com/ChuckinBits/BrewHive/issues/35
