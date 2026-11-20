@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmSheet, Fab, Field, Sheet, TopBar, toast } from '../components/ui.tsx';
-import { batches, categoriesOf, currencyOf, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
+import { batches, categoriesOf, currencyOf, ingredients, recipes, restoreStarterIngredients, saveSettings, useQuery, useSettings } from '../db/store.ts';
 import { INGREDIENT_UNITS, unitLabel, type IngredientCategory, type IngredientCost, type LibraryIngredient } from '../db/types.ts';
 import { categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from '../lib/library.ts';
 import { fmtMoney, pricePer, unitsCompatible } from '../lib/cost.ts';
@@ -97,6 +97,19 @@ export function IngredientsScreen() {
             );
           })
       )}
+
+      <div className="button-row button-row-center">
+        <button
+          type="button"
+          className="btn btn-quiet btn-small"
+          onClick={async () => {
+            const count = await restoreStarterIngredients();
+            toast(count === 0 ? 'All starter ingredients are already in your list' : `${plural(count, 'starter ingredient')} restored`);
+          }}
+        >
+          Restore starter ingredients
+        </button>
+      </div>
 
       <Fab to={category ? `/ingredients/new?category=${category}` : '/ingredients/new'} label="Add ingredient" />
       {managing && <CategoriesSheet categories={categories} counts={counts} onClose={() => setManaging(false)} />}

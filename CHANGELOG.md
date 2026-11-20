@@ -13,7 +13,9 @@ a milestone.
   use by category, with a search box and category chips. Each has a default
   unit and notes, and shows the recipes and batches that use it. It starts
   with common mead-making staples (honeys, yeasts, nutrients, stabilizers
-  including Nagardo, fining agents), with no prices.
+  including Nagardo, fining agents), with no prices. "Restore starter
+  ingredients" at the bottom of the list brings back any you deleted, leaving
+  your own ingredients and prices alone.
 - **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
   Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
   Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
@@ -38,6 +40,16 @@ a milestone.
   bottle and per gallon or liter. On a batch it's part of Details; recipes
   show it under their ingredients. A batch keeps the prices it was made with;
   recipes use today's. Choose the currency under More.
+
+### Sample data and erasing
+
+- **Sample data uses the library.** Its recipes and batches use the starter
+  ingredients plus five of their own (spring water, blackberries,
+  strawberries, cloves, oranges) with prices. Sample batches carry what they
+  paid, so they show a full cost; your own ingredients and the starter
+  ingredients are never priced or changed.
+- **Erase everything** now also erases ingredients, and puts the starter
+  ingredients back, like a fresh install.
 
 ### Batches
 

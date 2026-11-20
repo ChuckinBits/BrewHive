@@ -68,6 +68,18 @@ export async function ensureStarterIngredients(): Promise<void> {
   for (const item of missing) await ingredients.save(item);
 }
 
+/**
+ * Brings back starter ingredients that were deleted (or never added), and nothing else:
+ * ingredients you added, prices, and starters you edited stay as they are. Returns how many came back.
+ */
+export async function restoreStarterIngredients(): Promise<number> {
+  const live = new Set((await getAll<LibraryIngredient>('ingredients')).filter((i) => !i.deletedAt).map((i) => i.id));
+  const missing = starterIngredients(usesImperial()).filter((i) => !live.has(i.id));
+  // Saved fresh, so a deleted one comes back as it started, with no price.
+  for (const item of missing) await ingredients.save(item);
+  return missing.length;
+}
+
 // --- Settings ---------------------------------------------------------------
 
 function usesImperial(): boolean {

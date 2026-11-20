@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { createBackup, downloadBackup, restoreBackup } from '../db/backup.ts';
 import { clearAll } from '../db/idb.ts';
 import { loadSampleData } from '../db/sample.ts';
-import { currencyOf, rememberTheme, saveSettings, useSettings } from '../db/store.ts';
+import { currencyOf, ensureStarterIngredients, rememberTheme, saveSettings, useSettings } from '../db/store.ts';
 import { CURRENCIES } from '../lib/cost.ts';
 import { ConfirmSheet, Segmented, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
@@ -175,11 +175,13 @@ export function MoreScreen() {
       {erasing && (
         <ConfirmSheet
           title="Erase everything?"
-          message="Every recipe, batch, bottle and setting on this device will be deleted. This cannot be undone, so save a backup first if you might want it back."
+          message="Every recipe, batch, bottle, ingredient and setting on this device will be deleted, and the starter ingredients put back. This cannot be undone, so save a backup first if you might want it back."
           confirmLabel="Erase everything"
           onClose={() => setErasing(false)}
           onConfirm={async () => {
             await clearAll();
+            // Like a fresh install, which starts with the starter ingredients.
+            await ensureStarterIngredients();
             rememberTheme('system');
             setErasing(false);
             toast('Everything was erased');
