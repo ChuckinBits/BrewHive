@@ -2,7 +2,7 @@
 // tab bar.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { batches, cellar, loadSettings, recipes, saveSettings, useSettings } from './db/store.ts';
+import { batches, cellar, loadSettings, recipes, saveSettings, useSettings, ensureStarterIngredients } from './db/store.ts';
 import { loadSampleData } from './db/sample.ts';
 import type { Settings } from './db/types.ts';
 import { isDemo } from './lib/demo.ts';
@@ -10,6 +10,7 @@ import { applyTheme } from './lib/theme.ts';
 import { Toaster } from './components/ui.tsx';
 import { Icon, type IconName } from './icons/Icon.tsx';
 import { Link, matchPath, useRoute } from './lib/router.tsx';
+import { IngredientFormScreen, IngredientsScreen } from './screens/Ingredients.tsx';
 import { BatchDetailScreen } from './screens/BatchDetail.tsx';
 import { BatchFormScreen } from './screens/BatchForm.tsx';
 import { BatchesScreen } from './screens/Batches.tsx';
@@ -27,7 +28,7 @@ const TABS: { to: string; label: string; icon: IconName }[] = [
 function activeTab(path: string): string {
   if (path.startsWith('/recipes')) return '/recipes';
   if (path.startsWith('/cellar')) return '/cellar';
-  if (path.startsWith('/more')) return '/more';
+  if (path.startsWith('/more') || path.startsWith('/ingredients')) return '/more';
   return '/';
 }
 
@@ -46,6 +47,9 @@ function pickScreen(path: string, query: URLSearchParams): ReactNode {
   if ((m = matchPath('/cellar/:id/edit', path))) return <CellarFormScreen id={m.id} />;
   if ((m = matchPath('/cellar/:id', path))) return <CellarDetailScreen id={m.id} />;
   if (path === '/more') return <MoreScreen />;
+  if (path === '/ingredients') return <IngredientsScreen />;
+  if (path === '/ingredients/new') return <IngredientFormScreen category={query.get('category') ?? undefined} />;
+  if ((m = matchPath('/ingredients/:id', path))) return <IngredientFormScreen id={m.id} />;
   return <BatchesScreen />;
 }
 
@@ -66,7 +70,8 @@ export function App() {
 
   // Open the database once before drawing any screen.
   useEffect(() => {
-    startup ??= loadSettings().then(seedDemo);
+    // The starter ingredients go in once per device (see ensureStarterIngredients).
+    startup ??= loadSettings().then(seedDemo).then(ensureStarterIngredients);
     startup.then(
       () => setState('ready'),
       (error) => {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BatchEvent, BatchStatus, IngredientLine } from '../db/types.ts';
-import { addedLines, currentIngredientStage, groupByStage, joinAmount, splitAmount, stageForNewIngredient, timelineSections } from './stages.ts';
+import { addedLines, currentIngredientStage, groupByStage, joinAmount, splitAmount, stageForNewIngredient, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
 
 const base = { createdAt: '2026-11-01T00:00:00Z', updatedAt: '', deletedAt: null };
 const line = (id: string, stage?: IngredientLine['stage'], amount = ''): IngredientLine => ({ id, name: id, amount, stage });
@@ -42,6 +42,7 @@ test('amounts split back into quantity and unit, keeping unusual text whole', ()
   assert.deepEqual(splitAmount(line('a', undefined, '4 g, split in 3')), { quantity: '4 g, split in 3', unit: '' });
   assert.equal(joinAmount('3', 'lb'), '3 lb');
   assert.equal(joinAmount('2', ''), '2');
+  assert.equal(joinAmount('', 'lb'), '', 'no quantity, no amount');
 });
 
 test('the timeline splits into stage sections, newest first, each stage entry opening its section', () => {
@@ -84,4 +85,16 @@ test('the unit list is A to Z after "no unit", with each short form spelled out'
   assert.equal(unitLabel(INGREDIENT_UNITS[0]), 'No unit (a count)');
   assert.equal(unitLabel(INGREDIENT_UNITS.find((u) => u.id === 'lb')!), 'Pound (lb)');
   assert.equal(unitLabel(INGREDIENT_UNITS.find((u) => u.id === 'cup')!), 'Cup');
+});
+
+test('a timeline entry and its ingredient line carry the same name, amount and library link', () => {
+  const line = { id: 'l1', name: 'Honey', amount: '3 lb', quantity: '3', unit: 'lb', stage: 'primary' as const, ingredientId: 'i1', cost: { price: 24.99, quantity: 12, unit: 'lb' } };
+  assert.deepEqual(entryFromLine(line), { ingredient: 'Honey', amount: '3 lb', quantity: '3', unit: 'lb', ingredientId: 'i1' });
+  const less = lineFromEntry(line, { ingredient: 'Honey', amount: '2.5 lb', quantity: '2.5', unit: 'lb', ingredientId: 'i1' });
+  assert.equal(less.amount, '2.5 lb');
+  assert.equal(less.stage, 'primary', 'keeps its stage');
+  assert.deepEqual(less.cost, line.cost, 'keeps the price it was saved with');
+  const other = lineFromEntry(line, { ingredient: 'Clover honey', amount: '3 lb', quantity: '3', unit: 'lb', ingredientId: 'i2' });
+  assert.equal(other.name, 'Clover honey');
+  assert.equal(other.cost, undefined, 'another ingredient drops the old price');
 });

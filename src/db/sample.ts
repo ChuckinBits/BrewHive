@@ -2,8 +2,36 @@
 // Dates are set relative to today, so the samples never look stale.
 
 import { putMany } from './idb.ts';
-import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientLine, IngredientStage, Pour, Recipe } from './types.ts';
+import { ensureStarterIngredients, ingredients } from './store.ts';
+import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientCost, IngredientLine, IngredientStage, LibraryIngredient, Pour, Recipe } from './types.ts';
+import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
+import { entryFromLine, joinAmount } from '../lib/stages.ts';
+
+// Ingredients only the samples use, priced so the samples show costs. Fixed ids: added once, never overwriting yours.
+const SAMPLE_INGREDIENTS: Pick<LibraryIngredient, 'id' | 'name' | 'category' | 'defaultUnit' | 'notes' | 'cost'>[] = [
+  { id: 'sample-spring-water', name: 'Spring water', category: 'other', defaultUnit: 'gal', notes: '', cost: { price: 1.49, quantity: 1, unit: 'gal' } },
+  { id: 'sample-blackberries', name: 'Blackberries, frozen', category: 'fruit', defaultUnit: 'lb', notes: '', cost: { price: 8.99, quantity: 2, unit: 'lb' } },
+  { id: 'sample-strawberries', name: 'Strawberries', category: 'fruit', defaultUnit: 'lb', notes: '', cost: { price: 3.99, quantity: 1, unit: 'lb' } },
+  { id: 'sample-cloves', name: 'Cloves', category: 'spice', defaultUnit: '', notes: '', cost: { price: 4.49, quantity: 60, unit: '' } },
+  { id: 'sample-oranges', name: 'Oranges', category: 'fruit', defaultUnit: '', notes: '', cost: { price: 0.89, quantity: 1, unit: '' } },
+];
+
+// Prices for the starter ingredients the samples use. Loading sample data gives them these prices,
+// only where an ingredient has no price yet, so a price you set is never replaced.
+const SAMPLE_PRICES: Record<string, IngredientCost> = {
+  'Wildflower honey': { price: 24.99, quantity: 12, unit: 'lb' },
+  'Clover honey': { price: 19.99, quantity: 12, unit: 'lb' },
+  'Orange blossom honey': { price: 29.99, quantity: 12, unit: 'lb' },
+  'Apple juice': { price: 6.99, quantity: 1, unit: 'gal' },
+  'Lalvin 71B': { price: 1.49, quantity: 1, unit: 'packet' },
+  'Lalvin EC-1118': { price: 1.29, quantity: 1, unit: 'packet' },
+  'Lalvin D47': { price: 1.49, quantity: 1, unit: 'packet' },
+  'Fermaid O': { price: 14.99, quantity: 100, unit: 'g' },
+  'Pectic enzyme': { price: 3.99, quantity: 24, unit: 'tsp' },
+  'Cinnamon sticks': { price: 5.99, quantity: 12, unit: '' },
+  'Oak cubes': { price: 7.99, quantity: 3, unit: 'oz' },
+};
 
 const stamp = () => {
   const now = new Date().toISOString();
@@ -14,12 +42,40 @@ const stamp = () => {
 const staged = (from: IngredientLine[], stages: Record<string, IngredientStage> = {}): IngredientLine[] =>
   from.map((line) => ({ ...line, id: newId(), stage: stages[line.name] ?? 'primary' }));
 
-const lines = (...pairs: [string, string][]): IngredientLine[] =>
-  pairs.map(([name, amount]) => ({ id: newId(), name, amount }));
+/** Library ids and prices by name, filled in when the sample data loads. */
+let libraryIds = new Map<string, string>();
+let libraryCosts = new Map<string, IngredientCost>();
+
+/** One ingredient line, linked to the library ingredient of that name: name, quantity, unit and an optional note on the amount. */
+const line = (name: string, quantity: string, unit: string, note = ''): IngredientLine => {
+  const ingredientId = libraryIds.get(name.toLowerCase());
+  return { id: newId(), name, quantity, unit, amount: [joinAmount(quantity, unit), note].filter(Boolean).join(', '), ...(ingredientId ? { ingredientId } : {}) };
+};
+const lines = (...items: Parameters<typeof line>[]): IngredientLine[] => items.map((args) => line(...args));
+
+/** Batch lines keep the price they were bought at: the library's price, as when any batch is saved. */
+const priced = (from: IngredientLine[]): IngredientLine[] =>
+  from.map((l) => {
+    const cost = libraryCosts.get(l.name.toLowerCase());
+    return cost ? { ...l, cost } : l;
+  });
 
 const at = (daysAgo: number, hour = 18) => `${daysFromToday(-daysAgo)}T${String(hour).padStart(2, '0')}:00:00`;
 
 export async function loadSampleData(): Promise<void> {
+  // The samples use the starter ingredients, plus a few of their own.
+  await ensureStarterIngredients();
+  const existing = await ingredients.list();
+  for (const item of SAMPLE_INGREDIENTS) if (!existing.some((i) => i.id === item.id)) await ingredients.save(item);
+  // Starter ingredients the samples use get a price, unless they already have one.
+  for (const item of await ingredients.list()) {
+    const price = SAMPLE_PRICES[item.name];
+    if (price && !item.cost) await ingredients.save({ ...item, cost: price });
+  }
+  const library = await ingredients.list();
+  libraryIds = new Map(library.map((i) => [i.name.toLowerCase(), i.id]));
+  libraryCosts = new Map(library.filter((i) => i.cost).map((i) => [i.name.toLowerCase(), i.cost as IngredientCost]));
+
   const recipe = (data: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'isPublished'>): Recipe => ({
     ...data,
     id: newId(),
@@ -31,10 +87,10 @@ export async function loadSampleData(): Promise<void> {
     name: 'First Traditional',
     beverageType: 'mead',
     style: 'Traditional',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.1,
     targetFG: 1.0,
-    ingredients: lines(['Wildflower honey', '3 lb'], ['Spring water', 'to 1 gal'], ['Lalvin 71B yeast', '1 packet'], ['Fermaid O', '4 g, split in 3']),
+    ingredients: lines(['Wildflower honey', '3', 'lb'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin 71B', '1', 'packet'], ['Fermaid O', '4', 'g', 'split in 3']),
     steps: [
       'Sanitize everything that touches the mead.',
       'Mix the honey into half the water until dissolved, then top up to 1 gallon.',
@@ -52,10 +108,10 @@ export async function loadSampleData(): Promise<void> {
     name: 'Bramble Melomel',
     beverageType: 'mead',
     style: 'Melomel',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.115,
     targetFG: 1.01,
-    ingredients: lines(['Clover honey', '3 lb'], ['Blackberries, frozen', '2 lb'], ['Water', 'to 1 gal'], ['Lalvin EC-1118 yeast', '1 packet'], ['Pectic enzyme', '1/2 tsp']),
+    ingredients: lines(['Clover honey', '3', 'lb'], ['Blackberries, frozen', '2', 'lb'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin EC-1118', '1', 'packet'], ['Pectic enzyme', '0.5', 'tsp']),
     steps: [
       'Thaw the blackberries and add them to a sanitized bucket with pectic enzyme.',
       'Dissolve the honey in water and pour it over the fruit.',
@@ -73,11 +129,11 @@ export async function loadSampleData(): Promise<void> {
     name: 'Orchard Cyser',
     beverageType: 'mead',
     style: 'Cyser',
-    batchSizeL: 3.785,
+    batchSizeL: L_PER_GAL,
     targetOG: 1.09,
     targetFG: 1.005,
-    ingredients: lines(['Apple juice, no preservatives', '1 gal'], ['Orange blossom honey', '1.5 lb'], ['Cinnamon stick', '1'], ['Lalvin D47 yeast', '1 packet']).map((l) =>
-      l.name === 'Cinnamon stick' ? { ...l, stage: 'secondary' as const } : l,
+    ingredients: lines(['Apple juice', '1', 'gal', 'no preservatives'], ['Orange blossom honey', '1.5', 'lb'], ['Cinnamon sticks', '1', ''], ['Lalvin D47', '1', 'packet']).map((l) =>
+      l.name === 'Cinnamon sticks' ? { ...l, stage: 'secondary' as const } : l,
     ),
     steps: ['Warm a little juice and dissolve the honey in it.', 'Combine with the rest of the juice, take an OG reading and pitch the yeast.', 'Add the cinnamon stick in secondary for 1 to 2 weeks, tasting as you go.'],
     icon: 'apple',
@@ -95,10 +151,10 @@ export async function loadSampleData(): Promise<void> {
     style: 'Melomel',
     status: 'primary',
     startDate: daysFromToday(-9),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.114,
     targetFG: 1.01,
-    ingredients: [...staged(blackberry.ingredients), { id: newId(), name: 'Oak cubes, medium toast', amount: '1 oz', quantity: '1', unit: 'oz', stage: 'aging' }],
+    ingredients: priced([...staged(blackberry.ingredients), { ...line('Oak cubes', '1', 'oz', 'medium toast'), stage: 'aging' }]),
     icon: 'blackberry',
     color: '#4A2A5E',
     rating: null,
@@ -111,10 +167,10 @@ export async function loadSampleData(): Promise<void> {
     style: 'Cyser',
     status: 'secondary',
     startDate: daysFromToday(-34),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.092,
     targetFG: 1.0,
-    ingredients: staged(cyser.ingredients, { 'Cinnamon stick': 'secondary' }),
+    ingredients: priced(staged(cyser.ingredients, { 'Cinnamon sticks': 'secondary' })),
     icon: 'apple',
     color: '#D9B44A',
     rating: 7,
@@ -127,10 +183,10 @@ export async function loadSampleData(): Promise<void> {
     style: 'Metheglin',
     status: 'aging',
     startDate: daysFromToday(-120),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.105,
     targetFG: 1.0,
-    ingredients: lines(['Wildflower honey', '3 lb'], ['Cinnamon sticks', '2'], ['Cloves', '4'], ['Orange zest', '1 orange']),
+    ingredients: priced(lines(['Wildflower honey', '3', 'lb'], ['Cinnamon sticks', '2', ''], ['Cloves', '4', ''], ['Oranges', '1', '', 'zest only'])),
     icon: 'cinnamon',
     color: '#B5672F',
     rating: 8.5,
@@ -143,10 +199,10 @@ export async function loadSampleData(): Promise<void> {
     style: 'Melomel',
     status: 'planned',
     startDate: daysFromToday(7),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: null,
     targetFG: 1.0,
-    ingredients: lines(['Clover honey', '2.5 lb'], ['Strawberries', '3 lb']),
+    ingredients: priced(lines(['Clover honey', '2.5', 'lb'], ['Strawberries', '3', 'lb'])),
     icon: 'strawberry',
     color: '#E5646A',
     rating: null,
@@ -159,10 +215,10 @@ export async function loadSampleData(): Promise<void> {
     style: 'Traditional',
     status: 'bottled',
     startDate: daysFromToday(-210),
-    volumeL: 3.785,
+    volumeL: L_PER_GAL,
     og: 1.1,
     targetFG: 1.0,
-    ingredients: traditional.ingredients,
+    ingredients: priced(staged(traditional.ingredients)),
     icon: 'traditional',
     color: '#E8A33A',
     rating: 8,
@@ -189,7 +245,7 @@ export async function loadSampleData(): Promise<void> {
   const sampleEvents: BatchEvent[] = [
     ...b1.ingredients
       .filter((l) => l.stage === 'primary' && !l.name.startsWith('Pectic'))
-      .map((l) => ({ ...event(b1.id, 'ingredient', at(9, 17)), ingredient: l.name, amount: l.amount, ingredientLineId: l.id })),
+      .map((l) => ({ ...event(b1.id, 'ingredient', at(9, 17)), ...entryFromLine(l), ingredientLineId: l.id })),
     event(b1.id, 'pitch', at(9), null, 'EC-1118, rehydrated'),
     event(b1.id, 'nutrient', at(8), null, 'Fermaid O, 1.5 g'),
     event(b1.id, 'gravity', at(7), 1.096),
@@ -206,12 +262,9 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
     event(b2.id, 'rack', at(12), null, 'Racked off the yeast'),
-    {
-      ...event(b2.id, 'ingredient', at(12, 19)),
-      ingredient: 'Cinnamon stick',
-      amount: '1',
-      ingredientLineId: b2.ingredients.find((l) => l.name === 'Cinnamon stick')?.id,
-    },
+    ...b2.ingredients
+      .filter((l) => l.name === 'Cinnamon sticks')
+      .map((l) => ({ ...event(b2.id, 'ingredient', at(12, 19)), ...entryFromLine(l), ingredientLineId: l.id })),
     { ...event(b2.id, 'tasting', at(4), null, 'Apple up front, cinnamon just showing. Pull the stick soon.'), rating: 7 },
 
     event(b3.id, 'pitch', at(120)),

@@ -1,8 +1,67 @@
 # Changelog
 
 All notable changes to BrewHive are listed here. Versions follow the roadmap:
-minor versions are milestones (0.2 Equipment, 0.3 phone apps, 0.4 sync,
-0.5 community) and patch versions are releases within a milestone.
+minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
+phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
+a milestone.
+
+## Unreleased (v0.2.0)
+
+### Ingredient library
+
+- **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
+  use by category, with a search box and category chips. Each has a default
+  unit and notes, and shows the recipes and batches that use it. It starts
+  with common mead-making staples (honeys, yeasts, nutrients, stabilizers
+  including Nagardo, fining agents), with no prices. "Restore starter
+  ingredients" at the bottom of the list brings back any you deleted, leaving
+  your own ingredients and prices alone.
+- **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
+  Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
+  Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
+  remove one (its ingredients move to Other). Put them in order with Sort A–Z
+  (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
+  is used for the category chips and the sections of the list.
+- **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
+  shows your list as you type, with category chips. Picking one fills in its
+  default unit. A name that isn't on the list can be used once, or saved
+  with "Save as a new ingredient", which opens the New ingredient form
+  (category, default unit, cost) on top of what you're writing and picks it
+  when saved.
+- **Timeline ingredient entries** ([#35]) use the same form: pick from your
+  ingredients, quantity and unit, the cost hint, with When in place of Stage.
+  An entry and the batch ingredient it logged stay in step: editing the
+  entry offers "Also update batch ingredients", and editing the ingredient
+  in Batch Edit offers "Also update the timeline entry", both ticked.
+  Removing a batch ingredient keeps its timeline entry.
+- **Fixed:** an amount with a unit but no quantity showed as just "lb".
+- **Costs** ([#33]). Give an ingredient what you paid ("24.99 for 12 lb") and
+  batches and recipes show their ingredient cost: the total, per 750 mL
+  bottle and per gallon or liter. On a batch it's part of Details; recipes
+  show it under their ingredients. A batch keeps the prices it was made with;
+  recipes use today's. Choose the currency under More.
+
+### Sample data and erasing
+
+- **Sample data uses the library.** Its recipes and batches use the starter
+  ingredients plus five of their own (spring water, blackberries,
+  strawberries, cloves, oranges). Everything the samples use gets a price,
+  unless you've already priced it, so recipes, batches and your ingredient
+  list all show the same costs. Starter ingredients the samples don't use
+  stay unpriced.
+- **Erase everything** now also erases ingredients, and puts the starter
+  ingredients back, like a fresh install.
+
+### Batches
+
+- **Details first.** The Details section (volume, start date, recipe and now
+  cost) moves above Ingredients, as the overview of the batch, and always
+  shows.
+
+### Roadmap
+
+- Milestones renumbered: v0.2 Ingredient library, v0.3 Equipment, v0.4 phone
+  apps, v0.5 sync, v0.6 community.
 
 ## v0.1.2 – 2026-11-19
 
@@ -123,3 +182,7 @@ themes; sample data.
 [#24]: https://github.com/ChuckinBits/BrewHive/issues/24
 [#26]: https://github.com/ChuckinBits/BrewHive/issues/26
 [#27]: https://github.com/ChuckinBits/BrewHive/issues/27
+[#31]: https://github.com/ChuckinBits/BrewHive/issues/31
+[#32]: https://github.com/ChuckinBits/BrewHive/issues/32
+[#33]: https://github.com/ChuckinBits/BrewHive/issues/33
+[#35]: https://github.com/ChuckinBits/BrewHive/issues/35

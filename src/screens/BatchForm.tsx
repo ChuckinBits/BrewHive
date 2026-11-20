@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
-import { batches, events, loadSettings, recipes, useQuery, useSettings } from '../db/store.ts';
+import { batches, events, loadSettings, recipes, useQuery, useSettings, ingredients } from '../db/store.ts';
 import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
@@ -11,7 +11,8 @@ import { Icon } from '../icons/Icon.tsx';
 import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { Field, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor } from '../icons/FlavorIcon.tsx';
-import { cleanIngredients } from '../lib/stages.ts';
+import { cleanIngredients, entryFromLine } from '../lib/stages.ts';
+import { currentCost } from '../components/CostCard.tsx';
 import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentationComplete, projectedAbv, targetFinalGravity } from '../lib/batch.ts';
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
@@ -130,6 +131,10 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const [error, setError] = useState('');
   // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
   const [editing, setEditing] = useState<IngredientLine | 'new' | null>(null);
+  // Ingredients whose timeline entries follow their changes when the batch is saved.
+  const [syncLines, setSyncLines] = useState<Set<string>>(new Set());
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const loggedFor = (lineId: string) => loaded.timeline.filter((e) => e.type === 'ingredient' && e.ingredientLineId === lineId);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const naming = useNameAndStyle(draft, set);
   const isNew = !loaded.existing;
@@ -158,6 +163,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';
 
   const save = async () => {
+    const library = await ingredients.list();
     const name = draft.name.trim();
     if (!name) return setError('Give the batch a name.');
     const og = parseNum(draft.og);
@@ -192,7 +198,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
       og,
       ...target,
       targetFG: target.targetFG ?? DEFAULT_TARGET_FG,
-      ingredients: cleanIngredients(draft.ingredients),
+      // Each line keeps the price it had when first saved with the batch; new ones take today's.
+      ingredients: cleanIngredients(draft.ingredients).map((line) => (line.cost ? line : { ...line, cost: currentCost(line, library) })),
       icon: draft.icon,
       extraIcons: draft.extraIcons,
       color: draft.color,
@@ -204,6 +211,13 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
     }
     // The final gravity or the estimate goes on the timeline.
     if (asksFinal) await saveFinalReading(saved.id, draft.final, finishedAt);
+    // Timeline entries of edited ingredients follow them; entries of removed ingredients stay, unlinked.
+    for (const entry of loaded.timeline) {
+      if (entry.type !== 'ingredient' || !entry.ingredientLineId) continue;
+      const line = saved.ingredients.find((l) => l.id === entry.ingredientLineId);
+      if (!line) await events.save({ ...entry, ingredientLineId: undefined });
+      else if (syncLines.has(line.id)) await events.save({ ...entry, ...entryFromLine(line) });
+    }
     toast(isNew ? 'Batch started' : 'Batch saved');
     navigate(`/batches/${saved.id}`, { replace: true });
   };
@@ -307,9 +321,16 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           line={editing === 'new' ? null : editing}
           defaultStage={draft.status === 'secondary' || draft.status === 'aging' ? draft.status : 'primary'}
           defaultUnit={settings.volumeUnit === 'gal' ? 'lb' : 'g'}
-          onSave={(line) =>
-            set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] })
-          }
+          logged={editing === 'new' ? [] : loggedFor(editing.id)}
+          syncLogged={editing === 'new' || !touched.has(editing.id) || syncLines.has(editing.id)}
+          onSave={(line, sync) => {
+            set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] });
+            const next = new Set(syncLines);
+            if (sync) next.add(line.id);
+            else next.delete(line.id);
+            setSyncLines(next);
+            setTouched(new Set(touched).add(line.id));
+          }}
           onRemove={(id) => set({ ingredients: draft.ingredients.filter((l) => l.id !== id) })}
           onClose={() => setEditing(null)}
         />

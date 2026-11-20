@@ -232,6 +232,61 @@ export interface IngredientLine {
   unit?: string;
   /** When it goes in. Missing means Primary. Recipes set it too, and batches started from a recipe keep it. */
   stage?: IngredientStage;
+  /**
+   * The library ingredient this line was picked from, if any. Only a pointer: the line keeps its own
+   * name and amount, so renaming or deleting the library item never changes an old batch.
+   */
+  ingredientId?: string;
+  /**
+   * Batches only: the library cost when the batch was saved, so a later price change doesn't
+   * rewrite an old batch. Recipes always use the current price.
+   */
+  cost?: IngredientCost;
+}
+
+/** What an ingredient cost when bought: price for an amount, such as 24.99 for 12 lb. */
+export interface IngredientCost {
+  price: number;
+  quantity: number;
+  /** One of INGREDIENT_UNITS. */
+  unit: string;
+}
+
+// --- Ingredient library (v0.2) ------------------------------------------------
+
+export interface IngredientCategory {
+  id: string;
+  label: string;
+}
+
+/** The categories every library starts with. They can be renamed, and more can be added. */
+export const DEFAULT_CATEGORIES: IngredientCategory[] = [
+  { id: 'honey', label: 'Honey' },
+  { id: 'fruit', label: 'Fruit' },
+  { id: 'juice', label: 'Juice & concentrate' },
+  { id: 'sweetener', label: 'Sweeteners' },
+  { id: 'spice', label: 'Spices' },
+  { id: 'herb', label: 'Herbs & flowers' },
+  { id: 'yeast', label: 'Yeast' },
+  { id: 'nutrient', label: 'Nutrients' },
+  { id: 'additive', label: 'Additives' },
+  { id: 'fining', label: 'Fining & clarifiers' },
+  { id: 'oak', label: 'Oak & wood' },
+  { id: 'grain', label: 'Grains & malt' },
+  { id: 'hops', label: 'Hops' },
+  { id: 'other', label: 'Other' },
+];
+
+/** An ingredient in the library: what it is, how it's usually measured, and (optionally) what it costs. */
+export interface LibraryIngredient extends Base {
+  name: string;
+  /** An IngredientCategory id. Unknown ids show under Other. */
+  category: string;
+  /** The unit a new line starts with when this ingredient is picked. One of INGREDIENT_UNITS. */
+  defaultUnit: string;
+  notes: string;
+  /** Optional. Used for batch and recipe totals. */
+  cost?: IngredientCost | null;
 }
 
 export type VolumeUnit = 'gal' | 'L';
@@ -335,9 +390,14 @@ export interface BatchEvent extends Base {
    * the final one until a newer final reading or a feeding replaced it: still a measurement, never sugar.
    */
   final?: boolean;
-  /** For "ingredient" entries: what was added, and how much. */
+  /** For "ingredient" entries: what was added, and how much ("3 lb"). */
   ingredient?: string;
   amount?: string;
+  /** For "ingredient" entries: the amount's number and unit, as on an ingredient line. Older entries have only `amount`. */
+  quantity?: string;
+  unit?: string;
+  /** For "ingredient" entries: the library ingredient it was picked from, if any. */
+  ingredientId?: string;
   /** For "ingredient" entries: the line in the batch's ingredient list this entry ticks off. */
   ingredientLineId?: string;
   /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */
@@ -402,4 +462,8 @@ export interface Settings {
   sorts: Record<string, string>;
   /** Set once a hosted preview has loaded its sample data. Unused in the real app. */
   demoSeeded?: boolean;
+  /** The ingredient categories, in order. Missing means DEFAULT_CATEGORIES. */
+  ingredientCategories?: IngredientCategory[];
+  /** ISO 4217 code, such as USD. Missing means the locale's currency. */
+  currency?: string;
 }

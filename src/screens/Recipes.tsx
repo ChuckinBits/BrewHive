@@ -7,13 +7,14 @@ import { IconPicker } from '../components/IconPicker.tsx';
 import { TargetField, targetError, targetValues } from '../components/TargetField.tsx';
 import { StyleField, useNameAndStyle } from '../components/StyleField.tsx';
 import { EditableIngredients, IngredientSheet, IngredientsByStage } from '../components/StagedIngredients.tsx';
+import { CostCard } from '../components/CostCard.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
 import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
-import { abv } from '../lib/calc.ts';
+import { L_PER_GAL, abv } from '../lib/calc.ts';
 import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
@@ -154,6 +155,8 @@ export function RecipeDetailScreen({ id }: { id: string }) {
         </section>
       )}
 
+      <CostCard lines={recipe.ingredients} volumeL={recipe.batchSizeL} useSaved={false} />
+
       {recipe.steps.length > 0 && (
         <section className="card">
           <h2>Steps</h2>
@@ -246,7 +249,7 @@ export function RecipeFormScreen({ id }: { id?: string }) {
           name: '',
           beverageType: 'mead',
           style: '',
-          batchSize: volumeToInput(volumeUnit === 'gal' ? 3.785411784 : 4, volumeUnit),
+          batchSize: volumeToInput(volumeUnit === 'gal' ? L_PER_GAL : 4, volumeUnit),
           volumeUnit,
           targetOG: '',
           targetMode: 'fg',
@@ -329,7 +332,8 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
       volumeUnit: draft.volumeUnit,
       targetOG,
       ...target,
-      ingredients: cleanIngredients(draft.ingredients),
+      // Recipes use current prices, so lines don't keep a saved cost.
+      ingredients: cleanIngredients(draft.ingredients).map(({ cost: _cost, ...line }) => line),
       steps: draft.steps
         .split('\n')
         .map((step) => step.trim())

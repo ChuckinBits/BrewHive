@@ -4,18 +4,21 @@ import { useRef, useState } from 'react';
 import { createBackup, downloadBackup, restoreBackup } from '../db/backup.ts';
 import { clearAll } from '../db/idb.ts';
 import { loadSampleData } from '../db/sample.ts';
-import { rememberTheme, saveSettings, useSettings } from '../db/store.ts';
+import { currencyOf, ensureStarterIngredients, rememberTheme, saveSettings, useSettings } from '../db/store.ts';
+import { CURRENCIES } from '../lib/cost.ts';
 import { ConfirmSheet, Segmented, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import { isDemo } from '../lib/demo.ts';
 import { plural } from '../lib/format.ts';
 import { APP_VERSION, REPO_URL } from '../lib/version.ts';
+import { Link } from '../lib/router.tsx';
 
 const ROADMAP: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'honey', title: 'Equipment', text: 'Ingredient stock and vessels, with a pantry shelf. Planned for v0.2.' },
-  { icon: 'sparkle', title: 'Calculators and reminders', text: 'ABV, backsweetening and nutrient schedules. Planned for v0.2.' },
-  { icon: 'upload', title: 'Sync between devices', text: 'Through a server you host yourself. Planned for v0.4.' },
-  { icon: 'people', title: 'Community recipes', text: 'Share, rate and tip recipes over Nostr. Planned for v0.5.' },
+  { icon: 'honey', title: 'Ingredient library', text: 'Your ingredients by category, with costs and batch totals. Planned for v0.2.' },
+  { icon: 'rack', title: 'Equipment and inventory', text: 'Vessels and ingredient stock. Planned for v0.3.' },
+  { icon: 'sparkle', title: 'Calculators and reminders', text: 'ABV, backsweetening and nutrient schedules. Planned for v0.3.' },
+  { icon: 'upload', title: 'Sync between devices', text: 'Through a server you host yourself. Planned for v0.5.' },
+  { icon: 'people', title: 'Community recipes', text: 'Share, rate and tip recipes over Nostr. Planned for v0.6.' },
 ];
 
 export function MoreScreen() {
@@ -50,6 +53,17 @@ export function MoreScreen() {
     <>
       <TopBar title="More" />
 
+      <Link to="/ingredients" className="card more-link">
+        <span className="timeline-icon">
+          <Icon name="honey" size={20} />
+        </span>
+        <span className="more-link-text">
+          <strong>Ingredients</strong>
+          <span className="muted">Your ingredient library: categories, default units and costs.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </Link>
+
       <section className="card">
         <h2>Units</h2>
         <div className="settings-row">
@@ -75,6 +89,16 @@ export function MoreScreen() {
               { id: 'C', label: '°C' },
             ]}
           />
+        </div>
+        <div className="settings-row">
+          <span>Currency</span>
+          <select className="settings-select" aria-label="Currency" value={currencyOf(settings)} onChange={(e) => saveSettings({ currency: e.target.value })}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 
@@ -151,11 +175,13 @@ export function MoreScreen() {
       {erasing && (
         <ConfirmSheet
           title="Erase everything?"
-          message="Every recipe, batch, bottle and setting on this device will be deleted. This cannot be undone, so save a backup first if you might want it back."
+          message="Every recipe, batch, bottle, ingredient and setting on this device will be deleted, and the starter ingredients put back. This cannot be undone, so save a backup first if you might want it back."
           confirmLabel="Erase everything"
           onClose={() => setErasing(false)}
           onConfirm={async () => {
             await clearAll();
+            // Like a fresh install, which starts with the starter ingredients.
+            await ensureStarterIngredients();
             rememberTheme('system');
             setErasing(false);
             toast('Everything was erased');

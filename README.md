@@ -4,18 +4,22 @@
 
 BrewHive is an open source, private-by-default brew log that makes tracking brews fun to look at and easy to start. It is built for mead first, with room for cider, wine, beer and kombucha. Your data stays on your device: there is no account, no server and no tracking.
 
-This is **v0.1**, the first milestone of the [project plan](#roadmap): a complete local brew log that installs as an app from the browser.
+The latest release is **v0.1.2**: a complete local brew log that installs as an app from the browser. The next milestone, **v0.2**, adds an ingredient library with costs. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
 
 ## What it does today
 
-- **Batches.** Track each batch from Planned through Primary, Secondary, Aging and Bottled. Log gravity readings, nutrients, racking, tastings and notes on a timeline. See live ABV and a gravity chart.
-- **Recipes.** Save ingredients, steps and target gravities, then start a new batch from a recipe with one tap.
-- **Cellar.** Bottling a batch adds it to the cellar. Log each bottle you drink, gift or enter in a competition, and see what is ready to drink.
-- **Shelf view.** Every collection can be shown as a list or as a shelf: carboys for batches, books for recipes and bottles for the cellar. Carboys bubble while a batch is in primary.
-- **Icons and ratings.** Give anything one of 30 flavor icons and a 0 to 10 rating. Ratings show as a badge above each item, and every list can be sorted by rating.
+- **Batches.** Track each batch from Planned through Primary, Secondary, Aging and Bottled, then archive it. Log gravity readings, ingredients, nutrients, step feeding, backsweetening, stabilizing, racking, tastings and notes on a timeline, divided by stage. See the ABV, a gravity chart and the points of sugar added.
+- **Final gravity.** Moving a batch to Aging or bottling it asks for the final reading, which settles the ABV. No reading? Enter an estimated ABV instead.
+- **Targets.** Aim for a final gravity or an ABV. Aiming for an ABV shows the gravity it finishes at, or how much more sugar it needs, and the batch page says when the target is reached.
+- **Recipes.** Save ingredients by stage, steps and targets, then start a batch from a recipe with one tap. Save a batch as a recipe, and update the recipe as the batch evolves.
+- **Ingredient library** *(v0.2)*. Your ingredients by category, with default units, a starter list of mead-making staples, and the recipes and batches that use each one. Pick from the list as you type when adding ingredients.
+- **Costs** *(v0.2)*. Enter what you paid for an ingredient and see what each batch and recipe costs: the total, per 750 mL bottle and per gallon or liter.
+- **Cellar.** Bottling a batch adds it to the cellar, in as many bottle sizes as you filled. Log each bottle you drink, gift or enter in a competition, and edit or remove pours.
+- **Shelf view.** Every collection can be shown as a list or as a shelf: carboys for batches, books for recipes and archived batches, and bottles for the cellar. Carboys bubble while a batch is in primary.
+- **Icons and ratings.** Give anything up to three of 30 flavor icons, any color, and a 0 to 10 rating. Picking an icon suggests a name and a style for the type of brew.
 - **Backup.** Save everything to one JSON file and restore it on any device.
 - **Works offline.** After the first visit the app loads without a connection, and it can be installed to the home screen on iOS, Android and desktop.
-- **Light and dark themes**, gallons or liters, °F or °C.
+- **Light and dark themes**, gallons or liters and °F or °C (per batch too), and your currency.
 
 ## Run it on your computer
 
@@ -34,7 +38,7 @@ Other commands:
 | --- | --- |
 | `npm run build` | Builds the app into the `dist` folder |
 | `npm run preview` | Serves the built app locally, with offline support switched on |
-| `npm test` | Runs the unit tests for the brewing math |
+| `npm test` | Runs the unit tests (brewing math, costs, ingredient library and more) |
 | `npm run typecheck` | Checks the TypeScript types |
 
 ## Put it online
@@ -59,37 +63,48 @@ src/
   App.tsx           Picks the screen for the current address, draws the tab bar
   styles.css        All styles; colors are tokens with light and dark values
   db/
-    types.ts        The data model (recipes, batches, events, cellar, pours)
+    types.ts        The data model (recipes, batches, events, cellar, pours, ingredients)
     idb.ts          Small wrapper around the browser's IndexedDB
     store.ts        The data API the screens use, plus live-updating hooks
+    actions.ts      Changes that touch several records (stage changes, archiving)
     backup.ts       JSON backup and restore
     sample.ts       Sample data
-  lib/
-    calc.ts         Brewing math (ABV, Brix, unit conversions), with tests
-    batch.ts        Numbers derived from a batch and its timeline
+    starterIngredients.ts  The ingredients a new library starts with
+  lib/              Logic with no screen, each with unit tests beside it
+    calc.ts         Brewing math (ABV, Brix, unit conversions)
+    batch.ts        Numbers derived from a batch and its timeline (ABV, targets)
+    stages.ts       Ingredient stages and the timeline sections
+    bottling.ts     Bottle sizes and counts
+    cellar.ts       Cellar filters and the archive prompt
+    cost.ts         Ingredient costs and currencies
+    library.ts      Ingredient library search and categories
+    recipeFromBatch.ts  Saving a batch as a recipe
+    suggest.ts      Name and style suggestions from icons
     format.ts       Dates, units and number formatting
     router.tsx      Tiny hash router
     theme.ts        Applies the light / dark theme
     demo.ts         Demo mode switch for hosted previews
+    version.ts      The app version
   icons/            Flavor icons and interface icons, all inline SVG
-  components/       Shelf, carboy / book / bottle artwork, forms, sheets, chart
-  screens/          Batches, Recipes, Cellar, More
+  components/       Shelf, carboy / book / bottle artwork, forms, sheets, chart, cost card
+  screens/          Batches, Recipes, Cellar, Ingredients, More
 public/
   sw.js             Service worker for offline use
   manifest.webmanifest, icons
 ```
 
-The app has only two runtime dependencies, React and React DOM. Volumes are stored in liters, temperatures in °C and gravity as SG; the screens convert to the units chosen in Settings.
+The app has only two runtime dependencies, React and React DOM. Volumes are stored in liters, temperatures in °C and gravity as SG; the screens convert to the units chosen under More, or on each batch.
 
 ## Roadmap
 
 | Version | Focus |
 | --- | --- |
-| **v0.1 (this release)** | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
-| v0.2 | Equipment screen (ingredient stock and vessels), calculators, photos, reminders, Simple / Advanced mode |
-| v0.3 | iOS and Android apps with Capacitor |
-| v0.4 | Optional sync through a self-hosted server |
-| v0.5 | Community recipes on Nostr, with zaps |
+| **v0.1** (released, latest v0.1.2) | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
+| **v0.2** (in progress) | Ingredient library: categories, default units, costs and batch totals |
+| v0.3 | Equipment screen (vessels and ingredient inventory), calculators, photos, reminders, Simple / Advanced mode |
+| v0.4 | iOS and Android apps with Capacitor |
+| v0.5 | Optional sync through a self-hosted server |
+| v0.6 | Community recipes on Nostr, with zaps |
 | Later | Smart hydrometers, BeerXML import, printable labels |
 
 ## Contributing

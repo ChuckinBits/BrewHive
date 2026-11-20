@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
-import { batches, cellar, events, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type Settings, type TempUnit } from '../db/types.ts';
+import { batches, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
+import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
-import { LoggableIngredients } from '../components/StagedIngredients.tsx';
+import { LoggableIngredients, useIngredientFields } from '../components/StagedIngredients.tsx';
+import { CostFacts, currentCost } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
@@ -25,7 +26,7 @@ import {
   projectedAbv,
   targetReached,
 } from '../lib/batch.ts';
-import { addedLines, currentIngredientStage, ingredientStageLabel, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
+import { addedLines, currentIngredientStage, entryFromLine, ingredientStageLabel, lineFromEntry, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
 import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, suggestCount, totalMl, type BottleLine, type BottleUnit } from '../lib/bottling.ts';
 import { Link, navigate } from '../lib/router.tsx';
@@ -214,6 +215,29 @@ export function BatchDetailScreen({ id }: { id: string }) {
         <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
       </section>
 
+      <section className="card">
+        <h2>Details</h2>
+        <dl className="facts">
+          {batch.volumeL != null && (
+            <>
+              <dt>Volume</dt>
+              <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
+            </>
+          )}
+          <dt>Started</dt>
+          <dd>{fmtDate(batch.startDate)}</dd>
+          {data.recipe && (
+            <>
+              <dt>Recipe</dt>
+              <dd>
+                <Link to={`/recipes/${data.recipe.id}`}>{data.recipe.name}</Link>
+              </dd>
+            </>
+          )}
+          <CostFacts lines={batch.ingredients} volumeL={batch.volumeL} />
+        </dl>
+      </section>
+
       {batch.ingredients.length > 0 && (
         <section className="card">
           <div className="card-head">
@@ -236,37 +260,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
                 date: nowLocal(),
                 value: null,
                 note: '',
-                ingredient: line.name,
-                amount: line.amount,
+                ...entryFromLine(line),
                 ingredientLineId: line.id,
               });
               toast(`${line.name} logged on the timeline`);
             }}
           />
-        </section>
-      )}
-
-      {(batch.volumeL != null || data.recipe) && (
-        <section className="card">
-          <h2>Details</h2>
-          <dl className="facts">
-            {batch.volumeL != null && (
-              <>
-                <dt>Volume</dt>
-                <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
-              </>
-            )}
-            <dt>Started</dt>
-            <dd>{fmtDate(batch.startDate)}</dd>
-            {data.recipe && (
-              <>
-                <dt>Recipe</dt>
-                <dd>
-                  <Link to={`/recipes/${data.recipe.id}`}>{data.recipe.name}</Link>
-                </dd>
-              </>
-            )}
-          </dl>
         </section>
       )}
 
@@ -456,10 +455,17 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const [ferments, setFerments] = useState(existing?.ferments === true);
   // Gravity readings: whether this is the final gravity. Off unless ticked; a batch has only one.
   const [isFinal, setIsFinal] = useState(existing?.final === true);
-  const [ingredient, setIngredient] = useState(existing?.ingredient ?? '');
+  // The same ingredient fields as the batch's ingredient sheet, with the date in place of the stage.
+  const ingredient = useIngredientFields(
+    existing?.type === 'ingredient' ? { name: existing.ingredient ?? '', amount: existing.amount ?? '', quantity: existing.quantity, unit: existing.unit, ingredientId: existing.ingredientId } : null,
+    settings.volumeUnit === 'gal' ? 'lb' : 'g',
+  );
+  // The batch ingredient this entry logged, if it's still on the list: offered to update along with it.
+  const linkedLine = existing?.ingredientLineId ? batch.ingredients.find((l) => l.id === existing.ingredientLineId) : undefined;
+  const [updateList, setUpdateList] = useState(true);
   // New ingredient entries also add the ingredient to the batch's list, ticked off, in the current stage.
+  // Older entries that aren't on the list can be added too, but aren't by default.
   const [addToList, setAddToList] = useState(!existing);
-  const [amount, setAmount] = useState(existing?.amount ?? '');
   const [method, setMethod] = useState(existing?.method ?? STABILIZE_METHODS[0]);
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
 
@@ -495,12 +501,13 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter the gravity after adding, between 0.980 and 1.200, or leave it empty.');
     } else if (kind === 'place' && !place.trim()) {
       return setError('Enter where the batch went, such as Basement.');
-    } else if (kind === 'ingredient' && !ingredient.trim()) {
+    } else if (kind === 'ingredient' && !ingredient.name.trim()) {
       return setError('Enter what you added, such as Oak cubes.');
     } else if (isReview && rating == null) {
       return setError('Pick a rating, or remove this entry.');
     }
 
+    const picked = kind === 'ingredient' ? await ingredient.commit() : null;
     const fields = {
       batchId: batch.id,
       date: date || nowLocal(),
@@ -508,8 +515,11 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       value: parsed,
       place: kind === 'place' ? place.trim() : undefined,
       ferments: type === 'backsweeten' && ferments ? true : undefined,
-      ingredient: kind === 'ingredient' ? ingredient.trim() : undefined,
-      amount: kind === 'ingredient' ? amount.trim() : undefined,
+      ingredient: picked?.name,
+      amount: picked?.amount,
+      quantity: picked?.quantity,
+      unit: picked?.unit,
+      ingredientId: picked?.ingredientId,
       method: kind === 'method' ? method : undefined,
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
@@ -523,12 +533,16 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     } else if (existing && isReview) {
       // Editing a rating entry by hand keeps it, even if the batch rating changes again today.
       await events.save({ ...existing, ...fields, auto: false });
+    } else if (existing && kind === 'ingredient' && linkedLine) {
+      await events.save({ ...existing, ...fields, type });
+      if (updateList) await batches.save({ ...batch, ingredients: batch.ingredients.map((l) => (l.id === linkedLine.id ? lineFromEntry(l, fields) : l)) });
+    } else if (kind === 'ingredient' && addToList) {
+      const line: IngredientLine = { id: newId(), name: picked?.name ?? '', amount: picked?.amount ?? '', quantity: picked?.quantity, unit: picked?.unit, ingredientId: picked?.ingredientId, stage: stageForNewIngredient(batch.status) };
+      line.cost = currentCost(line, await ingredients.list());
+      await batches.save({ ...batch, ingredients: [...batch.ingredients, line] });
+      await events.save({ ...(existing ?? {}), ...fields, type, ingredientLineId: line.id });
     } else if (existing) {
       await events.save({ ...existing, ...fields, type });
-    } else if (kind === 'ingredient' && addToList) {
-      const line = { id: newId(), name: fields.ingredient ?? '', amount: fields.amount ?? '', stage: stageForNewIngredient(batch.status) };
-      await batches.save({ ...batch, ingredients: [...batch.ingredients, line] });
-      await events.save({ ...fields, type, ingredientLineId: line.id });
     } else {
       await events.save({ ...fields, type });
     }
@@ -544,6 +558,12 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     onClose();
     if (type === 'backsweeten' && fields.ferments && !(existing?.ferments) && isFermentationComplete(batch)) onRestart();
   };
+
+  const whenField = (
+    <Field label="When">
+      <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
+    </Field>
+  );
 
   return (
     <Sheet title={existing ? 'Edit entry' : 'Add to timeline'} onClose={onClose}>
@@ -644,17 +664,15 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             {type === 'feeding' && <p className="field-hint">The added sugar raises the potential ABV.</p>}
           </>
         )}
-        {kind === 'ingredient' && (
-          <div className="form-pair">
-            <Field label="Ingredient">
-              <input type="text" value={ingredient} placeholder="Oak cubes" autoFocus={!existing} onChange={(e) => setIngredient(e.target.value)} />
-            </Field>
-            <Field label="Amount">
-              <input type="text" value={amount} placeholder="1 oz" onChange={(e) => setAmount(e.target.value)} />
-            </Field>
-          </div>
+        {kind === 'ingredient' && ingredient.fields}
+        {kind === 'ingredient' && whenField}
+        {kind === 'ingredient' && linkedLine && (
+          <label className="check-field">
+            <input type="checkbox" checked={updateList} onChange={(e) => setUpdateList(e.target.checked)} />
+            Also update batch ingredients
+          </label>
         )}
-        {kind === 'ingredient' && !existing && (
+        {kind === 'ingredient' && !linkedLine && (
           <label className="check-field">
             <input type="checkbox" checked={addToList} onChange={(e) => setAddToList(e.target.checked)} />
             Add to batch ingredients ({ingredientStageLabel(stageForNewIngredient(batch.status))})
@@ -710,9 +728,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             <input type="text" value={place} placeholder="Basement" autoFocus={!existing} onChange={(e) => setPlace(e.target.value)} />
           </Field>
         )}
-        <Field label="When">
-          <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
+        {kind !== 'ingredient' && whenField}
         <Field label="Note (optional)">
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
@@ -755,6 +771,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             </button>
           ))}
       </form>
+      {kind === 'ingredient' && ingredient.sheet}
     </Sheet>
   );
 }

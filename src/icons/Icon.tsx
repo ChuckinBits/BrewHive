@@ -48,6 +48,7 @@ const PATHS = {
       <path d="M13.5 6.5l4 4" />
     </>
   ),
+  grip: <path d="M5 8h14M5 12h14M5 16h14" />,
   trash: (
     <>
       <path d="M4 7h16M9 7V4h6v3" />
