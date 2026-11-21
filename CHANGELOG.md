@@ -12,13 +12,17 @@ a milestone.
 - **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
   use by category, with a search box and category chips. Each has a default
   unit and notes, and shows the recipes and batches that use it. It starts
-  with common mead-making staples (honeys, yeasts, nutrients, stabilizers
-  including Nagardo, fining agents), with no prices. "Restore starter
+  with 94 starter ingredients, with no prices ([#38]): honeys including
+  meadowfoam, 16 fruits, juices, sugar and sugar substitutes, spices, herbs
+  and flowers, 12 yeasts (wine, ale, kveik and bread yeast), nutrients,
+  acids and stabilizers including Nagardo, fining agents, tannins (wine
+  tannin, oak, tea), malts and hops. A starter whose name is already in your
+  list isn't added again. "Restore starter
   ingredients" at the bottom of the list brings back any you deleted, leaving
   your own ingredients and prices alone.
 - **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
   Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
-  Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
+  Tannins, Grains & malt, Hops and Other. Rename them, add your own, or
   remove one (its ingredients move to Other). Put them in order with Sort A–Z
   (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
   is used for the category chips and the sections of the list.
@@ -193,3 +197,4 @@ themes; sample data.
 [#33]: https://github.com/ChuckinBits/BrewHive/issues/33
 [#35]: https://github.com/ChuckinBits/BrewHive/issues/35
 [#36]: https://github.com/ChuckinBits/BrewHive/issues/36
+[#38]: https://github.com/ChuckinBits/BrewHive/issues/38

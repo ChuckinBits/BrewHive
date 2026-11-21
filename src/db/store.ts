@@ -58,14 +58,26 @@ export function categoriesOf(settings: Settings): IngredientCategory[] {
   return settings.ingredientCategories?.length ? settings.ingredientCategories : DEFAULT_CATEGORIES;
 }
 
+/** Starters to add: not already on the device (by id), and not named like an ingredient in the list. */
+function startersToAdd(all: LibraryIngredient[], skip: (item: LibraryIngredient) => boolean) {
+  const names = new Set(all.filter((i) => !i.deletedAt).map((i) => i.name.trim().toLowerCase()));
+  const ids = new Set(all.filter(skip).map((i) => i.id));
+  return starterIngredients(usesImperial()).filter((i) => !ids.has(i.id) && !names.has(i.name.toLowerCase()));
+}
+
 /**
  * Adds the starter ingredients the device has never had. They have fixed ids, so one you deleted
  * stays deleted (its record is still there, flagged) and restoring a backup never duplicates them.
+ * One whose name is already in the list (one you made, say) isn't added. A starter you never
+ * edited follows the starter list if its category changes (Wine tannin moved to Tannins).
  */
 export async function ensureStarterIngredients(): Promise<void> {
-  const known = new Set((await getAll<LibraryIngredient>('ingredients')).map((i) => i.id));
-  const missing = starterIngredients(usesImperial()).filter((i) => !known.has(i.id));
-  await putMany('ingredients', missing.map(fresh));
+  const all = await getAll<LibraryIngredient>('ingredients');
+  const starters = new Map(starterIngredients(usesImperial()).map((i) => [i.id, i]));
+  const moved = all
+    .filter((i) => !i.deletedAt && i.createdAt === i.updatedAt && starters.has(i.id) && starters.get(i.id)?.category !== i.category)
+    .map((i) => ({ ...i, category: starters.get(i.id)?.category ?? i.category }));
+  await putMany('ingredients', [...moved, ...startersToAdd(all, () => true).map(fresh)]);
 }
 
 /** A new record with its timestamps, for writing several in one go. */
@@ -79,8 +91,8 @@ function fresh<T extends object>(data: T): T & Base {
  * ingredients you added, prices, and starters you edited stay as they are. Returns how many came back.
  */
 export async function restoreStarterIngredients(): Promise<number> {
-  const live = new Set((await getAll<LibraryIngredient>('ingredients')).filter((i) => !i.deletedAt).map((i) => i.id));
-  const missing = starterIngredients(usesImperial()).filter((i) => !live.has(i.id));
+  // Only live records count as present, so deleted starters come back.
+  const missing = startersToAdd(await getAll<LibraryIngredient>('ingredients'), (i) => !i.deletedAt);
   // Saved fresh, so a deleted one comes back as it started, with no price.
   await putMany('ingredients', missing.map(fresh));
   return missing.length;

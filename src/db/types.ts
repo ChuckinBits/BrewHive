@@ -273,7 +273,7 @@ export const DEFAULT_CATEGORIES: IngredientCategory[] = [
   { id: 'nutrient', label: 'Nutrients', icon: 'nutrient' },
   { id: 'additive', label: 'Additives', icon: 'additive' },
   { id: 'fining', label: 'Fining & clarifiers', icon: 'fining' },
-  { id: 'oak', label: 'Oak & wood', icon: 'oak' },
+  { id: 'oak', label: 'Tannins', icon: 'oak' },
   { id: 'grain', label: 'Grains & malt', icon: 'grain' },
   { id: 'hops', label: 'Hops', icon: 'hops' },
   { id: 'other', label: 'Other', icon: 'jar' },

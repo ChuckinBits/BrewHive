@@ -8,12 +8,9 @@ import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 import { entryFromLine, joinAmount } from '../lib/stages.ts';
 
-// Ingredients only the samples use, priced so the samples show costs. Fixed ids: added once, never overwriting yours.
+// Ingredients only the samples use (the rest are starter ingredients), priced so the samples show costs. Fixed ids: added once, never overwriting yours.
 const SAMPLE_INGREDIENTS: Pick<LibraryIngredient, 'id' | 'name' | 'category' | 'defaultUnit' | 'notes' | 'cost'>[] = [
   { id: 'sample-spring-water', name: 'Spring water', category: 'other', defaultUnit: 'gal', notes: '', cost: { price: 1.49, quantity: 1, unit: 'gal' } },
-  { id: 'sample-blackberries', name: 'Blackberries, frozen', category: 'fruit', defaultUnit: 'lb', notes: '', cost: { price: 8.99, quantity: 2, unit: 'lb' } },
-  { id: 'sample-strawberries', name: 'Strawberries', category: 'fruit', defaultUnit: 'lb', notes: '', cost: { price: 3.99, quantity: 1, unit: 'lb' } },
-  { id: 'sample-cloves', name: 'Cloves', category: 'spice', defaultUnit: '', notes: '', cost: { price: 4.49, quantity: 60, unit: '' } },
   { id: 'sample-oranges', name: 'Oranges', category: 'fruit', defaultUnit: '', notes: '', cost: { price: 0.89, quantity: 1, unit: '' } },
 ];
 
@@ -31,6 +28,9 @@ const SAMPLE_PRICES: Record<string, IngredientCost> = {
   'Pectic enzyme': { price: 3.99, quantity: 24, unit: 'tsp' },
   'Cinnamon sticks': { price: 5.99, quantity: 12, unit: '' },
   'Oak cubes': { price: 7.99, quantity: 3, unit: 'oz' },
+  Blackberries: { price: 8.99, quantity: 2, unit: 'lb' },
+  Strawberries: { price: 3.99, quantity: 1, unit: 'lb' },
+  Clove: { price: 4.49, quantity: 60, unit: '' },
 };
 
 const stamp = () => {
@@ -111,7 +111,7 @@ export async function loadSampleData(): Promise<void> {
     batchSizeL: L_PER_GAL,
     targetOG: 1.115,
     targetFG: 1.01,
-    ingredients: lines(['Clover honey', '3', 'lb'], ['Blackberries, frozen', '2', 'lb'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin EC-1118', '1', 'packet'], ['Pectic enzyme', '0.5', 'tsp']),
+    ingredients: lines(['Clover honey', '3', 'lb'], ['Blackberries', '2', 'lb', 'frozen'], ['Spring water', '1', 'gal', 'topped up'], ['Lalvin EC-1118', '1', 'packet'], ['Pectic enzyme', '0.5', 'tsp']),
     steps: [
       'Thaw the blackberries and add them to a sanitized bucket with pectic enzyme.',
       'Dissolve the honey in water and pour it over the fruit.',
@@ -186,7 +186,7 @@ export async function loadSampleData(): Promise<void> {
     volumeL: L_PER_GAL,
     og: 1.105,
     targetFG: 1.0,
-    ingredients: priced(lines(['Wildflower honey', '3', 'lb'], ['Cinnamon sticks', '2', ''], ['Cloves', '4', ''], ['Oranges', '1', '', 'zest only'])),
+    ingredients: priced(lines(['Wildflower honey', '3', 'lb'], ['Cinnamon sticks', '2', ''], ['Clove', '4', ''], ['Oranges', '1', '', 'zest only'])),
     icon: 'cinnamon',
     color: '#B5672F',
     rating: 8.5,
