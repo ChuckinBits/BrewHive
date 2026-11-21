@@ -66,17 +66,22 @@ export function MoreScreen() {
       <section className="card">
         <h2>Units</h2>
         <div className="settings-row">
-          <span>Volume</span>
+          <span>Volume &amp; weight</span>
           <Segmented
-            label="Volume unit"
+            label="Volume and weight units"
             value={settings.volumeUnit}
             onChange={(volumeUnit) => saveSettings({ volumeUnit })}
             options={[
-              { id: 'gal', label: 'Gallons' },
-              { id: 'L', label: 'Liters' },
+              { id: 'gal', label: 'US' },
+              { id: 'L', label: 'Metric' },
             ]}
           />
         </div>
+        <p className="field-hint settings-hint">
+          {settings.volumeUnit === 'gal'
+            ? 'Gallons, pounds and ounces. New starter ingredients and ones you haven’t changed use these.'
+            : 'Liters, kilograms and grams. New starter ingredients and ones you haven’t changed use these.'}
+        </p>
         <div className="settings-row">
           <span>Temperature</span>
           <Segmented

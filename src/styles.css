@@ -2435,3 +2435,7 @@ button.library-row {
   margin-top: 1px;
   color: var(--accent-ink);
 }
+
+.settings-hint {
+  margin-top: -6px;
+}

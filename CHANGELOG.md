@@ -7,9 +7,12 @@ a milestone.
 
 ## Unreleased (v0.2.1)
 
-- **Starter ingredients follow your units** ([#41]). Switching More → Units
-  → Volume between gallons and liters moves the starter ingredients' default
-  units to match: lb and kg, oz and g, gal and L, fl oz and mL. Ingredients
+- **Volume & weight: US or Metric** ([#41]). The Volume setting under
+  More → Units is now Volume & weight, with US (gallons, pounds, ounces) or
+  Metric (liters, kilograms, grams).
+- **Starter ingredients follow your units** ([#41]). Switching between US
+  and Metric moves the starter ingredients' default units to match: lb and
+  kg, oz and g, gal and L, fl oz and mL. Ingredients
   you've changed, and your own, keep their units. Starters now take their
   units from that setting rather than the browser's region, and opening an
   ingredient and saving it without changes no longer counts as changing it.
