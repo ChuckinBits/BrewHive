@@ -50,13 +50,45 @@ export function CategoryChips({
   );
 }
 
+// The list's search, category chip and scroll position, kept while the app is open, so opening an
+// ingredient and coming back (or saving it) returns to the same place in the list.
+const listState = { search: '', category: null as string | null, scrollY: 0 };
+
 export function IngredientsScreen() {
   const settings = useSettings();
   const categories = categoriesOf(settings);
-  const all = useQuery(() => ingredients.list()) ?? [];
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
+  const loaded = useQuery(() => ingredients.list());
+  const all = loaded ?? [];
+  const [search, setSearchState] = useState(listState.search);
+  const [category, setCategoryState] = useState<string | null>(
+    // A category removed since then falls back to All.
+    listState.category && categories.some((c) => c.id === listState.category) ? listState.category : null,
+  );
   const [managing, setManaging] = useState(false);
+  const setSearch = (value: string) => {
+    listState.search = value;
+    setSearchState(value);
+  };
+  const setCategory = (value: string | null) => {
+    listState.category = value;
+    setCategoryState(value);
+  };
+
+  // Back to where the list was, once it has loaded (after the app's scroll to the top on each page).
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !loaded) return;
+    restored.current = true;
+    const y = listState.scrollY;
+    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [loaded]);
+  useEffect(() => {
+    const remember = () => {
+      listState.scrollY = window.scrollY;
+    };
+    window.addEventListener('scroll', remember, { passive: true });
+    return () => window.removeEventListener('scroll', remember);
+  }, []);
 
   const counts = new Map<string, number>();
   for (const item of all) counts.set(categoryOf(item, categories).id, (counts.get(categoryOf(item, categories).id) ?? 0) + 1);

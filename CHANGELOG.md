@@ -10,7 +10,9 @@ a milestone.
 ### Ingredient library
 
 - **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
-  use by category, with a search box and category chips. Each has a default
+  use by category, with a search box and category chips; the search, chip
+  and scroll position stay put when you open an ingredient and come back.
+  Each has a default
   unit and notes, and shows the recipes and batches that use it. It starts
   with 100 starter ingredients, with no prices ([#38]), each with a short
   note on what it is and what it does in a brew: honeys including
