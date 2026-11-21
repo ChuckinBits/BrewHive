@@ -10,22 +10,37 @@ a milestone.
 ### Ingredient library
 
 - **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
-  use by category, with a search box and category chips. Each has a default
+  use by category, with a search box and category chips; the search, chip
+  and scroll position stay put when you open an ingredient and come back.
+  Each has a default
   unit and notes, and shows the recipes and batches that use it. It starts
-  with common mead-making staples (honeys, yeasts, nutrients, stabilizers
-  including Nagardo, fining agents), with no prices. "Restore starter
+  with 100 starter ingredients, with no prices ([#38]), each with a short
+  note on what it is and what it does in a brew: honeys including
+  meadowfoam, 16 fruits, juices, sugar and sugar substitutes, spices
+  (including coffee, cacao nibs and chili peppers), herbs and flowers, 12 yeasts (wine, ale, kveik and bread yeast), nutrients,
+  acids and stabilizers including Nagardo, fining agents, tannins (wine
+  tannin, oak, tea), malts and hops. A starter whose name is already in your
+  list isn't added again. "Restore starter
   ingredients" at the bottom of the list brings back any you deleted, leaving
   your own ingredients and prices alone.
 - **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
   Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
-  Oak & wood, Grains & malt, Hops and Other. Rename them, add your own, or
+  Tannins, Grains & malt, Hops and Other. Rename them, add your own, or
   remove one (its ingredients move to Other). Put them in order with Sort A–Z
   (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
   is used for the category chips and the sections of the list.
+- **Category icons** ([#36]). Each category in the ingredient list has a
+  line icon: honeycomb, fruit, juice, sugar cubes, star anise, flower, yeast,
+  nutrients, test tube, funnel, oak, wheat, hops and a jar for Other. In
+  Categories, tap a category's icon to pick another (also water, leaf and a
+  spice jar) or None. Categories you add start with no icon. Category names
+  in the list are in the accent color, like the selected chip.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
-  default unit. A name that isn't on the list can be used once, or saved
-  with "Save as a new ingredient", which opens the New ingredient form
+  default unit and shows its note under the field, so you see what it is
+  and how it's used as you add it. A name that isn't on the list can be
+  used once, or saved with "Save as a new ingredient", which opens the New
+  ingredient form
   (category, default unit, cost) on top of what you're writing and picks it
   when saved.
 - **Timeline ingredient entries** ([#35]) use the same form: pick from your
@@ -186,3 +201,5 @@ themes; sample data.
 [#32]: https://github.com/ChuckinBits/BrewHive/issues/32
 [#33]: https://github.com/ChuckinBits/BrewHive/issues/33
 [#35]: https://github.com/ChuckinBits/BrewHive/issues/35
+[#36]: https://github.com/ChuckinBits/BrewHive/issues/36
+[#38]: https://github.com/ChuckinBits/BrewHive/issues/38

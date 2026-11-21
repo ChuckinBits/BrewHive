@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_CATEGORIES, type IngredientLine, type LibraryIngredient } from '../db/types.ts';
 import { starterIngredients } from '../db/starterIngredients.ts';
-import { categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from './library.ts';
+import { categoryIcon, categoryOf, filterIngredients, lineIsIngredient, moveItem, sortCategories } from './library.ts';
 
 const item = (name: string, category: string): LibraryIngredient =>
   ({ id: name, name, category, defaultUnit: '', notes: '', createdAt: '', updatedAt: '', deletedAt: null }) as LibraryIngredient;
@@ -45,4 +45,19 @@ test('moveItem moves one item and leaves the rest in order', () => {
   assert.deepEqual(moveItem(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd']);
   assert.deepEqual(moveItem(['a', 'b', 'c', 'd'], 3, 0), ['d', 'a', 'b', 'c']);
   assert.deepEqual(moveItem(['a', 'b'], 1, 5), ['a', 'b'], 'clamped to the end');
+});
+
+test('category icons: the starter icon for older saves, the chosen one, or none', () => {
+  assert.equal(categoryIcon({ id: 'honey', label: 'Honey' }), 'honey', 'saved before icons: the starter icon');
+  assert.equal(categoryIcon({ id: 'other', label: 'Other' }), 'jar');
+  assert.equal(categoryIcon({ id: 'honey', label: 'Honey', icon: 'water' }), 'water', 'a chosen icon');
+  assert.equal(categoryIcon({ id: 'honey', label: 'Honey', icon: '' }), null, 'None');
+  assert.equal(categoryIcon({ id: 'tea', label: 'Tea' }), null, 'a category of your own starts with none');
+});
+
+test('every starter category has an icon that exists', async () => {
+  const { CATEGORY_ICONS } = await import('../icons/categoryIcons.ts');
+  const ids = new Set(CATEGORY_ICONS.map((i) => i.id));
+  for (const c of DEFAULT_CATEGORIES) assert.ok(c.icon && ids.has(c.icon), c.id);
+  assert.equal(ids.size, CATEGORY_ICONS.length, 'ids are unique');
 });

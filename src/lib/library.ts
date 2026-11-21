@@ -1,6 +1,6 @@
 // Ingredient library rules that don't depend on the screen.
 
-import type { IngredientCategory, IngredientLine, LibraryIngredient } from '../db/types.ts';
+import { DEFAULT_CATEGORIES, type IngredientCategory, type IngredientLine, type LibraryIngredient } from '../db/types.ts';
 
 /** The category an ingredient shows under: its own, or Other when that category is gone. */
 export function categoryOf(item: LibraryIngredient, categories: IngredientCategory[]): IngredientCategory {
@@ -37,4 +37,10 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
   const [item] = next.splice(a, 1);
   next.splice(b, 0, item);
   return next;
+}
+
+/** A category's icon id, or null for none. Categories saved before icons existed get their starter icon. */
+export function categoryIcon(category: IngredientCategory): string | null {
+  if (category.icon !== undefined) return category.icon || null;
+  return DEFAULT_CATEGORIES.find((c) => c.id === category.id)?.icon ?? null;
 }

@@ -2349,3 +2349,89 @@ button.library-row {
   width: auto;
   min-width: 110px;
 }
+
+/* --- Category icons (v0.2, issue #36) ----------------------------------- */
+
+/* Category names in the ingredient list stand out in the accent, like the selected chip. */
+.category-divider {
+  color: var(--accent-ink);
+}
+
+.category-divider::after {
+  background: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.stage-divider .category-icon {
+  flex: none;
+  margin-right: -2px;
+}
+
+.category-icon-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.category-icon-none {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.icon-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.icon-pick-on {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* The picked ingredient's note, under the Ingredient field */
+.ingredient-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: -6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ingredient-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-ink);
+}
