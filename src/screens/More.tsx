@@ -66,14 +66,14 @@ export function MoreScreen() {
       <section className="card">
         <h2>Units</h2>
         <div className="settings-row">
-          <span>Volume</span>
+          <span>Volume &amp; weight</span>
           <Segmented
-            label="Volume unit"
+            label="Volume and weight units"
             value={settings.volumeUnit}
             onChange={(volumeUnit) => saveSettings({ volumeUnit })}
             options={[
-              { id: 'gal', label: 'Gallons' },
-              { id: 'L', label: 'Liters' },
+              { id: 'gal', label: 'US' },
+              { id: 'L', label: 'Metric' },
             ]}
           />
         </div>

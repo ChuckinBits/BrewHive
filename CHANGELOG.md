@@ -5,6 +5,18 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.1)
+
+- **Volume & weight: US or Metric** ([#41]). The Volume setting under
+  More → Units is now Volume & weight, with US (gallons, pounds, ounces) or
+  Metric (liters, kilograms, grams).
+- **Starter ingredients follow your units** ([#41]). Switching between US
+  and Metric moves the starter ingredients' default units to match: lb and
+  kg, oz and g, gal and L, fl oz and mL. Ingredients
+  you've changed, and your own, keep their units. Starters now take their
+  units from that setting rather than the browser's region, and opening an
+  ingredient and saving it without changes no longer counts as changing it.
+
 ## v0.2.0 – 2026-11-21
 
 The ingredient library: your ingredients by category, picked from as you
@@ -208,3 +220,4 @@ themes; sample data.
 [#35]: https://github.com/ChuckinBits/BrewHive/issues/35
 [#36]: https://github.com/ChuckinBits/BrewHive/issues/36
 [#38]: https://github.com/ChuckinBits/BrewHive/issues/38
+[#41]: https://github.com/ChuckinBits/BrewHive/issues/41
