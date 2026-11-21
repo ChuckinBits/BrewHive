@@ -4,6 +4,8 @@
 
 BrewHive is an open source, private-by-default brew log that makes tracking brews fun to look at and easy to start. It is built for mead first, with room for cider, wine, beer and kombucha. Your data stays on your device: there is no account, no server and no tracking.
 
+**Use it at [brewhive.app](https://brewhive.app).** It runs in any modern browser and can be installed to your home screen or desktop from there.
+
 The latest release is **v0.2.0**: a complete local brew log that installs as an app from the browser, now with an ingredient library and batch costs. The next milestone, **v0.3**, adds equipment and inventory. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
 
 ## What it does today
@@ -45,7 +47,7 @@ Other commands:
 
 BrewHive is a static site. `npm run build` produces a `dist` folder that any web server can host.
 
-**GitHub Pages.** This repo includes a workflow that builds and publishes on every push to `main`. Turn it on once under *Settings > Pages > Build and deployment > Source: GitHub Actions*. To use a custom domain such as `brewhive.app`, add it on the same settings page.
+**GitHub Pages.** This repo includes a workflow that builds and publishes on every push to `main`; that's how [brewhive.app](https://brewhive.app) is served. Turn it on once under *Settings > Pages > Build and deployment > Source: GitHub Actions*. A custom domain is set on the same page (with GitHub Actions deployments no `CNAME` file is needed), and the domain's DNS points at GitHub Pages.
 
 **Self-hosting.** Copy the contents of `dist` to any folder served over HTTPS (Caddy, nginx, Apache, a NAS). All paths are relative, so it works at a domain root or in a subfolder. HTTPS is required for offline support and installing to the home screen; `localhost` is the one exception.
 
