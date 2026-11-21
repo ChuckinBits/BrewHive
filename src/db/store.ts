@@ -69,15 +69,19 @@ function startersToAdd(all: LibraryIngredient[], skip: (item: LibraryIngredient)
  * Adds the starter ingredients the device has never had. They have fixed ids, so one you deleted
  * stays deleted (its record is still there, flagged) and restoring a backup never duplicates them.
  * One whose name is already in the list (one you made, say) isn't added. A starter you never
- * edited follows the starter list if its category changes (Wine tannin moved to Tannins).
+ * edited follows the starter list's category and note (Wine tannin moved to Tannins; notes were added).
  */
 export async function ensureStarterIngredients(): Promise<void> {
   const all = await getAll<LibraryIngredient>('ingredients');
   const starters = new Map(starterIngredients(usesImperial()).map((i) => [i.id, i]));
-  const moved = all
-    .filter((i) => !i.deletedAt && i.createdAt === i.updatedAt && starters.has(i.id) && starters.get(i.id)?.category !== i.category)
-    .map((i) => ({ ...i, category: starters.get(i.id)?.category ?? i.category }));
-  await putMany('ingredients', [...moved, ...startersToAdd(all, () => true).map(fresh)]);
+  // Never edited: it follows the starter list's category and note.
+  const followed = all.flatMap((i) => {
+    const starter = starters.get(i.id);
+    if (!starter || i.deletedAt || i.createdAt !== i.updatedAt) return [];
+    if (starter.category === i.category && starter.notes === i.notes) return [];
+    return [{ ...i, category: starter.category, notes: starter.notes }];
+  });
+  await putMany('ingredients', [...followed, ...startersToAdd(all, () => true).map(fresh)]);
 }
 
 /** A new record with its timestamps, for writing several in one go. */

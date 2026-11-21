@@ -434,7 +434,7 @@ export function IngredientForm({ item, all, categories, startCategory, startName
           </p>
         </fieldset>
         <Field label="Notes">
-          <textarea rows={3} value={notes} placeholder="Where you buy it, how you use it" onChange={(e) => setNotes(e.target.value)} />
+          <textarea rows={4} value={notes} placeholder="Where you buy it, how you use it" onChange={(e) => setNotes(e.target.value)} />
         </Field>
         {error && (
           <p className="form-error" role="alert">
