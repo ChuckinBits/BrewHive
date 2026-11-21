@@ -185,6 +185,7 @@ export function useIngredientFields(start: { name: string; amount: string; quant
           role="combobox"
           aria-expanded={picking}
           aria-controls={`${formId}-list`}
+          aria-describedby={match?.notes && !picking ? `${formId}-note` : undefined}
           onFocus={() => setPicking(true)}
           onClick={() => setPicking(true)}
           onChange={(e) => {
@@ -193,6 +194,13 @@ export function useIngredientFields(start: { name: string; amount: string; quant
           }}
         />
       </Field>
+      {/* The picked ingredient's note: what it is and what it does, right when it's being added. */}
+      {match?.notes && !picking && (
+        <p className="ingredient-note" id={`${formId}-note`}>
+          <Icon name="info" size={16} />
+          <span>{match.notes}</span>
+        </p>
+      )}
       {picking && (
         <div className="picker">
           <CategoryChips categories={categories} value={pickCategory} onChange={setPickCategory} />

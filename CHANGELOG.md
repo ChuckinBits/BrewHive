@@ -35,8 +35,10 @@ a milestone.
   in the list are in the accent color, like the selected chip.
 - **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
   shows your list as you type, with category chips. Picking one fills in its
-  default unit. A name that isn't on the list can be used once, or saved
-  with "Save as a new ingredient", which opens the New ingredient form
+  default unit and shows its note under the field, so you see what it is
+  and how it's used as you add it. A name that isn't on the list can be
+  used once, or saved with "Save as a new ingredient", which opens the New
+  ingredient form
   (category, default unit, cost) on top of what you're writing and picks it
   when saved.
 - **Timeline ingredient entries** ([#35]) use the same form: pick from your

@@ -2415,3 +2415,23 @@ button.library-row {
   background: var(--accent-soft);
   color: var(--accent-ink);
 }
+
+/* The picked ingredient's note, under the Ingredient field */
+.ingredient-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: -6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ingredient-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-ink);
+}
