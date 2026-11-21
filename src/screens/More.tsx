@@ -77,11 +77,6 @@ export function MoreScreen() {
             ]}
           />
         </div>
-        <p className="field-hint settings-hint">
-          {settings.volumeUnit === 'gal'
-            ? 'Gallons, pounds and ounces. New starter ingredients and ones you haven’t changed use these.'
-            : 'Liters, kilograms and grams. New starter ingredients and ones you haven’t changed use these.'}
-        </p>
         <div className="settings-row">
           <span>Temperature</span>
           <Segmented
