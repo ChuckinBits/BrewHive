@@ -10,7 +10,7 @@ import { ConfirmSheet, Segmented, TopBar, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
 import { isDemo } from '../lib/demo.ts';
 import { plural } from '../lib/format.ts';
-import { APP_VERSION, REPO_URL } from '../lib/version.ts';
+import { APP_VERSION, REPO_URL, SITE_URL } from '../lib/version.ts';
 import { Link } from '../lib/router.tsx';
 
 const ROADMAP: { icon: IconName; title: string; text: string }[] = [
@@ -168,7 +168,7 @@ export function MoreScreen() {
         <strong>BrewHive</strong>
         From first pitch to final gravity
         <br />
-        Version {APP_VERSION} · Open source under the MIT license · <a href={REPO_URL}>Source code</a>
+        Version {APP_VERSION} · <a href={SITE_URL}>brewhive.app</a> · Open source under the MIT license · <a href={REPO_URL}>Source code</a>
       </footer>
 
       {erasing && (
