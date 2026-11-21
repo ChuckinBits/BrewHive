@@ -403,6 +403,13 @@ export function IngredientForm({ item, all, categories, startCategory, startName
     if (!name.trim()) return setError('Enter the ingredient, such as Orange blossom honey.');
     if (duplicate) return setError(`${duplicate.name} is already in your ingredients.`);
     if (price.trim() && !cost) return setError('Enter the price and how much it was for, such as 24.99 for 12 lb.');
+    // Saving with nothing changed leaves it as it was, so a starter still counts as never edited.
+    const same = (a: IngredientCost | null | undefined, b: IngredientCost | null) =>
+      (a ?? null) === b || (!!a && !!b && a.price === b.price && a.quantity === b.quantity && a.unit === b.unit);
+    if (item && item.name === name.trim() && item.category === category && item.defaultUnit === defaultUnit && item.notes === notes.trim() && same(item.cost, cost)) {
+      toast('Ingredient saved');
+      return done(item);
+    }
     const saved = await ingredients.save({ ...(item ?? {}), name: name.trim(), category, defaultUnit, notes: notes.trim(), cost });
     toast(item ? 'Ingredient saved' : 'Added to your ingredients');
     done(saved);

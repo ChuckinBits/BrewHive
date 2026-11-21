@@ -59,29 +59,37 @@ export function categoriesOf(settings: Settings): IngredientCategory[] {
 }
 
 /** Starters to add: not already on the device (by id), and not named like an ingredient in the list. */
-function startersToAdd(all: LibraryIngredient[], skip: (item: LibraryIngredient) => boolean) {
+function startersToAdd(all: LibraryIngredient[], imperial: boolean, skip: (item: LibraryIngredient) => boolean) {
   const names = new Set(all.filter((i) => !i.deletedAt).map((i) => i.name.trim().toLowerCase()));
   const ids = new Set(all.filter(skip).map((i) => i.id));
-  return starterIngredients(usesImperial()).filter((i) => !ids.has(i.id) && !names.has(i.name.toLowerCase()));
+  return starterIngredients(imperial).filter((i) => !ids.has(i.id) && !names.has(i.name.toLowerCase()));
 }
 
 /**
  * Adds the starter ingredients the device has never had. They have fixed ids, so one you deleted
  * stays deleted (its record is still there, flagged) and restoring a backup never duplicates them.
  * One whose name is already in the list (one you made, say) isn't added. A starter you never
- * edited follows the starter list's category and note (Wine tannin moved to Tannins; notes were added).
+ * edited follows the starter list: its category, its note, and its default unit in the units chosen
+ * under More (lb or kg, oz or g, gal or L, fl oz or mL). Called at start and when the units change.
  */
 export async function ensureStarterIngredients(): Promise<void> {
   const all = await getAll<LibraryIngredient>('ingredients');
-  const starters = new Map(starterIngredients(usesImperial()).map((i) => [i.id, i]));
-  // Never edited: it follows the starter list's category and note.
+  const imperial = await usesImperialUnits();
+  const starters = new Map(starterIngredients(imperial).map((i) => [i.id, i]));
+  // Never edited: it keeps up with the starter list.
   const followed = all.flatMap((i) => {
     const starter = starters.get(i.id);
     if (!starter || i.deletedAt || i.createdAt !== i.updatedAt) return [];
-    if (starter.category === i.category && starter.notes === i.notes) return [];
-    return [{ ...i, category: starter.category, notes: starter.notes }];
+    if (starter.category === i.category && starter.notes === i.notes && starter.defaultUnit === i.defaultUnit) return [];
+    // Written as-is otherwise, timestamps included, so it still counts as never edited.
+    return [{ ...i, category: starter.category, notes: starter.notes, defaultUnit: starter.defaultUnit }];
   });
-  await putMany('ingredients', [...followed, ...startersToAdd(all, () => true).map(fresh)]);
+  await putMany('ingredients', [...followed, ...startersToAdd(all, imperial, () => true).map(fresh)]);
+}
+
+/** Starter units follow the volume unit chosen under More: gallons means US units. */
+async function usesImperialUnits(): Promise<boolean> {
+  return (await loadSettings()).volumeUnit === 'gal';
 }
 
 /** A new record with its timestamps, for writing several in one go. */
@@ -96,7 +104,7 @@ function fresh<T extends object>(data: T): T & Base {
  */
 export async function restoreStarterIngredients(): Promise<number> {
   // Only live records count as present, so deleted starters come back.
-  const missing = startersToAdd(await getAll<LibraryIngredient>('ingredients'), (i) => !i.deletedAt);
+  const missing = startersToAdd(await getAll<LibraryIngredient>('ingredients'), await usesImperialUnits(), (i) => !i.deletedAt);
   // Saved fresh, so a deleted one comes back as it started, with no price.
   await putMany('ingredients', missing.map(fresh));
   return missing.length;
@@ -134,6 +142,8 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
   const next: Settings = { ...current, ...patch, id: 'app' };
   await putMany('settings', [next]);
   rememberTheme(next.theme);
+  // Switching between gallons and liters moves untouched starter ingredients to the matching units.
+  if (next.volumeUnit !== current.volumeUnit) await ensureStarterIngredients();
 }
 
 /** Mirrors the theme into localStorage so main.tsx can apply it before the first paint. */
