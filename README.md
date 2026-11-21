@@ -4,7 +4,7 @@
 
 BrewHive is an open source, private-by-default brew log that makes tracking brews fun to look at and easy to start. It is built for mead first, with room for cider, wine, beer and kombucha. Your data stays on your device: there is no account, no server and no tracking.
 
-The latest release is **v0.1.2**: a complete local brew log that installs as an app from the browser. The next milestone, **v0.2**, adds an ingredient library with costs. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
+The latest release is **v0.2.0**: a complete local brew log that installs as an app from the browser, now with an ingredient library and batch costs. The next milestone, **v0.3**, adds equipment and inventory. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
 
 ## What it does today
 
@@ -12,7 +12,7 @@ The latest release is **v0.1.2**: a complete local brew log that installs as an 
 - **Final gravity.** Moving a batch to Aging or bottling it asks for the final reading, which settles the ABV. No reading? Enter an estimated ABV instead.
 - **Targets.** Aim for a final gravity or an ABV. Aiming for an ABV shows the gravity it finishes at, or how much more sugar it needs, and the batch page says when the target is reached.
 - **Recipes.** Save ingredients by stage, steps and targets, then start a batch from a recipe with one tap. Save a batch as a recipe, and update the recipe as the batch evolves.
-- **Ingredient library** *(v0.2)*. Your ingredients by category, with default units, a starter list of 100 mead-making ingredients, each with a note on what it does, (honeys, fruit, sweeteners, spices, herbs, yeasts, nutrients, additives, tannins, malts and hops), and the recipes and batches that use each one. Pick from the list as you type when adding ingredients.
+- **Ingredient library** *(v0.2)*. Your ingredients by category, with default units, a starter list of 100 mead-making ingredients, each with a note on what it does (honeys, fruit, sweeteners, spices, herbs, yeasts, nutrients, additives, tannins, malts and hops), and the recipes and batches that use each one. Pick from the list as you type when adding ingredients.
 - **Costs** *(v0.2)*. Enter what you paid for an ingredient and see what each batch and recipe costs: the total, per 750 mL bottle and per gallon or liter.
 - **Cellar.** Bottling a batch adds it to the cellar, in as many bottle sizes as you filled. Log each bottle you drink, gift or enter in a competition, and edit or remove pours.
 - **Shelf view.** Every collection can be shown as a list or as a shelf: carboys for batches, books for recipes and archived batches, and bottles for the cellar. Carboys bubble while a batch is in primary.
@@ -99,9 +99,9 @@ The app has only two runtime dependencies, React and React DOM. Volumes are stor
 
 | Version | Focus |
 | --- | --- |
-| **v0.1** (released, latest v0.1.2) | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
-| **v0.2** (in progress) | Ingredient library: categories, default units, costs and batch totals |
-| v0.3 | Equipment screen (vessels and ingredient inventory), calculators, photos, reminders, Simple / Advanced mode |
+| **v0.1** (released) | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
+| **v0.2** (released, latest v0.2.0) | Ingredient library: categories, icons, 100 starter ingredients, costs and batch totals |
+| **v0.3** (next) | Equipment screen (vessels and ingredient inventory), calculators, photos, reminders, Simple / Advanced mode |
 | v0.4 | iOS and Android apps with Capacitor |
 | v0.5 | Optional sync through a self-hosted server |
 | v0.6 | Community recipes on Nostr, with zaps |
