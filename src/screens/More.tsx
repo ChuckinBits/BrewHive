@@ -14,7 +14,6 @@ import { APP_VERSION, REPO_URL } from '../lib/version.ts';
 import { Link } from '../lib/router.tsx';
 
 const ROADMAP: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'honey', title: 'Ingredient library', text: 'Your ingredients by category, with costs and batch totals. Planned for v0.2.' },
   { icon: 'rack', title: 'Equipment and inventory', text: 'Vessels and ingredient stock. Planned for v0.3.' },
   { icon: 'sparkle', title: 'Calculators and reminders', text: 'ABV, backsweetening and nutrient schedules. Planned for v0.3.' },
   { icon: 'upload', title: 'Sync between devices', text: 'Through a server you host yourself. Planned for v0.5.' },

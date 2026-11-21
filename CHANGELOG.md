@@ -5,78 +5,83 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.0)
+## v0.2.0 – 2026-11-21
 
-### Ingredient library
+The ingredient library: your ingredients by category, picked from as you
+type, with costs for every batch and recipe.
 
-- **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
-  use by category, with a search box and category chips; the search, chip
-  and scroll position stay put when you open an ingredient and come back.
-  Each has a default
-  unit and notes, and shows the recipes and batches that use it. It starts
-  with 100 starter ingredients, with no prices ([#38]), each with a short
-  note on what it is and what it does in a brew: honeys including
-  meadowfoam, 16 fruits, juices, sugar and sugar substitutes, spices
-  (including coffee, cacao nibs and chili peppers), herbs and flowers, 12 yeasts (wine, ale, kveik and bread yeast), nutrients,
-  acids and stabilizers including Nagardo, fining agents, tannins (wine
-  tannin, oak, tea), malts and hops. A starter whose name is already in your
-  list isn't added again. "Restore starter
-  ingredients" at the bottom of the list brings back any you deleted, leaving
-  your own ingredients and prices alone.
+### Your ingredients
+
+- **Ingredient library** ([#31]). More → Ingredients lists your ingredients
+  by category, with a search box and category chips. Each has a default
+  unit, notes, and the recipes and batches that use it. The search, chip and
+  scroll position stay put when you open an ingredient and come back.
+- **100 starter ingredients** ([#38]), each with a short note on what it is
+  and what it does in a brew: honeys including meadowfoam, 16 fruits,
+  juices, sugar and sugar substitutes, spices (including coffee, cacao nibs
+  and chili peppers), herbs and flowers, 12 yeasts (wine, ale, kveik and
+  bread yeast), nutrients, acids and stabilizers including Nagardo, fining
+  agents, tannins (wine tannin, oak, tea), malts and hops. None have prices.
+  "Restore starter ingredients" brings back any you deleted, leaving your
+  own ingredients and prices alone.
 - **Categories** ([#31]): Honey, Fruit, Juice & concentrate, Sweeteners,
   Spices, Herbs & flowers, Yeast, Nutrients, Additives, Fining & clarifiers,
   Tannins, Grains & malt, Hops and Other. Rename them, add your own, or
-  remove one (its ingredients move to Other). Put them in order with Sort A–Z
-  (Other stays last) or by dragging the ≡ handle (or its arrow keys); the order
-  is used for the category chips and the sections of the list.
-- **Category icons** ([#36]). Each category in the ingredient list has a
-  line icon: honeycomb, fruit, juice, sugar cubes, star anise, flower, yeast,
-  nutrients, test tube, funnel, oak, wheat, hops and a jar for Other. In
-  Categories, tap a category's icon to pick another (also water, leaf and a
-  spice jar) or None. Categories you add start with no icon. Category names
-  in the list are in the accent color, like the selected chip.
-- **Pick from the list** ([#32]). Adding an ingredient to a recipe or batch
-  shows your list as you type, with category chips. Picking one fills in its
-  default unit and shows its note under the field, so you see what it is
-  and how it's used as you add it. A name that isn't on the list can be
-  used once, or saved with "Save as a new ingredient", which opens the New
-  ingredient form
-  (category, default unit, cost) on top of what you're writing and picks it
-  when saved.
-- **Timeline ingredient entries** ([#35]) use the same form: pick from your
-  ingredients, quantity and unit, the cost hint, with When in place of Stage.
-  An entry and the batch ingredient it logged stay in step: editing the
-  entry offers "Also update batch ingredients", and editing the ingredient
-  in Batch Edit offers "Also update the timeline entry", both ticked.
-  Removing a batch ingredient keeps its timeline entry.
-- **Fixed:** an amount with a unit but no quantity showed as just "lb".
-- **Costs** ([#33]). Give an ingredient what you paid ("24.99 for 12 lb") and
-  batches and recipes show their ingredient cost: the total, per 750 mL
-  bottle and per gallon or liter. On a batch it's part of Details; recipes
-  show it under their ingredients. A batch keeps the prices it was made with;
-  recipes use today's. Choose the currency under More.
+  remove one (its ingredients move to Other). Sort A–Z (Other stays last)
+  or drag the ≡ handle (or use its arrow keys); the order is used for the
+  chips and the sections of the list.
+- **Category icons** ([#36]). Each category has a line icon, shown in the
+  list with the category name in the accent color. In Categories, tap an
+  icon to pick another (17 in all) or None. Categories you add start with
+  none.
+
+### Adding ingredients
+
+- **Pick from the list** ([#32]). Adding an ingredient to a recipe, a batch
+  or the timeline shows your list as you type, with category chips. Picking
+  one fills in its default unit and shows its note under the field. A name
+  that isn't on the list can be used once, or saved with "Save as a new
+  ingredient", which opens the New ingredient form (category, default unit,
+  cost) on top of what you're writing and picks it when saved.
+- **Timeline ingredient entries** ([#35]) use the same form, with When in
+  place of Stage. An entry and the batch ingredient it logged stay in step:
+  editing the entry offers "Also update batch ingredients", and editing the
+  ingredient in Batch Edit offers "Also update the timeline entry", both
+  ticked. Removing a batch ingredient keeps its timeline entry.
+
+### Costs
+
+- **What a batch costs** ([#33]). Give an ingredient what you paid ("24.99
+  for 12 lb") and batches and recipes show their ingredient cost: the total,
+  per 750 mL bottle and per gallon or liter. A batch keeps the prices it was
+  made with; recipes use today's. Choose the currency under More.
+- **Details first.** On a batch, cost is part of Details, which moves above
+  Ingredients as the overview of the batch. Recipes show cost under their
+  ingredients.
 
 ### Sample data and erasing
 
 - **Sample data uses the library.** Its recipes and batches use the starter
-  ingredients plus five of their own (spring water, blackberries,
-  strawberries, cloves, oranges). Everything the samples use gets a price,
-  unless you've already priced it, so recipes, batches and your ingredient
-  list all show the same costs. Starter ingredients the samples don't use
-  stay unpriced.
-- **Erase everything** now also erases ingredients, and puts the starter
+  ingredients (plus spring water and oranges), and everything they use gets
+  a price unless you've already priced it, so recipes, batches and the
+  ingredient list show the same costs.
+- **Erase everything** also erases ingredients, then puts the starter
   ingredients back, like a fresh install.
 
-### Batches
+### Fixed
 
-- **Details first.** The Details section (volume, start date, recipe and now
-  cost) moves above Ingredients, as the overview of the batch, and always
-  shows.
+- An amount with a unit but no quantity showed as just "lb".
+- A 1 gallon sample batch cost a cent more per gallon than in total.
 
 ### Roadmap
 
 - Milestones renumbered: v0.2 Ingredient library, v0.3 Equipment, v0.4 phone
   apps, v0.5 sync, v0.6 community.
+
+**Updating from v0.1.2:** existing data carries over, and the app adds the
+ingredient library on first start. Ingredients already in your recipes and
+batches are matched to it by name, so they show under "Used in" and get a
+cost once you price them.
 
 ## v0.1.2 – 2026-11-19
 
