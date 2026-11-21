@@ -12,10 +12,10 @@ a milestone.
 - **Your ingredients** ([#31]). More → Ingredients lists the ingredients you
   use by category, with a search box and category chips. Each has a default
   unit and notes, and shows the recipes and batches that use it. It starts
-  with 95 starter ingredients, with no prices ([#38]), each with a short
+  with 100 starter ingredients, with no prices ([#38]), each with a short
   note on what it is and what it does in a brew: honeys including
   meadowfoam, 16 fruits, juices, sugar and sugar substitutes, spices
-  (including coffee and cacao nibs), herbs and flowers, 12 yeasts (wine, ale, kveik and bread yeast), nutrients,
+  (including coffee, cacao nibs and chili peppers), herbs and flowers, 12 yeasts (wine, ale, kveik and bread yeast), nutrients,
   acids and stabilizers including Nagardo, fining agents, tannins (wine
   tannin, oak, tea), malts and hops. A starter whose name is already in your
   list isn't added again. "Restore starter

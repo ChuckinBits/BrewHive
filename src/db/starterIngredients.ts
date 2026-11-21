@@ -48,6 +48,7 @@ export function starterIngredients(imperial: boolean): Starter[] {
     item('Cherry juice', 'juice', liquid, "Cherry flavor and color without pitting fruit. Use juice without preservatives."),
     item('Cranberry juice', 'juice', liquid, "Tart and bright. Use 100% juice without preservatives; often blended with sweeter juice."),
     item('Grape juice', 'juice', liquid, "For pyments, or to add body and wine character. Use juice without preservatives."),
+    item('Lemon juice', 'juice', splash, "Bright acidity and citrus. A splash brightens a flat mead; add to taste after fermenting, and use bottled juice without preservatives."),
     // Sweeteners
     item('Cane sugar', 'sweetener', weight, "Ferments completely, adding alcohol but no flavor. Also for backsweetening after stabilizing."),
     item('Maple syrup', 'sweetener', splash, "Fermented with honey, it makes an acerglyn. Most maple flavor ferments away; add some at the end to keep it."),
@@ -65,11 +66,14 @@ export function starterIngredients(imperial: boolean): Starter[] {
     item('Clove', 'spice', '', "Strong, warming and slightly numbing. One or two per gallon is often plenty."),
     item('Ginger', 'spice', small, "Bright, spicy heat from fresh or dried root. Pairs with citrus, peach and honey."),
     item('Nutmeg', 'spice', 'tsp', "Warm, sweet and nutty. Grate it fresh; a small amount in spiced and holiday meads."),
+    item('Black peppercorns', 'spice', '', "Warm, piney bite. Crack lightly; a few per gallon add a subtle spicy finish, great with fruit or ginger."),
     item('Star anise', 'spice', '', "Potent and licorice-like. One pod per gallon or less; good in spiced and dark meads."),
     item('Lime peel', 'spice', small, "Zest for bright citrus aroma. Leave out the white pith, which is bitter."),
+    item('Lemon peel', 'spice', small, "Zest for bright lemon aroma. Leave out the white pith, which is bitter."),
     item('Orange peel', 'spice', small, "Sweet or bitter orange zest for citrus aroma. A classic with cinnamon and clove."),
     item('Coffee', 'spice', small, "Whole or cracked roasted beans, steeped in secondary like cold brew. Pairs with vanilla, cacao and dark honey."),
     item('Cacao nibs', 'spice', small, "Roasted cocoa bean pieces: chocolate flavor without sugar. Steep in secondary; pairs with vanilla, cherry and coffee."),
+    item('Chili peppers', 'spice', '', "Fruity heat for a capsicumel (pepper mead): jalapeño, habanero, chipotle. Start with one, seeded, and taste often; the heat builds fast."),
     // Herbs & flowers
     item('Basil', 'herb', small, "Sweet and peppery. Fresh leaves pair surprisingly well with strawberry or lemon."),
     item('Chamomile', 'herb', small, "Soft, apple-like and floral. Steep dried flowers briefly; long steeps can taste grassy."),
@@ -112,6 +116,7 @@ export function starterIngredients(imperial: boolean): Starter[] {
     item('Bentonite', 'fining', 'tsp', "Clay that clears protein haze. Mix with water first; add at the start or in secondary."),
     item('Sparkalloid', 'fining', 'g', "Clears stubborn haze. Mix with hot water; settles slowly but packs down well."),
     item('Chitosan', 'fining', '', "Fast clearing, usually paired with kieselsol. Made from shellfish."),
+    item('Gelatin finings', 'fining', 'tsp', "Unflavored gelatin clears haze and softens harsh tannins. Dissolve in warm water first. Not vegan."),
     // Tannins
     item('Wine tannin', 'oak', 'tsp', "Adds structure and a slight dryness. Helps fruit meads that taste thin."),
     item('Oak cubes', 'oak', small, "Slow, smooth oak flavor for long aging. Taste every few weeks."),

@@ -6,7 +6,7 @@ import { DEFAULT_CATEGORIES, INGREDIENT_UNITS } from './types.ts';
 for (const imperial of [true, false]) {
   test(`starter ingredients are well formed (${imperial ? 'US' : 'metric'} units)`, () => {
     const list = starterIngredients(imperial);
-    assert.equal(list.length, 95);
+    assert.equal(list.length, 100);
     for (const item of list) assert.ok(item.notes.length > 20, `${item.name} has a note`);
     assert.equal(new Set(list.map((i) => i.id)).size, list.length, 'ids are unique');
     assert.equal(new Set(list.map((i) => i.name.toLowerCase())).size, list.length, 'names are unique');
