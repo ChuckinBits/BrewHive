@@ -7,6 +7,14 @@ a milestone.
 
 ## Unreleased (v0.2.1)
 
+- **Bottled without the cellar** ([#46]). Bottle this batch has "Mark as
+  bottled without adding to the cellar": the batch moves to Bottled with a
+  Bottled timeline entry (and the final reading, if entered), and no
+  bottles. Closing the sheet still leaves the stage as it was.
+- **Bottled opens bottling** ([#46]). Tapping Bottled on a bottled batch, or
+  its Bottled timeline entry, opens Add bottles. Bottles added to an entry
+  that had none are recorded on it; later bottlings get their own entry.
+  "Edit timeline entry" there changes the entry's date or removes it.
 - **Volume & weight: US or Metric** ([#41]). The Volume setting under
   More → Units is now Volume & weight, with US (gallons, pounds, ounces) or
   Metric (liters, kilograms, grams).
@@ -221,3 +229,4 @@ themes; sample data.
 [#36]: https://github.com/ChuckinBits/BrewHive/issues/36
 [#38]: https://github.com/ChuckinBits/BrewHive/issues/38
 [#41]: https://github.com/ChuckinBits/BrewHive/issues/41
+[#46]: https://github.com/ChuckinBits/BrewHive/issues/46

@@ -85,7 +85,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
   // null: closed. 'new': adding an entry. An event: editing that entry.
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
-  const [bottling, setBottling] = useState(false);
+  // Bottling: false when closed; otherwise the Bottled timeline entry it was opened from, if any.
+  const [bottling, setBottling] = useState<{ entry: BatchEvent | null } | false>(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [archiving, setArchiving] = useState(false);
   // Moving from fermenting to Aging asks for the final reading.
@@ -119,9 +120,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const added = addedLines(data.events);
 
   const setStatus = async (status: BatchStatus) => {
+    // Bottling asks how many bottles first, then fills the cellar. Tapping Bottled again adds more.
+    if (status === 'bottled') return setBottling({ entry: null });
     if (status === batch.status) return;
-    // Bottling asks how many bottles first, then fills the cellar.
-    if (status === 'bottled') return setBottling(true);
     if (status === 'aging' && !complete && !finalReading(data.events)) return setFinishing(true);
     await changeStatus(batch, status);
   };
@@ -297,7 +298,13 @@ export function BatchDetailScreen({ id }: { id: string }) {
               const showNote = event.note && !(event.type === 'status' && !event.toStatus);
               return (
                 <li key={event.id} className="timeline-row">
-                  <button type="button" className="timeline-entry" onClick={() => setEntry(event)} aria-label={`Edit ${eventTitle(event)}, ${fmtDate(event.date)}`}>
+                  <button
+                    type="button"
+                    className="timeline-entry"
+                    // The Bottled entry opens bottling, to add bottles; its own date and removal are a tap further.
+                    onClick={() => (isBottledEntry(event) ? setBottling({ entry: event }) : setEntry(event))}
+                    aria-label={isBottledEntry(event) ? `Bottling, ${fmtDate(event.date)}` : `Edit ${eventTitle(event)}, ${fmtDate(event.date)}`}
+                  >
                     <span className="timeline-icon">
                       <Icon name={EVENT_ICONS[event.type]} size={20} />
                     </span>
@@ -338,7 +345,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <div className="button-row">
         {isActive(batch.status) && (
-          <button type="button" className="btn" onClick={() => setBottling(true)}>
+          <button type="button" className="btn" onClick={() => setBottling({ entry: null })}>
             <Icon name="cellar" size={20} />
             Bottle this batch
           </button>
@@ -395,7 +402,18 @@ export function BatchDetailScreen({ id }: { id: string }) {
           }}
         />
       )}
-      {bottling && <BottleSheet batch={batch} timeline={data.events} onClose={() => setBottling(false)} />}
+      {bottling && (
+        <BottleSheet
+          batch={batch}
+          timeline={data.events}
+          entry={bottling.entry}
+          onEditEntry={(e) => {
+            setBottling(false);
+            setEntry(e);
+          }}
+          onClose={() => setBottling(false)}
+        />
+      )}
       {deleting && (
         <ConfirmSheet
           title="Delete this batch?"
@@ -823,7 +841,23 @@ function FinishSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
 /** The size a unit starts at when picked. */
 const UNIT_START_SIZE: Record<BottleUnit, string> = { ml: '750', floz: '12', cup: '1', pint: '1', quart: '1', l: '1', other: '' };
 
-function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: BatchEvent[]; onClose: () => void }) {
+/** A Bottled stage entry on the timeline. */
+const isBottledEntry = (e: BatchEvent) => e.type === 'status' && e.toStatus === 'bottled';
+
+interface BottleSheetProps {
+  batch: Batch;
+  timeline: BatchEvent[];
+  /** The Bottled timeline entry it was opened from, if any. */
+  entry: BatchEvent | null;
+  /** Opens that entry's own sheet, to change its date or remove it. */
+  onEditEntry: (entry: BatchEvent) => void;
+  onClose: () => void;
+}
+
+function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: BottleSheetProps) {
+  const alreadyBottled = batch.status === 'bottled';
+  // A Bottled entry with no bottles on it yet (marked bottled without the cellar) gets the bottles added now.
+  const emptyEntry = entry && !entry.note ? entry : !entry ? [...timeline].reverse().find((e) => isBottledEntry(e) && !e.note && !e.deletedAt) ?? null : null;
   // Bottled straight from fermenting: ask for the final reading too.
   const asksFinal = !isFermentationComplete(batch) && !finalReading(timeline);
   const [final, setFinal] = useState<FinalReading>(NO_FINAL_READING);
@@ -880,27 +914,41 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
         }),
       );
     }
-    await batches.save({ ...batch, status: 'bottled' });
+    if (!alreadyBottled) await batches.save({ ...batch, status: 'bottled' });
     // A bottling entry records real bottles, so it is never replaced by a later stage tap.
-    await events.save({
-      batchId: batch.id,
-      type: 'status',
-      date: now,
-      value: null,
-      note: bottlingNote(lines),
-      toStatus: 'bottled',
-      fromStatus: batch.status,
-      auto: false,
-    });
+    if (emptyEntry) await events.save({ ...emptyEntry, note: bottlingNote(lines), auto: false });
+    else
+      await events.save({
+        batchId: batch.id,
+        type: 'status',
+        date: now,
+        value: null,
+        note: bottlingNote(lines),
+        toStatus: 'bottled',
+        fromStatus: batch.status,
+        auto: false,
+      });
     toast('Bottles added to your cellar');
     onClose();
     navigate(saved.length === 1 ? `/cellar/${saved[0].id}` : '/cellar');
   };
 
+  // Bottled, without putting bottles in the cellar (kegged, given away, or counted later).
+  const markBottled = async () => {
+    const problem = asksFinal ? finalReadingError(final) : null;
+    if (problem) return setError(problem);
+    const now = nowLocal();
+    if (asksFinal) await saveFinalReading(batch.id, final, now);
+    await batches.save({ ...batch, status: 'bottled' });
+    await events.save({ batchId: batch.id, type: 'status', date: now, value: null, note: '', toStatus: 'bottled', fromStatus: batch.status, auto: false });
+    toast('Marked as bottled');
+    onClose();
+  };
+
   const total = totalMl(lines);
 
   return (
-    <Sheet title="Bottle this batch" onClose={onClose}>
+    <Sheet title={alreadyBottled ? 'Add bottles' : 'Bottle this batch'} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -983,6 +1031,17 @@ function BottleSheet({ batch, timeline, onClose }: { batch: Batch; timeline: Bat
         <button type="submit" className="btn btn-primary btn-block">
           Add to cellar
         </button>
+        {!alreadyBottled && (
+          <button type="button" className="btn btn-quiet btn-block" onClick={() => void markBottled()}>
+            Mark as bottled without adding to the cellar
+          </button>
+        )}
+        {entry && (
+          <button type="button" className="btn btn-quiet btn-block" onClick={() => onEditEntry(entry)}>
+            <Icon name="edit" size={18} />
+            Edit timeline entry
+          </button>
+        )}
       </form>
     </Sheet>
   );
