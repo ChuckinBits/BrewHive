@@ -506,6 +506,13 @@ interface EventSheetProps {
 }
 
 /** What a new entry can be: the entry types, plus a stage change. */
+/** The stage after this one: Planned → Primary → Secondary → Aging → Bottled. */
+function nextStage(status: BatchStatus): BatchStatus {
+  const order: BatchStatus[] = ['planned', 'primary', 'secondary', 'aging', 'bottled'];
+  const i = order.indexOf(status);
+  return i < 0 ? 'bottled' : order[Math.min(i + 1, order.length - 1)];
+}
+
 const ENTRY_CHOICES = [...EVENT_TYPES.slice(0, 1), ...[...EVENT_TYPES.slice(1), { id: 'status' as EventType, label: 'Stage change' }].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))];
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
@@ -516,7 +523,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // The OG's entry: its value is the batch's OG, so it stays a gravity reading and is never the final one.
   const isOg = existing?.type === 'gravity' && existing.og === true;
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
-  const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
+  // A new stage change starts on the stage after the batch's current one, the one it's most likely moving to.
+  const [stage, setStage] = useState<BatchStatus>(existing ? (existing.toStatus ?? stageFromNote(existing.note ?? '') ?? batch.status) : nextStage(batch.status));
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
   const [value, setValue] = useState(existing ? valueToInput(existing, settings) : '');
   const [place, setPlace] = useState(existing?.place ?? '');
@@ -722,7 +730,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
         )}
         {newStage && (
           <>
-            <Field label="Stage" hint={
+            <Field label="Move to" hint={
                 !stageIsNewest
                   ? 'Earlier than the latest stage change, so this only records when it happened.'
                   : stage === batch.status

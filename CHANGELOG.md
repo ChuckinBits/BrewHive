@@ -24,6 +24,8 @@ a milestone.
 
 ### Timeline
 
+- **Stage change starts on the next stage.** Picking Stage change in Add
+  entry shows "Move to", set to the stage after the batch's current one.
 - **Pasteurization temperature and time** ([#54]). Stabilized with
   Pasteurization asks the temperature (in your °F/°C setting) and how many
   minutes, both optional, and reads "Pasteurization · 160 °F for 15 min".
