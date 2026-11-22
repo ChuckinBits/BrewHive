@@ -2,6 +2,7 @@
 // required field, everything else can be filled in later.
 
 import { useState } from 'react';
+import { volumeUnitOf } from '../lib/units.ts';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, loadSettings, recipes, useQuery, useSettings, ingredients } from '../db/store.ts';
 import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
@@ -52,7 +53,7 @@ interface Loaded {
 export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: string }) {
   const settings = useSettings();
   const loaded = useQuery<Loaded | null>(async () => {
-    const { volumeUnit } = await loadSettings();
+    const volumeUnit = volumeUnitOf(await loadSettings());
     if (id) {
       const batch = await batches.get(id);
       if (!batch) return null;
@@ -320,7 +321,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
         <IngredientSheet
           line={editing === 'new' ? null : editing}
           defaultStage={draft.status === 'secondary' || draft.status === 'aging' ? draft.status : 'primary'}
-          defaultUnit={settings.volumeUnit === 'gal' ? 'lb' : 'g'}
+          defaultUnit={settings.units === 'us' ? 'lb' : 'g'}
           logged={editing === 'new' ? [] : loggedFor(editing.id)}
           syncLogged={editing === 'new' || !touched.has(editing.id) || syncLines.has(editing.id)}
           onSave={(line, sync) => {

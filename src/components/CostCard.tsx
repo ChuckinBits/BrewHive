@@ -2,6 +2,7 @@
 // and which ingredients aren't counted. Shown once at least one ingredient has a cost.
 
 import { currencyOf, ingredients, useQuery, useSettings } from '../db/store.ts';
+import { volumeUnitOf } from '../lib/units.ts';
 import type { IngredientCost, IngredientLine, LibraryIngredient } from '../db/types.ts';
 import { costSummary, fmtMoney, type MissingReason } from '../lib/cost.ts';
 import { fmtVolume } from '../lib/format.ts';
@@ -46,7 +47,7 @@ function useCost(lines: IngredientLine[], volumeL: number | null, useSaved: bool
   if (summary.counted === 0) return null;
   const currency = currencyOf(settings);
   const money = (n: number) => fmtMoney(n, currency);
-  const gallons = settings.volumeUnit === 'gal';
+  const gallons = settings.units === 'us';
   const perVolume = gallons ? L_PER_GAL : 1;
   const hasVolume = volumeL != null && volumeL > 0;
   return {
@@ -55,7 +56,7 @@ function useCost(lines: IngredientLine[], volumeL: number | null, useSaved: bool
     // Divided by the volume in the display unit (rounded past any float noise), so 1 gal gives exactly the total.
     perVolume: hasVolume ? money(summary.total / (Math.round(((volumeL as number) / perVolume) * 1e6) / 1e6)) : null,
     perVolumeName: gallons ? 'gallon' : 'liter',
-    perVolumeShort: fmtVolume(perVolume, settings.volumeUnit).replace(/^1 /, ''),
+    perVolumeShort: fmtVolume(perVolume, volumeUnitOf(settings)).replace(/^1 /, ''),
     notCounted: summary.missing.length > 0 ? `Not counted: ${summary.missing.map((m) => `${m.name} (${WHY[m.reason]})`).join(', ')}.` : null,
   };
 }

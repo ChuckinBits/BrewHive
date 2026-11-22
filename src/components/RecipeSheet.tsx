@@ -1,6 +1,7 @@
 // "Save as recipe" and "Update recipe" on the batch page.
 
 import { useState } from 'react';
+import { volumeUnitOf } from '../lib/units.ts';
 import { batches, recipes, useQuery } from '../db/store.ts';
 import type { Batch, BatchEvent, Recipe, Settings } from '../db/types.ts';
 import { fmtVolume, plural } from '../lib/format.ts';
@@ -37,7 +38,7 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
   };
 
   if (mode === 'update' && recipe) {
-    const changes = recipeChanges(recipe, fields, (l) => fmtVolume(l, settings.volumeUnit));
+    const changes = recipeChanges(recipe, fields, (l) => fmtVolume(l, volumeUnitOf(settings)));
     const upToDate = changes.fields.length === 0 && changes.ingredients.length === 0;
     const others = otherBatchesFrom(recipe.id, allBatches, batch.id);
     const update = async () => {
