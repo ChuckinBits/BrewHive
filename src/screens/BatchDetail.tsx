@@ -1,6 +1,7 @@
 // One batch: its numbers, gravity chart, rating and timeline.
 
 import { useState } from 'react';
+import { volumeUnitOf } from '../lib/units.ts';
 import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
 import { batches, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type Settings, type TempUnit } from '../db/types.ts';
@@ -221,7 +222,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
           {batch.volumeL != null && (
             <>
               <dt>Volume</dt>
-              <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, settings.volumeUnit)}</dd>
+              <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, volumeUnitOf(settings))}</dd>
             </>
           )}
           <dt>Started</dt>
@@ -458,7 +459,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // The same ingredient fields as the batch's ingredient sheet, with the date in place of the stage.
   const ingredient = useIngredientFields(
     existing?.type === 'ingredient' ? { name: existing.ingredient ?? '', amount: existing.amount ?? '', quantity: existing.quantity, unit: existing.unit, ingredientId: existing.ingredientId } : null,
-    settings.volumeUnit === 'gal' ? 'lb' : 'g',
+    settings.units === 'us' ? 'lb' : 'g',
   );
   // The batch ingredient this entry logged, if it's still on the list: offered to update along with it.
   const linkedLine = existing?.ingredientLineId ? batch.ingredients.find((l) => l.id === existing.ingredientLineId) : undefined;

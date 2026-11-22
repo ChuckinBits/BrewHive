@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getAll, getOne, putMany, subscribe, type StoreName } from './idb.ts';
 import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
 import { starterIngredients } from './starterIngredients.ts';
+import { upgradeSettings } from '../lib/units.ts';
 import { localeCurrency } from '../lib/cost.ts';
 import { newId } from '../lib/format.ts';
 
@@ -89,7 +90,7 @@ export async function ensureStarterIngredients(): Promise<void> {
 
 /** Starter units follow the volume unit chosen under More: gallons means US units. */
 async function usesImperialUnits(): Promise<boolean> {
-  return (await loadSettings()).volumeUnit === 'gal';
+  return (await loadSettings()).units === 'us';
 }
 
 /** A new record with its timestamps, for writing several in one go. */
@@ -121,7 +122,7 @@ export function defaultSettings(): Settings {
   const imperial = usesImperial();
   return {
     id: 'app',
-    volumeUnit: imperial ? 'gal' : 'L',
+    units: imperial ? 'us' : 'metric',
     tempUnit: imperial ? 'F' : 'C',
     theme: 'system',
     views: {},
@@ -133,7 +134,9 @@ let cachedSettings: Settings | null = null;
 
 export async function loadSettings(): Promise<Settings> {
   const saved = await getOne<Settings>('settings', 'app');
-  cachedSettings = { ...defaultSettings(), ...saved };
+  cachedSettings = { ...defaultSettings(), ...(saved ? upgradeSettings(saved) : {}) };
+  // Saved by v0.2.0 or earlier (volumeUnit): store it the current way, so backups say units too.
+  if (saved && 'volumeUnit' in saved) await putMany('settings', [cachedSettings]);
   return cachedSettings;
 }
 
@@ -142,8 +145,8 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
   const next: Settings = { ...current, ...patch, id: 'app' };
   await putMany('settings', [next]);
   rememberTheme(next.theme);
-  // Switching between gallons and liters moves untouched starter ingredients to the matching units.
-  if (next.volumeUnit !== current.volumeUnit) await ensureStarterIngredients();
+  // Switching between US and metric moves untouched starter ingredients to the matching units.
+  if (next.units !== current.units) await ensureStarterIngredients();
 }
 
 /** Mirrors the theme into localStorage so main.tsx can apply it before the first paint. */

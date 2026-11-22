@@ -453,9 +453,13 @@ export interface Pour extends Base {
 
 export type ViewMode = 'list' | 'shelf';
 
+/** US (gallons, pounds, ounces) or metric (liters, kilograms, grams). */
+export type UnitSystem = 'us' | 'metric';
+
 export interface Settings {
   id: 'app';
-  volumeUnit: 'gal' | 'L';
+  /** Volume and weight units. Older saves and backups had volumeUnit ('gal' or 'L') instead. */
+  units: UnitSystem;
   tempUnit: 'F' | 'C';
   theme: 'system' | 'light' | 'dark';
   /** Remembered List / Shelf choice per screen. */

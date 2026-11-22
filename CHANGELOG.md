@@ -9,7 +9,10 @@ a milestone.
 
 - **Volume & weight: US or Metric** ([#41]). The Volume setting under
   More → Units is now Volume & weight, with US (gallons, pounds, ounces) or
-  Metric (liters, kilograms, grams).
+  Metric (liters, kilograms, grams). Settings and backups now store it as
+  `units: "us"` or `"metric"` (it was `volumeUnit: "gal"` or `"L"`); older
+  settings and backups are converted when they load or restore. Batches and
+  recipes still record their own volume unit as gal or L.
 - **Starter ingredients follow your units** ([#41]). Switching between US
   and Metric moves the starter ingredients' default units to match: lb and
   kg, oz and g, gal and L, fl oz and mL. Ingredients
