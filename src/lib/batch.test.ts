@@ -9,6 +9,7 @@ import {
   currentGravity,
   effectiveOG,
   gravityPoints,
+  ogEntry,
   isFermentationComplete,
   planReviewEntry,
   planStatusEntry,
@@ -422,4 +423,30 @@ test('points needed: a range from 0.990 to 1.000, or one number when they match'
   assert.equal(fmtPoints({ low: 5, high: 5 }), '5');
   // Already at 0.993: nothing to reach 0.990, 7 to finish at 1.000.
   assert.deepEqual(pointsNeeded(1.12 - 0.02 - 14 / 131.25), { low: 0, high: 7 });
+});
+
+const ogMark = (date: string, sg: number): BatchEvent => ({ ...reading(date, sg), id: 'og', og: true });
+
+test('the OG entry is the starting point, not a reading', () => {
+  const events = [ogMark('2026-11-01T00:00', 1.1)];
+  const analysis = analyzeGravity(batch(), events);
+  assert.equal(analysis.hasReadings, false, 'no readings yet, so no ABV');
+  assert.equal(batchAbv(batch(), events), null);
+  assert.equal(currentGravity(batch(), events), 1.1, 'the current gravity is the OG');
+  assert.equal(ogEntry(events)?.id, 'og');
+});
+
+test('readings after the OG entry count as before', () => {
+  const events = [ogMark('2026-11-01T00:00', 1.1), reading('2026-11-10T09:00', 1.05), final('2026-12-01T09:00', 1.0)];
+  near(batchAbv(batch(), events), 13.125);
+  assert.equal(finalReading(events)?.value, 1.0);
+});
+
+test('the chart places the OG at its entry\'s date, or at the start date without one', () => {
+  assert.deepEqual(gravityPoints(batch(), [ogMark('2026-11-03T08:00', 1.1)]), [{ date: '2026-11-03T08:00', sg: 1.1 }]);
+  assert.deepEqual(gravityPoints(batch(), []), [{ date: '2026-11-01', sg: 1.1 }]);
+});
+
+test('a deleted OG entry is ignored', () => {
+  assert.equal(ogEntry([{ ...ogMark('2026-11-01T00:00', 1.1), deletedAt: '2026-11-02' }]), null);
 });

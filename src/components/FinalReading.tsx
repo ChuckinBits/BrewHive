@@ -5,7 +5,8 @@
 
 import { events } from '../db/store.ts';
 import type { BatchEvent } from '../db/types.ts';
-import { parseNum } from '../lib/format.ts';
+import { useState } from 'react';
+import { nowLocal, parseNum } from '../lib/format.ts';
 import { Field } from './ui.tsx';
 
 export interface FinalReading {
@@ -14,12 +15,15 @@ export interface FinalReading {
   fg: string;
   /** Estimated ABV in % as typed, when there is no reading. */
   estimate: string;
+  /** When the reading was taken (local date and time); empty means now. */
+  date: string;
 }
 
-export const NO_FINAL_READING: FinalReading = { mode: 'reading', fg: '', estimate: '' };
+export const NO_FINAL_READING: FinalReading = { mode: 'reading', fg: '', estimate: '', date: '' };
 
 /** A problem with what was typed, or null. Both fields are optional. */
-export function finalReadingError(input: FinalReading): string | null {
+export function finalReadingError(input: FinalReading, startDate?: string): string | null {
+  if (startDate && input.date && input.date.slice(0, 10) < startDate) return 'The final reading can\'t be from before the batch started.';
   if (input.mode === 'reading') {
     if (input.fg.trim() === '') return null;
     const fg = parseNum(input.fg);
@@ -31,7 +35,8 @@ export function finalReadingError(input: FinalReading): string | null {
 }
 
 /** The timeline entry the final reading becomes, ready to save; null when nothing was entered. */
-export function finalReadingEntry(batchId: string, input: FinalReading, date: string): Omit<BatchEvent, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'> | null {
+export function finalReadingEntry(batchId: string, input: FinalReading, now: string): Omit<BatchEvent, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'> | null {
+  const date = input.date || now;
   if (input.mode === 'estimate') {
     const abv = parseNum(input.estimate.replace('%', ''));
     return abv == null ? null : { batchId, type: 'estimate', date, value: abv, note: '' };
@@ -41,8 +46,8 @@ export function finalReadingEntry(batchId: string, input: FinalReading, date: st
 }
 
 /** Saves the final reading on the timeline, if one was entered. */
-export async function saveFinalReading(batchId: string, input: FinalReading, date: string): Promise<void> {
-  const entry = finalReadingEntry(batchId, input, date);
+export async function saveFinalReading(batchId: string, input: FinalReading, now: string): Promise<void> {
+  const entry = finalReadingEntry(batchId, input, now);
   if (entry) await events.save(entry);
 }
 
@@ -56,12 +61,20 @@ interface Props {
 }
 
 export function FinalReadingFields({ value, onChange, latest, abvSoFar }: Props) {
+  // When it was taken, since it goes on the timeline. Starts at now.
+  const [now] = useState(nowLocal);
+  const when = (
+    <Field label="When">
+      <input type="datetime-local" value={value.date || now} onChange={(e) => onChange({ ...value, date: e.target.value })} />
+    </Field>
+  );
   if (value.mode === 'estimate') {
     return (
       <div className="final-reading">
         <Field label="Estimated ABV (%)" hint={abvSoFar != null ? 'Starts at the ABV so far. Shown with ≈; a gravity reading logged later replaces it.' : 'Shown with ≈. A gravity reading logged later replaces it.'}>
           <input type="text" inputMode="decimal" value={value.estimate} placeholder="12" autoFocus onChange={(e) => onChange({ ...value, estimate: e.target.value })} />
         </Field>
+        {when}
         <button type="button" className="btn btn-quiet btn-small" onClick={() => onChange({ ...value, mode: 'reading' })}>
           Enter a final gravity instead
         </button>
@@ -79,6 +92,7 @@ export function FinalReadingFields({ value, onChange, latest, abvSoFar }: Props)
           onChange={(e) => onChange({ ...value, fg: e.target.value })}
         />
       </Field>
+      {when}
       <button
         type="button"
         className="btn btn-quiet btn-small"

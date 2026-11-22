@@ -17,14 +17,20 @@ const READING_TYPES = new Set(['gravity', 'feeding', 'backsweeten']);
 
 const byTime = (a: BatchEvent, b: BatchEvent) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
 
+/** Readings after the OG: the OG's own timeline entry is the starting point, not a reading. */
 function readings(events: BatchEvent[]): BatchEvent[] {
-  return events.filter((e) => READING_TYPES.has(e.type) && e.value != null && !e.deletedAt).sort(byTime);
+  return events.filter((e) => READING_TYPES.has(e.type) && e.value != null && !e.deletedAt && !e.og).sort(byTime);
 }
 
-/** The original gravity plus every gravity reading, oldest first. */
+/** The timeline entry for the batch's OG, if there is one. */
+export function ogEntry(events: BatchEvent[]): BatchEvent | null {
+  return events.find((e) => e.og && e.type === 'gravity' && !e.deletedAt) ?? null;
+}
+
+/** The original gravity plus every gravity reading, oldest first. The OG is placed at its entry's date, or the start date. */
 export function gravityPoints(batch: Batch, events: BatchEvent[]): GravityPoint[] {
   const points: GravityPoint[] = readings(events).map((e) => ({ date: e.date, sg: e.value as number }));
-  if (batch.og != null) points.unshift({ date: batch.startDate, sg: batch.og });
+  if (batch.og != null) points.unshift({ date: ogEntry(events)?.date ?? batch.startDate, sg: batch.og });
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -124,7 +130,7 @@ type Step = BatchEvent;
 
 /** The entries the gravity walk goes through, in timeline order: readings, and feeding or backsweetening entries. */
 export function gravitySteps(batch: Batch, events: BatchEvent[]): Step[] {
-  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  const live = events.filter((e) => !e.deletedAt && !e.og).sort(byTime);
   // When there is no OG, the first reading stands in for it.
   const skip = batch.og == null ? readings(live)[0] : undefined;
   return live.filter((e) => e !== skip && ((READING_TYPES.has(e.type) && e.value != null) || isSugar(e)));
@@ -185,7 +191,7 @@ export function abvEstimate(_batch: Batch, events: BatchEvent[]): number | null 
   const latest = estimates[estimates.length - 1];
   if (!latest) return null;
   const after = live.slice(live.indexOf(latest) + 1);
-  return after.some((e) => READING_TYPES.has(e.type) && e.value != null) ? null : latest.value;
+  return after.some((e) => READING_TYPES.has(e.type) && e.value != null && !e.og) ? null : latest.value;
 }
 
 /** ABV so far, or the estimate. Null until there is a reading after the OG, so a new batch shows a dash, not 0%. */

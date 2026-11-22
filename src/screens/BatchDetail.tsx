@@ -172,7 +172,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
       <div className="stats">
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
         <Stat label={complete || finalReading(data.events) ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
-        <Stat label={complete ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} extra={estimated ? 'Estimated' : undefined} />
+        <Stat label={complete || finalReading(data.events) ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} extra={estimated ? 'Estimated' : undefined} />
         <Stat
           label="Potential"
           value={fmtPercent(projected?.potential)}
@@ -314,6 +314,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
                                 <span className="final-chip">Final</span>
                               </>
                             )}
+                            {event.type === 'gravity' && event.og && (
+                              <>
+                                {' '}
+                                <span className="og-chip">OG</span>
+                              </>
+                            )}
                           </span>
                           {(event.type === 'tasting' || event.type === 'review') && <RatingBadge rating={event.rating} small />}
                         </strong>
@@ -442,6 +448,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const isStage = existing?.type === 'status';
   // "Batch rating" entries come from the rating slider; they are edited, not added, here.
   const isReview = existing?.type === 'review';
+  // The OG's entry: its value is the batch's OG, so it stays a gravity reading and is never the final one.
+  const isOg = existing?.type === 'gravity' && existing.og === true;
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
   const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
@@ -526,11 +534,14 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
       tempUnit: kind === 'temp' ? tempUnit : undefined,
       // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
-      final: type === 'gravity' ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
+      final: type === 'gravity' && !isOg ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
     };
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
       await events.save({ ...existing, ...fields, value: null, toStatus: stage, auto: false });
+    } else if (existing && isOg) {
+      await events.save({ ...existing, ...fields, type, og: true });
+      if (parsed !== batch.og) await batches.save({ ...batch, og: parsed });
     } else if (existing && isReview) {
       // Editing a rating entry by hand keeps it, even if the batch rating changes again today.
       await events.save({ ...existing, ...fields, auto: false });
@@ -567,7 +578,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   );
 
   return (
-    <Sheet title={existing ? 'Edit entry' : 'Add to timeline'} onClose={onClose}>
+    <Sheet title={isOg ? 'Original gravity' : existing ? 'Edit entry' : 'Add to timeline'} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -587,7 +598,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
               ))}
             </select>
           </Field>
-        ) : (
+        ) : isOg ? null : (
           <Field label="What happened?">
             <select
               value={type}
@@ -606,11 +617,14 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
           </Field>
         )}
         {kind === 'sg' && (
-          <Field label="Specific gravity" hint="Read it off your hydrometer, for example 1.045.">
+          <Field
+            label={isOg ? 'Original gravity' : 'Specific gravity'}
+            hint={isOg ? "The batch's OG: changing it here changes the OG. If you took it after starting the batch, set When to that day." : 'Read it off your hydrometer, for example 1.045.'}
+          >
             <input type="text" inputMode="decimal" value={value} placeholder="1.045" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
-        {type === 'gravity' && !isStage && (
+        {type === 'gravity' && !isStage && !isOg && (
           <>
             <label className="check-field">
               <input type="checkbox" checked={isFinal} onChange={(e) => setIsFinal(e.target.checked)} />
@@ -747,7 +761,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
         {existing &&
           (confirmingDelete ? (
             <div className="confirm-inline" role="group" aria-label="Confirm removal">
-              <p>Remove this entry from the timeline?</p>
+              <p>{isOg ? "Remove the OG? This also clears the batch's original gravity." : 'Remove this entry from the timeline?'}</p>
               <div className="button-row">
                 <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
                   Keep it
@@ -757,7 +771,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
                   className="btn btn-danger"
                   onClick={async () => {
                     await events.remove(existing.id);
-                    toast('Entry removed');
+                    if (isOg) await batches.save({ ...batch, og: null });
+                    toast(isOg ? 'OG removed' : 'Entry removed');
                     onClose();
                   }}
                 >
