@@ -2,7 +2,7 @@
 // everything in the database, so nobody is ever locked in to BrewHive.
 
 import { getAll, putMany, type StoreName } from './idb.ts';
-import { rememberTheme } from './store.ts';
+import { ensureOgEntries, rememberTheme } from './store.ts';
 import type { Settings } from './types.ts';
 
 const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
@@ -79,5 +79,7 @@ export async function restoreBackup(input: unknown): Promise<number> {
       rememberTheme(app.theme);
     }
   }
+  // A backup from before the OG had a timeline entry gets them.
+  await ensureOgEntries();
   return written;
 }

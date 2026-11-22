@@ -2,7 +2,7 @@
 // Dates are set relative to today, so the samples never look stale.
 
 import { putMany } from './idb.ts';
-import { ensureStarterIngredients, ingredients } from './store.ts';
+import { ensureOgEntries, ensureStarterIngredients, ingredients } from './store.ts';
 import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientCost, IngredientLine, IngredientStage, LibraryIngredient, Pour, Recipe } from './types.ts';
 import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
@@ -328,4 +328,6 @@ export async function loadSampleData(): Promise<void> {
   await putMany('events', sampleEvents);
   await putMany('cellar', [c1, c2]);
   await putMany('pours', samplePours);
+  // Each sample batch's OG on its timeline.
+  await ensureOgEntries();
 }

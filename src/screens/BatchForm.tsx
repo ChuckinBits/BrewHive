@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { recordStatusEntry } from '../db/actions.ts';
-import { batches, events, loadSettings, recipes, useQuery, useSettings, ingredients } from '../db/store.ts';
+import { batches, events, ingredients, loadSettings, recipes, syncOgEntry, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
@@ -144,7 +144,10 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   const validOg = inRange(parseNum(draft.og));
   // Moving a batch past fermentation (or entering one that already is) asks for the final reading.
   // ...unless the timeline already has a final gravity reading.
-  const asksFinal = isFermentationComplete({ status: draft.status } as Batch) && !(loaded.existing && isFermentationComplete(loaded.existing)) && !finalReading(loaded.timeline);
+  // A new batch started in Secondary may have finished fermenting already, so it's offered there too (optional).
+  const finalInSecondary = isNew && draft.status === 'secondary';
+  const asksFinal =
+    (isFermentationComplete({ status: draft.status } as Batch) && !(loaded.existing && isFermentationComplete(loaded.existing)) && !finalReading(loaded.timeline)) || finalInSecondary;
   const finalEntry = asksFinal ? finalReadingEntry(loaded.existing?.id ?? '', draft.final, nowLocal()) : null;
 
   // Work the numbers out from the draft as typed, with the batch's timeline, so step feedings count.
@@ -159,6 +162,11 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
   if (projected) abvParts.push(`Potential ${fmtPercent(projected.potential)}${projected.potentialFG < 0.9995 ? ` (at ${fmtSG(projected.potentialFG)})` : ''}`);
   if (projected?.showTarget && projected.target != null) abvParts.push(`Target ${fmtPercent(projected.target)}`);
   const abvLine = abvParts.join(' · ');
+
+  // An OG and a different final gravity on the same day usually means the start date is still today.
+  const finalFg = draft.final.mode === 'reading' ? inRange(parseNum(draft.final.fg)) : null;
+  const sameDay =
+    asksFinal && validOg != null && finalFg != null && Math.abs(finalFg - validOg) > 0.0005 && (draft.final.date || nowLocal()).slice(0, 10) === draft.startDate;
 
   const ogHint = loaded.targetOG != null ? `Recipe target: ${fmtSG(loaded.targetOG)}` : 'Optional. You can add it later.';
 
@@ -180,7 +188,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
     }
 
     if (asksFinal) {
-      const problem = finalReadingError(draft.final);
+      const problem = finalReadingError(draft.final, draft.startDate);
       if (problem) return setError(problem);
     }
     const finishedAt = nowLocal();
@@ -209,6 +217,8 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
     if (loaded.existing && loaded.existing.status !== saved.status) {
       await recordStatusEntry(saved.id, loaded.existing.status, saved.status);
     }
+    // The OG's timeline entry follows the OG (and the start date, if it was on it).
+    await syncOgEntry(saved, loaded.existing?.startDate);
     // The final gravity or the estimate goes on the timeline.
     if (asksFinal) await saveFinalReading(saved.id, draft.final, finishedAt);
     // Timeline entries of edited ingredients follow them; entries of removed ingredients stay, unlinked.
@@ -286,8 +296,19 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           {asksFinal && (
             <>
               <h3 className="stage-divider">Final reading</h3>
-              <p className="field-hint">{isNew ? 'This batch is past fermentation.' : `Moving to ${draft.status === 'aging' ? 'Aging' : 'a finished stage'} means fermentation is done.`}</p>
+              <p className="field-hint">
+                {finalInSecondary
+                  ? 'If fermentation has already finished, add the final reading. Otherwise leave it empty.'
+                  : isNew
+                    ? 'This batch is past fermentation.'
+                    : `Moving to ${draft.status === 'aging' ? 'Aging' : 'a finished stage'} means fermentation is done.`}
+              </p>
               <FinalReadingFields value={draft.final} onChange={(final) => set({ final })} abvSoFar={validOg != null ? batchAbv(preview, loaded.timeline) : null} />
+              {sameDay && (
+                <p className="warning" role="note">
+                  The OG and the final reading are on the same day. If the batch started earlier, set the Start date to the day you started it.
+                </p>
+              )}
             </>
           )}
           {abvLine && <p className="projection" aria-live="polite">{abvLine}</p>}

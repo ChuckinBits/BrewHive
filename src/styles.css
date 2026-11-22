@@ -2060,7 +2060,8 @@ button.staged-row:hover {
   align-self: flex-start;
 }
 
-.final-chip {
+.final-chip,
+.og-chip {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
