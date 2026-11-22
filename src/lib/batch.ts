@@ -372,3 +372,62 @@ export function planReviewEntry(events: BatchEvent[], rating: number | null, now
   if (todays) return { action: 'update', id: todays.id, rating };
   return { action: 'add', rating };
 }
+
+// --- Progress: the chart, fermentation rate, attenuation, days to target
+
+/** Backsweetening that isn't set to ferment adds sweetness, not something fermentation works through. */
+const chartable = (e: BatchEvent) => !(e.type === 'backsweeten' && !sugarFerments(e));
+
+/** The gravity chart's points: the OG and readings, leaving out backsweetening that won't ferment. */
+export function chartPoints(batch: Batch, events: BatchEvent[]): GravityPoint[] {
+  return gravityPoints(batch, events.filter(chartable));
+}
+
+/** Hours since the epoch for a yyyy-mm-dd or local yyyy-mm-ddThh:mm string. */
+const hoursOf = (date: string) => new Date(date.length === 10 ? `${date}T00:00` : date).getTime() / 3_600_000;
+
+/**
+ * Gravity points per day between the last two chart points (the OG counts as one). Null with fewer
+ * than two, when they're under an hour apart, or when the last is a rise (sugar just added).
+ */
+export function fermentationRate(batch: Batch, events: BatchEvent[]): number | null {
+  const points = chartPoints(batch, events);
+  if (points.length < 2) return null;
+  const [a, b] = points.slice(-2);
+  const hours = hoursOf(b.date) - hoursOf(a.date);
+  if (!(hours >= 1)) return null;
+  const rate = ((a.sg - b.sg) * 1000) / (hours / 24);
+  return rate < 0 ? null : rate;
+}
+
+/** Apparent attenuation in %: how much of the sugar (OG plus fermenting additions) has fermented. Null before any reading. */
+export function attenuation(batch: Batch, events: BatchEvent[]): number | null {
+  const og = effectiveOG(batch, events);
+  const sg = currentGravity(batch, events);
+  if (og == null || sg == null || og <= 1.0005 || !analyzeGravity(batch, events).hasReadings) return null;
+  return Math.max(0, ((og - sg) / (og - 1)) * 100);
+}
+
+/**
+ * About how many days until the target FG (1.000 without one) at the current rate. Fermentation slows,
+ * so it's optimistic. Null unless fermenting with a rate, or once the target is reached.
+ */
+export function daysToTarget(batch: Batch, events: BatchEvent[]): { days: number; targetFG: number } | null {
+  if (!isFermenting(batch.status) || finalReading(events)) return null;
+  const rate = fermentationRate(batch, events);
+  const sg = currentGravity(batch, events);
+  const og = effectiveOG(batch, events);
+  if (rate == null || rate < 0.1 || sg == null || og == null) return null;
+  const targetFG = projectedAbv(og, batch)?.targetFG ?? DEFAULT_TARGET_FG;
+  const points = (sg - targetFG) * 1000;
+  if (points <= 0.5) return null;
+  return { days: points / rate, targetFG };
+}
+
+/** How sweet a finished mead at this gravity is, by the BJCP ranges (Dessert above them). */
+export function sweetnessOf(sg: number): { label: string; range: string } {
+  if (sg < 1.01) return { label: 'Dry', range: 'below 1.010' };
+  if (sg < 1.025) return { label: 'Semi-sweet', range: '1.010–1.025' };
+  if (sg <= 1.05) return { label: 'Sweet', range: '1.025–1.050' };
+  return { label: 'Dessert', range: 'above 1.050' };
+}

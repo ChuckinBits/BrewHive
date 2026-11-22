@@ -10,6 +10,11 @@ import {
   effectiveOG,
   gravityPoints,
   ogEntry,
+  chartPoints,
+  fermentationRate,
+  attenuation,
+  daysToTarget,
+  sweetnessOf,
   isFermentationComplete,
   planReviewEntry,
   planStatusEntry,
@@ -449,4 +454,42 @@ test('the chart places the OG at its entry\'s date, or at the start date without
 
 test('a deleted OG entry is ignored', () => {
   assert.equal(ogEntry([{ ...ogMark('2026-11-01T00:00', 1.1), deletedAt: '2026-11-02' }]), null);
+});
+
+const sweeten = (date: string, sg: number, ferments = false): BatchEvent => ({ ...reading(date, sg), id: 'bs' + date, type: 'backsweeten', ferments });
+
+test('backsweetening that won\'t ferment stays off the chart; ticked, it is charted', () => {
+  const events = [reading('2026-11-10T09:00', 1.0), sweeten('2026-11-20T09:00', 1.02)];
+  assert.deepEqual(chartPoints(batch(), events).map((p) => p.sg), [1.1, 1.0]);
+  assert.deepEqual(chartPoints(batch(), [reading('2026-11-10T09:00', 1.0), sweeten('2026-11-20T09:00', 1.02, true)]).map((p) => p.sg), [1.1, 1.0, 1.02]);
+});
+
+test('fermentation rate: points per day between the last two points', () => {
+  near(fermentationRate(batch(), [reading('2026-11-05T00:00', 1.06)]), 10, 'OG 1.100 on Nov 1 to 1.060 on Nov 5: 10 pts/day');
+  near(fermentationRate(batch(), [reading('2026-11-05T00:00', 1.06), reading('2026-11-05T12:00', 1.055)]), 10, 'half a day apart');
+  assert.equal(fermentationRate(batch(), []), null, 'one point: no rate');
+  assert.equal(fermentationRate(batch(), [reading('2026-11-01T00:30', 1.099)]), null, 'under an hour apart');
+  assert.equal(fermentationRate(batch(), [reading('2026-11-05T00:00', 1.06), { ...reading('2026-11-06T00:00', 1.07), type: 'feeding' }]), null, 'just fed: no rate until the next reading');
+  near(fermentationRate(batch(), [reading('2026-11-05T00:00', 1.06), { ...reading('2026-11-06T00:00', 1.07), type: 'feeding' }, reading('2026-11-08T00:00', 1.05)]), 10, 'measured from the feeding');
+});
+
+test('attenuation counts fermenting additions', () => {
+  assert.equal(attenuation(batch(), []), null, 'no readings');
+  near(attenuation(batch(), [reading('2026-11-10T00:00', 1.025)]), 75);
+  near(attenuation(batch(), [reading('2026-11-04T00:00', 1.04), entry('feeding', '2026-11-05T00:00', 1.06), reading('2026-11-10T00:00', 1.03)]), 75, 'OG 1.100 + 20 pts fed, now 1.030');
+});
+
+test('days to target at the current rate', () => {
+  const b = batch();
+  near(daysToTarget(b, [reading('2026-11-05T00:00', 1.06)])?.days, 6, '60 pts left at 10 a day');
+  near(daysToTarget({ ...b, targetFG: 1.01 }, [reading('2026-11-05T00:00', 1.06)])?.days, 5, 'to a 1.010 target');
+  assert.equal(daysToTarget({ ...b, status: 'aging' }, [reading('2026-11-05T00:00', 1.06)]), null, 'not while aging');
+  assert.equal(daysToTarget(b, [reading('2026-11-05T00:00', 0.999)]), null, 'target reached');
+});
+
+test('sweetness by the BJCP ranges', () => {
+  assert.equal(sweetnessOf(1.0).label, 'Dry');
+  assert.equal(sweetnessOf(1.015).label, 'Semi-sweet');
+  assert.equal(sweetnessOf(1.03).label, 'Sweet');
+  assert.equal(sweetnessOf(1.06).label, 'Dessert');
 });

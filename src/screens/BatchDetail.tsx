@@ -19,7 +19,12 @@ import {
   pointsNeeded,
   currentGravity,
   finalGravity,
-  gravityPoints,
+  chartPoints,
+  attenuation,
+  daysToTarget,
+  fermentationRate,
+  isFermenting,
+  sweetnessOf,
   isActive,
   isFermentationComplete,
   analyzeGravity,
@@ -116,6 +121,10 @@ export function BatchDetailScreen({ id }: { id: string }) {
   // Sugar added later by step feeding or backsweetening raises the potential.
   const projected = projectedAbv(og == null ? null : og + addedSugar, batch);
   const reached = targetReached(batch, data.events);
+  // Progress, in Details: how far it has fermented, how fast (while fermenting), and how long to go.
+  const attenuationNow = attenuation(batch, data.events);
+  const rate = isFermenting(batch.status) ? fermentationRate(batch, data.events) : null;
+  const toTarget = daysToTarget(batch, data.events);
 
   const currentStage = currentIngredientStage(batch.status);
   const added = addedLines(data.events);
@@ -211,7 +220,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </p>
       )}
 
-      <GravityChart points={gravityPoints(batch, data.events)} />
+      <GravityChart points={chartPoints(batch, data.events)} />
 
       <section className="card">
         <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
@@ -234,6 +243,24 @@ export function BatchDetailScreen({ id }: { id: string }) {
               <dd>
                 <Link to={`/recipes/${data.recipe.id}`}>{data.recipe.name}</Link>
               </dd>
+            </>
+          )}
+          {attenuationNow != null && (
+            <>
+              <dt>Attenuation</dt>
+              <dd>{Math.round(attenuationNow)}%</dd>
+            </>
+          )}
+          {rate != null && (
+            <>
+              <dt>Fermentation rate</dt>
+              <dd>{rate < 10 ? rate.toFixed(1) : Math.round(rate)} pts/day</dd>
+            </>
+          )}
+          {toTarget && (
+            <>
+              <dt>To {fmtSG(toTarget.targetFG)}</dt>
+              <dd>{toTarget.days < 1 ? 'Less than a day' : `About ${Math.ceil(toTarget.days)} ${Math.ceil(toTarget.days) === 1 ? 'day' : 'days'}`}</dd>
             </>
           )}
           <CostFacts lines={batch.ingredients} volumeL={batch.volumeL} />
@@ -461,6 +488,9 @@ interface EventSheetProps {
   onRestart: () => void;
 }
 
+/** What a new entry can be: the entry types, plus a stage change. */
+const ENTRY_CHOICES = [...EVENT_TYPES.slice(0, 1), ...[...EVENT_TYPES.slice(1), { id: 'status' as EventType, label: 'Stage change' }].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))];
+
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
 function EventSheet({ batch, settings, existing, onClose, onRestart }: EventSheetProps) {
   const isStage = existing?.type === 'status';
@@ -502,6 +532,18 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const allEntries = useQuery(() => events.list());
   const knownTasters = [...new Set((allEntries ?? []).map((e) => e.taster?.trim()).filter((t): t is string => !!t))].sort();
 
+  // How sweet the backsweetened gravity is, as it's typed.
+  const typedSg = parseNum(value);
+  const sweetness = typedSg != null && typedSg >= 0.98 && typedSg <= 1.2 ? sweetnessOf(typedSg) : null;
+  // A new Stage change entry: records a stage and when, for a past brew or a change made earlier.
+  const newStage = !existing && type === 'status';
+  const batchEntries = (allEntries ?? []).filter((e) => e.batchId === batch.id && !e.deletedAt);
+  const stageEntries = batchEntries.filter((e) => e.type === 'status' && e.toStatus && e.id !== existing?.id);
+  // The newest stage entry decides the batch's stage; an older one only records history.
+  const stageIsNewest = !stageEntries.some((e) => e.date.slice(0, 16) > (date || nowLocal()));
+  const [final, setFinal] = useState<FinalReading>(NO_FINAL_READING);
+  // Moving from fermenting to Aging or Bottled this way asks for the final reading, as the stage buttons do.
+  const stageAsksFinal = newStage && stageIsNewest && (stage === 'aging' || stage === 'bottled') && !isFermentationComplete(batch) && !finalReading(batchEntries);
   const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
   // The batch's current final gravity reading, other than this one.
   const otherFinal = finalReading((allEntries ?? []).filter((e) => e.batchId === batch.id && e.id !== existing?.id));
@@ -554,9 +596,25 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
       final: type === 'gravity' && !isOg ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
     };
+    if (newStage) {
+      if (stageAsksFinal) {
+        const problem = finalReadingError(final, batch.startDate);
+        if (problem) return setError(problem);
+      }
+      // Where the batch was before this change: the stage entry just before it, or the batch's stage now.
+      const before = [...stageEntries].filter((e) => e.date.slice(0, 16) <= fields.date).sort((a, b) => a.date.localeCompare(b.date)).pop();
+      const fromStatus = stageIsNewest ? batch.status : (before?.toStatus ?? 'primary');
+      if (stageAsksFinal) await saveFinalReading(batch.id, { ...final, date: final.date || fields.date }, fields.date);
+      await events.save({ ...fields, type: 'status', value: null, toStatus: stage, fromStatus, auto: false });
+      if (stageIsNewest && stage !== batch.status) await batches.save({ ...batch, status: stage });
+      toast(stageIsNewest && stage !== batch.status ? `Moved to ${statusLabel(stage)}` : 'Added to the timeline');
+      return onClose();
+    }
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
       await events.save({ ...existing, ...fields, value: null, toStatus: stage, auto: false });
+      // The newest stage entry decides the batch's stage.
+      if (stageIsNewest && stage !== batch.status && stage !== 'archived') await batches.save({ ...batch, status: stage });
     } else if (existing && isOg) {
       await events.save({ ...existing, ...fields, type, og: true });
       if (parsed !== batch.og) await batches.save({ ...batch, og: parsed });
@@ -626,13 +684,39 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
                 setError('');
               }}
             >
-              {EVENT_TYPES.map((t) => (
+              {ENTRY_CHOICES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
                 </option>
               ))}
             </select>
           </Field>
+        )}
+        {newStage && (
+          <>
+            <Field label="Stage" hint={
+                !stageIsNewest
+                  ? 'Earlier than the latest stage change, so this only records when it happened.'
+                  : stage === batch.status
+                    ? 'The batch is already in this stage; this records when it got there.'
+                    : 'The batch moves to this stage.'
+              }>
+              <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
+                {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {whenField}
+            {stageAsksFinal && (
+              <>
+                <h3 className="stage-divider">Final reading</h3>
+                <FinalReadingFields value={{ ...final, date: final.date || date }} onChange={setFinal} abvSoFar={batchAbv(batch, batchEntries)} />
+              </>
+            )}
+          </>
         )}
         {kind === 'sg' && (
           <Field
@@ -681,6 +765,11 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             <Field label="Gravity after adding (optional)" hint="Take a reading once it is mixed in, so the added sugar is counted.">
               <input type="text" inputMode="decimal" value={value} placeholder="1.030" onChange={(e) => setValue(e.target.value)} />
             </Field>
+            {type === 'backsweeten' && sweetness && (
+              <p className="sweetness" aria-live="polite">
+                <strong>{sweetness.label}</strong> <span className="muted">({sweetness.range})</span>
+              </p>
+            )}
             {type === 'backsweeten' && (
               <>
                 <label className="check-field">
@@ -761,7 +850,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             <input type="text" value={place} placeholder="Basement" autoFocus={!existing} onChange={(e) => setPlace(e.target.value)} />
           </Field>
         )}
-        {kind !== 'ingredient' && whenField}
+        {kind !== 'ingredient' && !newStage && whenField}
         <Field label="Note (optional)">
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
