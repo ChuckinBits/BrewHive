@@ -2436,3 +2436,15 @@ button.library-row {
   margin-top: 1px;
   color: var(--accent-ink);
 }
+
+/* The sweetness of a backsweetened gravity, under its field */
+.sweetness {
+  margin-top: -8px;
+  color: var(--accent-ink);
+  font-size: 14px;
+}
+
+.sweetness-inline {
+  color: var(--accent-ink);
+  font-weight: 600;
+}

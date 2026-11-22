@@ -133,7 +133,7 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[]
       { id: 'estimate', label: 'Estimated ABV', value: 'abv' },
       { id: 'fining', label: 'Fining' },
       { id: 'ingredient', label: 'Ingredient', value: 'ingredient' },
-      { id: 'moved', label: 'Moved to', value: 'place' },
+      { id: 'moved', label: 'Relocate', value: 'place' },
       { id: 'note', label: 'Note' },
       { id: 'nutrient', label: 'Nutrients' },
       { id: 'ph', label: 'pH', value: 'ph' },
@@ -160,7 +160,7 @@ export function statusLabel(status: BatchStatus): string {
   return BATCH_STATUSES.find((s) => s.id === status)?.label ?? status;
 }
 
-/** The heading a timeline entry shows, such as "Moved to Secondary" or "Moved to Basement". */
+/** The heading a timeline entry shows, such as "Moved to Secondary" or "Relocated to Basement". */
 export function eventTitle(event: BatchEvent): string {
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
@@ -171,7 +171,7 @@ export function eventTitle(event: BatchEvent): string {
     return event.note || 'Stage change';
   }
   if (event.type === 'gravity' && event.og) return 'Original gravity';
-  if (event.type === 'moved') return event.place ? `Moved to ${event.place}` : 'Moved';
+  if (event.type === 'moved') return event.place ? `Relocated to ${event.place}` : 'Relocated';
   if (event.type === 'ingredient') return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
   if (event.type === 'tasting') return event.taster ? `Tasting by ${event.taster}` : 'Tasting';
   if (event.type === 'review') return 'Batch rating';
