@@ -2,7 +2,8 @@
 // everything in the database, so nobody is ever locked in to BrewHive.
 
 import { getAll, putMany, type StoreName } from './idb.ts';
-import { rememberTheme } from './store.ts';
+import { upgradeSettings } from '../lib/units.ts';
+import { ensureOgEntries, rememberTheme } from './store.ts';
 import type { Settings } from './types.ts';
 
 const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
@@ -75,9 +76,13 @@ export async function restoreBackup(input: unknown): Promise<number> {
   if (Array.isArray(settings)) {
     const app = settings.find((s) => isStamped(s) && s.id === 'app') as Settings | undefined;
     if (app) {
-      await putMany('settings', [app]);
-      rememberTheme(app.theme);
+      // Backups from v0.2.0 and earlier have volumeUnit; it becomes units.
+      const upgraded = upgradeSettings(app) as Settings;
+      await putMany('settings', [upgraded]);
+      rememberTheme(upgraded.theme);
     }
   }
+  // A backup from before the OG had a timeline entry gets them.
+  await ensureOgEntries();
   return written;
 }

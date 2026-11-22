@@ -170,6 +170,7 @@ export function eventTitle(event: BatchEvent): string {
     // Entries made before stages were stored keep their wording in the note.
     return event.note || 'Stage change';
   }
+  if (event.type === 'gravity' && event.og) return 'Original gravity';
   if (event.type === 'moved') return event.place ? `Moved to ${event.place}` : 'Moved';
   if (event.type === 'ingredient') return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
   if (event.type === 'tasting') return event.taster ? `Tasting by ${event.taster}` : 'Tasting';
@@ -392,6 +393,11 @@ export interface BatchEvent extends Base {
    * the final one until a newer final reading or a feeding replaced it: still a measurement, never sugar.
    */
   final?: boolean;
+  /**
+   * For gravity entries: true for the batch's original gravity. Its value mirrors batch.og (editing one
+   * changes the other); its date is when the OG was taken, the start date unless moved.
+   */
+  og?: boolean;
   /** For "ingredient" entries: what was added, and how much ("3 lb"). */
   ingredient?: string;
   amount?: string;
@@ -453,9 +459,13 @@ export interface Pour extends Base {
 
 export type ViewMode = 'list' | 'shelf';
 
+/** US (gallons, pounds, ounces) or metric (liters, kilograms, grams). */
+export type UnitSystem = 'us' | 'metric';
+
 export interface Settings {
   id: 'app';
-  volumeUnit: 'gal' | 'L';
+  /** Volume and weight units. Older saves and backups had volumeUnit ('gal' or 'L') instead. */
+  units: UnitSystem;
   tempUnit: 'F' | 'C';
   theme: 'system' | 'light' | 'dark';
   /** Remembered List / Shelf choice per screen. */

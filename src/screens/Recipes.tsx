@@ -1,6 +1,7 @@
 // Recipes: the list, one recipe, and the recipe form.
 
 import { useState } from 'react';
+import { volumeUnitOf } from '../lib/units.ts';
 import { batches, loadSettings, recipes, usePrefs, useQuery, useSettings } from '../db/store.ts';
 import { BEVERAGE_TYPES, type BeverageType, type IngredientLine, type Recipe, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
@@ -115,7 +116,7 @@ export function RecipeDetailScreen({ id }: { id: string }) {
         <Book icon={recipe.icon} extraIcons={recipe.extraIcons} color={recipe.color} size={168} />
         <p className="hero-sub">
           {recipe.style || 'Mead'}
-          {recipe.batchSizeL != null && ` · ${fmtVolumeBoth(recipe.batchSizeL, recipe.volumeUnit, settings.volumeUnit)}`}
+          {recipe.batchSizeL != null && ` · ${fmtVolumeBoth(recipe.batchSizeL, recipe.volumeUnit, volumeUnitOf(settings))}`}
         </p>
         {data.source && recipe.updatedFromAt && (
           <p className="hero-note">
@@ -241,7 +242,7 @@ interface Loaded {
 export function RecipeFormScreen({ id }: { id?: string }) {
   const settings = useSettings();
   const loaded = useQuery<Loaded | null>(async () => {
-    const { volumeUnit } = await loadSettings();
+    const volumeUnit = volumeUnitOf(await loadSettings());
     if (!id) {
       return {
         existing: null,
@@ -421,7 +422,7 @@ function RecipeForm({ loaded, settings, back, title }: { loaded: Loaded; setting
         <IngredientSheet
           line={editing === 'new' ? null : editing}
           defaultStage="primary"
-          defaultUnit={settings.volumeUnit === 'gal' ? 'lb' : 'g'}
+          defaultUnit={settings.units === 'us' ? 'lb' : 'g'}
           onSave={(line) =>
             set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] })
           }

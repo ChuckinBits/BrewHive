@@ -7,6 +7,16 @@ a milestone.
 
 ## Unreleased (v0.2.1)
 
+- **The OG on the timeline** ([#44]). A batch's OG is an "Original gravity"
+  entry marked OG, dated its start date. Editing its value changes the OG;
+  move its date if you took it after starting. Removing it clears the OG.
+  Batches that already have an OG get the entry.
+- **Final reading for new batches in Secondary** ([#44]), as for Aging and
+  Bottled, but optional. The final reading has a When (date and time), and
+  can't be before the start date. When the OG and a different final gravity
+  fall on the same day, a note suggests setting the start date to when the
+  batch really started.
+- With a final reading, the ABV tile says ABV, not ABV so far, in any stage.
 - **Bottled without the cellar** ([#46]). Bottle this batch has "Mark as
   bottled without adding to the cellar": the batch moves to Bottled with a
   Bottled timeline entry (and the final reading, if entered), and no
@@ -17,7 +27,10 @@ a milestone.
   "Edit timeline entry" there changes the entry's date or removes it.
 - **Volume & weight: US or Metric** ([#41]). The Volume setting under
   More → Units is now Volume & weight, with US (gallons, pounds, ounces) or
-  Metric (liters, kilograms, grams).
+  Metric (liters, kilograms, grams). Settings and backups now store it as
+  `units: "us"` or `"metric"` (it was `volumeUnit: "gal"` or `"L"`); older
+  settings and backups are converted when they load or restore. Batches and
+  recipes still record their own volume unit as gal or L.
 - **Starter ingredients follow your units** ([#41]). Switching between US
   and Metric moves the starter ingredients' default units to match: lb and
   kg, oz and g, gal and L, fl oz and mL. Ingredients
@@ -229,4 +242,5 @@ themes; sample data.
 [#36]: https://github.com/ChuckinBits/BrewHive/issues/36
 [#38]: https://github.com/ChuckinBits/BrewHive/issues/38
 [#41]: https://github.com/ChuckinBits/BrewHive/issues/41
+[#44]: https://github.com/ChuckinBits/BrewHive/issues/44
 [#46]: https://github.com/ChuckinBits/BrewHive/issues/46

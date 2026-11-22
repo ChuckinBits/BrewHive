@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getAll, getOne, putMany, subscribe, type StoreName } from './idb.ts';
 import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
 import { starterIngredients } from './starterIngredients.ts';
+import { upgradeSettings } from '../lib/units.ts';
 import { localeCurrency } from '../lib/cost.ts';
 import { newId } from '../lib/format.ts';
 
@@ -58,6 +59,41 @@ export function categoriesOf(settings: Settings): IngredientCategory[] {
   return settings.ingredientCategories?.length ? settings.ingredientCategories : DEFAULT_CATEGORIES;
 }
 
+// --- The OG on the timeline
+
+/** The OG entry's date for a start date: the start of that day, so it comes first on the timeline. */
+const ogDate = (startDate: string) => `${startDate}T00:00`;
+
+/**
+ * Keeps a batch's OG entry in step with its OG after the batch is saved: created when there is an
+ * OG, its value following the OG, removed when the OG is cleared. When the start date changes, an
+ * entry still on the old start date moves with it; one moved to another day stays put.
+ */
+export async function syncOgEntry(batch: Batch, previousStartDate?: string): Promise<void> {
+  const entry = (await getAll<BatchEvent>('events')).find((e) => e.batchId === batch.id && e.og && !e.deletedAt);
+  if (batch.og == null) {
+    if (entry) await events.remove(entry.id);
+    return;
+  }
+  if (!entry) {
+    await events.save({ batchId: batch.id, type: 'gravity', date: ogDate(batch.startDate), value: batch.og, note: '', og: true });
+    return;
+  }
+  const date = previousStartDate && previousStartDate !== batch.startDate && entry.date.startsWith(previousStartDate) ? batch.startDate + entry.date.slice(previousStartDate.length) : entry.date;
+  if (entry.value !== batch.og || date !== entry.date) await events.save({ ...entry, value: batch.og, date });
+}
+
+/** Batches with an OG but no OG entry (from before there were any) get one on their start date. */
+export async function ensureOgEntries(): Promise<void> {
+  const all = await getAll<BatchEvent>('events');
+  const has = new Set(all.filter((e) => e.og && !e.deletedAt).map((e) => e.batchId));
+  const missing = (await getAll<Batch>('batches')).filter((b) => !b.deletedAt && b.og != null && !has.has(b.id));
+  await putMany(
+    'events',
+    missing.map((b) => fresh({ id: newId(), batchId: b.id, type: 'gravity' as const, date: ogDate(b.startDate), value: b.og, note: '', og: true })),
+  );
+}
+
 /** Starters to add: not already on the device (by id), and not named like an ingredient in the list. */
 function startersToAdd(all: LibraryIngredient[], imperial: boolean, skip: (item: LibraryIngredient) => boolean) {
   const names = new Set(all.filter((i) => !i.deletedAt).map((i) => i.name.trim().toLowerCase()));
@@ -89,7 +125,7 @@ export async function ensureStarterIngredients(): Promise<void> {
 
 /** Starter units follow the volume unit chosen under More: gallons means US units. */
 async function usesImperialUnits(): Promise<boolean> {
-  return (await loadSettings()).volumeUnit === 'gal';
+  return (await loadSettings()).units === 'us';
 }
 
 /** A new record with its timestamps, for writing several in one go. */
@@ -121,7 +157,7 @@ export function defaultSettings(): Settings {
   const imperial = usesImperial();
   return {
     id: 'app',
-    volumeUnit: imperial ? 'gal' : 'L',
+    units: imperial ? 'us' : 'metric',
     tempUnit: imperial ? 'F' : 'C',
     theme: 'system',
     views: {},
@@ -133,7 +169,9 @@ let cachedSettings: Settings | null = null;
 
 export async function loadSettings(): Promise<Settings> {
   const saved = await getOne<Settings>('settings', 'app');
-  cachedSettings = { ...defaultSettings(), ...saved };
+  cachedSettings = { ...defaultSettings(), ...(saved ? upgradeSettings(saved) : {}) };
+  // Saved by v0.2.0 or earlier (volumeUnit): store it the current way, so backups say units too.
+  if (saved && 'volumeUnit' in saved) await putMany('settings', [cachedSettings]);
   return cachedSettings;
 }
 
@@ -142,8 +180,8 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
   const next: Settings = { ...current, ...patch, id: 'app' };
   await putMany('settings', [next]);
   rememberTheme(next.theme);
-  // Switching between gallons and liters moves untouched starter ingredients to the matching units.
-  if (next.volumeUnit !== current.volumeUnit) await ensureStarterIngredients();
+  // Switching between US and metric moves untouched starter ingredients to the matching units.
+  if (next.units !== current.units) await ensureStarterIngredients();
 }
 
 /** Mirrors the theme into localStorage so main.tsx can apply it before the first paint. */
