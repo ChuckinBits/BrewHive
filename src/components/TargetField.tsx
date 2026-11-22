@@ -2,7 +2,7 @@
 // or an ABV (the final gravity follows), with a switch between them.
 
 import type { TargetMode } from '../db/types.ts';
-import { DRIEST_FG, fmtPoints, pointsNeeded } from '../lib/batch.ts';
+import { DRIEST_FG, fmtPoints, pointsNeeded, sweetnessOf } from '../lib/batch.ts';
 import { abv } from '../lib/calc.ts';
 import { fmtPercent, fmtSG, parseNum } from '../lib/format.ts';
 import { UnitField } from './ui.tsx';
@@ -69,6 +69,10 @@ export function TargetField({ value, onChange, og }: Props) {
   }
   const hint = follows || (isAbv ? 'The strength you are aiming for.' : 'Where you expect fermentation to stop. 1.000 is fully dry.');
 
+  // How sweet it finishes: the target FG, or for an ABV target the FG it finishes at (needs the OG).
+  const finishFG = isAbv ? (og != null && valid(abvTarget, 0.1, 25) != null ? og - (abvTarget as number) / 131.25 : null) : valid(fg, 0.98, 1.2);
+  const sweetness = finishFG != null && finishFG >= DRIEST_FG - 1e-9 ? sweetnessOf(finishFG) : null;
+
   return (
     <UnitField
       label="Target"
@@ -77,7 +81,18 @@ export function TargetField({ value, onChange, og }: Props) {
       onChange={(text) => onChange(isAbv ? { targetAbv: text } : { targetFG: text })}
       unit={value.targetMode}
       units={MODES}
-      hint={hint}
+      hint={
+        sweetness ? (
+          <>
+            <span className="sweetness-inline">
+              {sweetness.label} ({sweetness.range}).
+            </span>{' '}
+            {hint}
+          </>
+        ) : (
+          hint
+        )
+      }
       onUnit={(mode) => {
         // Switching fills the other value in from this one, when it's empty and there's an OG.
         const patch: Partial<TargetDraft> = { targetMode: mode };

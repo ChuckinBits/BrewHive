@@ -2443,3 +2443,8 @@ button.library-row {
   color: var(--accent-ink);
   font-size: 14px;
 }
+
+.sweetness-inline {
+  color: var(--accent-ink);
+  font-weight: 600;
+}

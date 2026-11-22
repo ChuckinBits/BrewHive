@@ -13,7 +13,8 @@ a milestone.
   without one) at that rate. The rate and days show while fermenting.
 - **Sweetness when backsweetening** ([#49]). Typing the gravity after
   adding shows how sweet it is: Dry, Semi-sweet, Sweet or Dessert, by the
-  BJCP mead ranges.
+  BJCP mead ranges. The Target field on batches and recipes shows it too,
+  for the target FG or the FG an ABV target finishes at.
 - **Backsweetening off the chart** ([#49]). A backsweetening reading is
   charted only when ticked "This will ferment".
 - **Stage change entries** ([#49]). Add entry has Stage change: pick the
