@@ -69,11 +69,11 @@ export function MoreScreen() {
           <span>Volume &amp; weight</span>
           <Segmented
             label="Volume and weight units"
-            value={settings.volumeUnit}
-            onChange={(volumeUnit) => saveSettings({ volumeUnit })}
+            value={settings.units}
+            onChange={(units) => saveSettings({ units })}
             options={[
-              { id: 'gal', label: 'US' },
-              { id: 'L', label: 'Metric' },
+              { id: 'us', label: 'US' },
+              { id: 'metric', label: 'Metric' },
             ]}
           />
         </div>
