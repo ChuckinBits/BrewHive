@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtDateTime, fmtTempBoth, fmtVolumeBoth, tempToInput } from './format.ts';
+import { fmtDateTime, parseNum, fmtTempBoth, fmtVolumeBoth, tempToInput } from './format.ts';
 
 test('a record in the default unit shows one value', () => {
   assert.equal(fmtVolumeBoth(3.785411784, 'gal', 'gal'), '1 gal');
@@ -25,4 +25,17 @@ test('fmtDateTime gives the day and a 12-hour time', () => {
   assert.equal(fmtDateTime(`${year}-11-03T00:30`), 'Nov 3, 12:30 AM');
   assert.equal(fmtDateTime('2020-01-02T12:00'), 'Jan 2, 2020, 12:00 PM');
   assert.equal(fmtDateTime('2020-01-02'), 'Jan 2, 2020');
+});
+
+test('parseNum reads fractions', () => {
+  assert.equal(parseNum('1/2'), 0.5);
+  assert.equal(parseNum('1 1/2'), 1.5);
+  assert.equal(parseNum('½'), 0.5);
+  assert.equal(parseNum('1½'), 1.5);
+  assert.equal(parseNum('2 ¾'), 2.75);
+  assert.equal(parseNum('11/2'), 5.5, 'eleven halves');
+  assert.equal(parseNum('1/0'), null);
+  assert.equal(parseNum('1,5'), 1.5);
+  assert.equal(parseNum('a/b'), null);
+  assert.equal(parseNum('3'), 3);
 });

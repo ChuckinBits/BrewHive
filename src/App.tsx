@@ -36,7 +36,7 @@ function pickScreen(path: string, query: URLSearchParams): ReactNode {
   let m: Record<string, string> | null;
   if (path === '/' || path === '/batches') return <BatchesScreen />;
   if (path === '/batches/new') return <BatchFormScreen recipeId={query.get('recipe') ?? undefined} />;
-  if ((m = matchPath('/batches/:id/edit', path))) return <BatchFormScreen id={m.id} />;
+  if ((m = matchPath('/batches/:id/edit', path))) return <BatchFormScreen id={m.id} section={query.get('section') ?? undefined} />;
   if ((m = matchPath('/batches/:id', path))) return <BatchDetailScreen id={m.id} />;
   if (path === '/recipes') return <RecipesScreen />;
   if (path === '/recipes/new') return <RecipeFormScreen />;

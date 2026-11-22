@@ -4,10 +4,10 @@
 // - On the batch page, ingredients for the current stage can be tapped to log
 //   them on the timeline; ones already logged show when they went in.
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { categoriesOf, currencyOf, ingredients, useQuery, useSettings } from '../db/store.ts';
 import { costOf, fmtMoney } from '../lib/cost.ts';
-import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientLine, type IngredientStage, type LibraryIngredient } from '../db/types.ts';
+import { INGREDIENT_STAGES, INGREDIENT_UNITS, unitLabel, type BatchEvent, type IngredientCost, type IngredientLine, type IngredientStage, type LibraryIngredient } from '../db/types.ts';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtDateShort, fmtDateTime, newId, parseNum } from '../lib/format.ts';
 import { categoryOf, filterIngredients } from '../lib/library.ts';
@@ -134,7 +134,7 @@ export interface IngredientValue {
  * quantity and unit, and the cost hint. Returns the fields, the "Your ingredients" sheet to render
  * outside the form, and `commit`, which saves a new name to the library if asked and gives the value.
  */
-export function useIngredientFields(start: { name: string; amount: string; quantity?: string; unit?: string; ingredientId?: string } | null, defaultUnit: string) {
+export function useIngredientFields(start: { name: string; amount: string; quantity?: string; unit?: string; ingredientId?: string } | null, defaultUnit: string, costHint = true) {
   const initial = start ? splitAmount({ id: '', name: start.name, amount: start.amount, quantity: start.quantity, unit: start.unit }) : { quantity: '', unit: defaultUnit };
   const [name, setName] = useState(start?.name ?? '');
   const [quantity, setQuantity] = useState(initial.quantity);
@@ -240,7 +240,7 @@ export function useIngredientFields(start: { name: string; amount: string; quant
           </select>
         </Field>
       </div>
-      {match?.cost && quantity.trim() !== '' && (
+      {costHint && match?.cost && quantity.trim() !== '' && (
         <p className="field-hint">
           {costOf(parseNum(quantity) ?? 0, unit, match.cost) != null
             ? `About ${fmtMoney(costOf(parseNum(quantity) ?? 0, unit, match.cost) as number, currencyOf(settings))} at your price for ${match.name}.`
@@ -265,7 +265,7 @@ export function useIngredientFields(start: { name: string; amount: string; quant
       />
     </Sheet>
   ) : null;
-  return { fields, sheet, name, commit };
+  return { fields, sheet, name, commit, match, quantity, unit, units };
 }
 
 /** "Nov 3, 2:15 PM" for one timeline entry, or "the 2 timeline entries". */
@@ -284,23 +284,65 @@ interface SheetProps {
   logged?: BatchEvent[];
   /** Whether those entries were already set to follow (from an earlier edit before saving). */
   syncLogged?: boolean;
+  /** Batches: ask what was paid for it, starting from the line's price or your ingredients' price. */
+  pricePaid?: boolean;
   onSave: (line: IngredientLine, syncLogged: boolean) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
 }
 
 /** Adds or edits one ingredient: what it is, how much, and which stage it goes in. */
-export function IngredientSheet({ line, defaultStage, defaultUnit, logged = [], syncLogged = true, onSave, onRemove, onClose }: SheetProps) {
-  const ingredient = useIngredientFields(line, defaultUnit);
+export function IngredientSheet({ line, defaultStage, defaultUnit, logged = [], syncLogged = true, pricePaid = false, onSave, onRemove, onClose }: SheetProps) {
+  // A batch's sheet shows the price paid instead of the library price hint.
+  const ingredient = useIngredientFields(line, defaultUnit, !pricePaid);
+  const settings = useSettings();
+  const currency = currencyOf(settings);
+  const match = ingredient.match;
+
+  // Price paid: starts from the price saved with the line, or else your ingredients' price,
+  // and follows the picked ingredient until it's typed in.
+  // (Your ingredients load a moment later, so a line's own price doesn't wait for them.)
+  const startCost = (line?.cost && (!match || line.ingredientId === match.id) ? line.cost : null) ?? match?.cost ?? null;
+  const [price, setPrice] = useState(startCost ? String(startCost.price) : '');
+  const [costQty, setCostQty] = useState(startCost ? String(startCost.quantity) : '');
+  const [costUnit, setCostUnit] = useState(startCost?.unit ?? ingredient.unit);
+  const [priceTouched, setPriceTouched] = useState(false);
+  useEffect(() => {
+    if (priceTouched) return;
+    setPrice(startCost ? String(startCost.price) : '');
+    setCostQty(startCost ? String(startCost.quantity) : '');
+    setCostUnit(startCost?.unit ?? ingredient.unit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id]);
+  const touch = <T,>(setter: (v: T) => void) => (v: T) => {
+    setPriceTouched(true);
+    setter(v);
+  };
+  const priceValue = parseNum(price.replace(/[^0-9.,/ -]/g, ''));
+  // An empty amount means "for this much": the quantity above.
+  const qtyValue = costQty.trim() === '' ? parseNum(ingredient.quantity) : parseNum(costQty);
+  const paidCost: IngredientCost | null = priceValue != null && priceValue >= 0 && qtyValue != null && qtyValue > 0 ? { price: priceValue, quantity: qtyValue, unit: costTypedUnit() } : null;
+  function costTypedUnit() {
+    return costQty.trim() === '' ? ingredient.unit : costUnit;
+  }
+  const sameCost = (a: IngredientCost | null | undefined, b: IngredientCost | null) => (a ?? null) === b || (!!a && !!b && a.price === b.price && a.quantity === b.quantity && a.unit === b.unit);
+  // "Also update the price in your ingredients": off by default, on when it has no price yet.
+  const offerUpdate = pricePaid && !!match && !!paidCost && !sameCost(match.cost, paidCost);
+  const [updateLibrary, setUpdateLibrary] = useState<boolean | null>(null);
+  const updating = offerUpdate && (updateLibrary ?? !match?.cost);
+  const lineQty = parseNum(ingredient.quantity);
+  const lineCost = paidCost && lineQty != null ? costOf(lineQty, ingredient.unit, paidCost) : null;
   const [stage, setStage] = useState<IngredientStage>(line?.stage ?? (line ? 'primary' : defaultStage));
   const [sync, setSync] = useState(syncLogged);
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!ingredient.name.trim()) return setError('Enter the ingredient, such as Wildflower honey.');
+    if (pricePaid && price.trim() && !paidCost) return setError('Enter the price and how much it was for, such as 24.99 for 12 lb.');
     const value = await ingredient.commit();
-    // The line keeps the price it was saved with, unless it's now another ingredient.
-    const cost = line?.cost && line.ingredientId === value.ingredientId ? line.cost : undefined;
+    // Batches save the price paid. Recipes keep a line's price unless it's now another ingredient.
+    const cost = pricePaid ? (paidCost ?? undefined) : line?.cost && line.ingredientId === value.ingredientId ? line.cost : undefined;
+    if (updating && match && paidCost) await ingredients.save({ ...match, cost: paidCost });
     onSave({ id: line?.id ?? newId(), ...value, stage, ...(cost ? { cost } : {}) }, logged.length > 0 && sync);
     onClose();
   };
@@ -324,6 +366,42 @@ export function IngredientSheet({ line, defaultStage, defaultUnit, logged = [], 
             ))}
           </select>
         </Field>
+        {pricePaid && (
+          <fieldset className="cost-fields">
+            <legend className="field-label">Price paid (optional)</legend>
+            <div className="cost-row">
+              <Field label={`Price (${currency})`}>
+                <input type="text" inputMode="decimal" value={price} placeholder="24.99" onChange={(e) => touch(setPrice)(e.target.value)} />
+              </Field>
+              <span className="cost-for">for</span>
+              <Field label="Amount">
+                <input type="text" inputMode="decimal" value={costQty} placeholder={ingredient.quantity.trim() || '12'} onChange={(e) => touch(setCostQty)(e.target.value)} />
+              </Field>
+              <Field label="Unit">
+                <select value={costQty.trim() === '' ? ingredient.unit : costUnit} onChange={(e) => touch(setCostUnit)(e.target.value)}>
+                  {ingredient.units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.id || 'count'}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <p className="field-hint">
+              {lineCost != null
+                ? `= ${fmtMoney(lineCost, currency)} in this batch.`
+                : paidCost
+                  ? `Its price is in ${paidCost.unit || 'a count'}, so this amount isn't priced.`
+                  : 'What you paid and how much it was for.'}
+            </p>
+            {offerUpdate && (
+              <label className="check-field">
+                <input type="checkbox" checked={updating} onChange={(e) => setUpdateLibrary(e.target.checked)} />
+                Also update the price in your ingredients
+              </label>
+            )}
+          </fieldset>
+        )}
         {logged.length > 0 && (
           <label className="check-field">
             <input type="checkbox" checked={sync} onChange={(e) => setSync(e.target.checked)} />

@@ -1,7 +1,7 @@
 // New batch and edit batch. The form stays short: a name is the only
 // required field, everything else can be filled in later.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, ingredients, loadSettings, recipes, syncOgEntry, useQuery, useSettings } from '../db/store.ts';
@@ -50,7 +50,8 @@ interface Loaded {
   timeline: BatchEvent[];
 }
 
-export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: string }) {
+/** `section: 'ingredients'` opens the form scrolled to its ingredients. */
+export function BatchFormScreen({ id, recipeId, section }: { id?: string; recipeId?: string; section?: string }) {
   const settings = useSettings();
   const loaded = useQuery<Loaded | null>(async () => {
     const volumeUnit = volumeUnitOf(await loadSettings());
@@ -124,10 +125,17 @@ export function BatchFormScreen({ id, recipeId }: { id?: string; recipeId?: stri
       </>
     );
   }
-  return <BatchForm key={id ?? 'new'} loaded={loaded} settings={settings} back={back} title={title} />;
+  return <BatchForm key={id ?? 'new'} loaded={loaded} settings={settings} back={back} title={title} section={section} />;
 }
 
-function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings: Settings; back: string; title: string }) {
+function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded; settings: Settings; back: string; title: string; section?: string }) {
+  // Opened from a batch's Edit ingredients: start at the Ingredients section (after the page's scroll to the top).
+  const ingredientsRef = useRef<HTMLFieldSetElement>(null);
+  useEffect(() => {
+    if (section !== 'ingredients') return;
+    const frame = requestAnimationFrame(() => ingredientsRef.current?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [section]);
   const [draft, setDraft] = useState(loaded.draft);
   const [error, setError] = useState('');
   // The ingredient open in the ingredient sheet: 'new' to add one, null when closed.
@@ -315,7 +323,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           {abvLine && <p className="projection" aria-live="polite">{abvLine}</p>}
         </div>
 
-        <fieldset className="ingredient-editor">
+        <fieldset className="ingredient-editor" ref={ingredientsRef}>
           <legend className="field-label">Ingredients</legend>
           <EditableIngredients lines={draft.ingredients} onEdit={(line) => setEditing(line)} />
           <button type="button" className="btn btn-small" onClick={() => setEditing('new')}>
@@ -345,6 +353,7 @@ function BatchForm({ loaded, settings, back, title }: { loaded: Loaded; settings
           defaultUnit={settings.units === 'us' ? 'lb' : 'g'}
           logged={editing === 'new' ? [] : loggedFor(editing.id)}
           syncLogged={editing === 'new' || !touched.has(editing.id) || syncLines.has(editing.id)}
+          pricePaid
           onSave={(line, sync) => {
             set({ ingredients: draft.ingredients.some((l) => l.id === line.id) ? draft.ingredients.map((l) => (l.id === line.id ? line : l)) : [...draft.ingredients, line] });
             const next = new Set(syncLines);
