@@ -5,18 +5,23 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.2)
+## v0.2.2 – 2026-11-21
+
+### Fermentation
 
 - **Fermentation progress in Details** ([#49]): attenuation (how much of
   the sugar has fermented), the fermentation rate in points per day between
   the last two readings, and about how many days to the target FG (1.000
   without one) at that rate. The rate and days show while fermenting.
-- **Sweetness when backsweetening** ([#49]). Typing the gravity after
-  adding shows how sweet it is: Dry, Semi-sweet, Sweet or Dessert, by the
-  BJCP mead ranges. The Target field on batches and recipes shows it too,
-  for the target FG or the FG an ABV target finishes at.
+- **Sweetness** ([#49]). Typing the gravity after backsweetening shows how
+  sweet it is: Dry, Semi-sweet, Sweet or Dessert, by the BJCP mead ranges.
+  The Target field on batches and recipes shows it too, for the target FG
+  or the FG an ABV target finishes at.
 - **Backsweetening off the chart** ([#49]). A backsweetening reading is
   charted only when ticked "This will ferment".
+
+### Timeline
+
 - **Stage change entries** ([#49]). Add entry has Stage change: pick the
   stage and when. The newest stage change moves the batch to it (moving to
   Aging or Bottled asks for the final reading); an earlier one only records
@@ -24,6 +29,9 @@ a milestone.
 - **Relocate** ([#49]). The "Moved to" entry for where a batch is kept is
   now Relocate, shown as "Relocated to Basement", so it isn't mistaken for
   a stage change.
+
+**Updating from v0.2.1:** existing data carries over; nothing changes in how
+it's saved.
 
 ## v0.2.1 – 2026-11-21
 
