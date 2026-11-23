@@ -70,6 +70,24 @@ test('a timeline with no stage entries is one section in the batch\'s stage', ()
   );
 });
 
+test('a batch logged in a later stage keeps its OG and FG in Primary', () => {
+  const events = [
+    ev('og', '2026-09-01T00:00', { type: 'gravity', value: 1.1, og: true }),
+    ev('fg', '2026-10-01T12:00', { type: 'gravity', value: 1.01, final: true }),
+    ev('oak', '2026-10-15T12:00', { type: 'ingredient' }),
+  ];
+  assert.deepEqual(
+    timelineSections(events, 'aging').map((s) => [s.stage, s.events.map((e) => e.id)]),
+    [
+      ['aging', ['oak']],
+      ['primary', ['fg', 'og']],
+    ],
+  );
+  // With history added afterwards, the first change recording "from Bottled" still starts in Primary.
+  const logged = [...events.slice(0, 1), stage('to-sec', '2026-09-20T10:00', 'bottled', 'secondary')];
+  assert.deepEqual(timelineSections(logged, 'bottled').map((s) => s.stage), ['secondary', 'primary']);
+});
+
 test('old stage entries without a stored stage are read from their wording', () => {
   const old = ev('old', '2026-11-10T10:00', { type: 'status', note: 'Moved to Aging' });
   assert.deepEqual(

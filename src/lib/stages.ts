@@ -45,12 +45,19 @@ export function statusAt(date: string, current: BatchStatus, entries: BatchEvent
   const at = date.slice(0, 16);
   const last = changes.filter((e) => e.date.slice(0, 16) <= at).pop();
   if (last?.toStatus) return last.toStatus;
-  // Before the first change: the stage it moved from, when that comes earlier. A batch logged as
-  // Bottled and given its history afterwards says it moved from Bottled, which can't be.
+  return stageBeforeFirstChange(changes[0]);
+}
+
+/**
+ * The stage before a batch's first stage change: the stage it moved from, when that comes earlier,
+ * else Primary. A batch logged as Bottled and given its history afterwards says it moved from
+ * Bottled, which can't be.
+ */
+function stageBeforeFirstChange(first: BatchEvent): BatchStatus {
   const order: BatchStatus[] = ['primary', 'secondary', 'aging', 'bottled'];
-  const from = changes[0].fromStatus;
-  const to = changes[0].toStatus as BatchStatus;
-  return from && order.includes(from) && (!order.includes(to) || order.indexOf(from) < order.indexOf(to)) ? from : 'primary';
+  const from = first.fromStatus;
+  const to = stageOfEntry(first);
+  return from && order.includes(from) && (!to || !order.includes(to) || order.indexOf(from) < order.indexOf(to)) ? from : 'primary';
 }
 
 /** The ingredient stage something added at a date belongs in: the batch's stage then, or Primary. */
@@ -130,14 +137,21 @@ function stageOfEntry(e: BatchEvent): BatchStatus | undefined {
 export function timelineSections(events: BatchEvent[], currentStatus: BatchStatus): TimelineSection[] {
   const oldestFirst = [...events].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
   const firstStage = oldestFirst.find((e) => stageOfEntry(e) !== undefined);
-  let stage: BatchStatus = firstStage ? (firstStage.fromStatus ?? 'primary') : currentStatus;
+  let stage: BatchStatus = firstStage ? stageBeforeFirstChange(firstStage) : currentStatus;
+  let changed = false;
   const sections: TimelineSection[] = [];
   for (const e of oldestFirst) {
     const next = stageOfEntry(e);
-    if (next !== undefined) stage = next;
+    if (next !== undefined) {
+      stage = next;
+      changed = true;
+    }
+    // The OG and FG belong to primary fermentation: before any stage change they go in Primary,
+    // even for a batch logged in a later stage.
+    const at = !changed && (e.og || e.final) && e.type === 'gravity' ? 'primary' : stage;
     const last = sections[sections.length - 1];
-    if (last && last.stage === stage) last.events.push(e);
-    else sections.push({ stage, events: [e] });
+    if (last && last.stage === at) last.events.push(e);
+    else sections.push({ stage: at, events: [e] });
   }
   return sections.reverse().map((s) => ({ ...s, events: s.events.reverse() }));
 }
