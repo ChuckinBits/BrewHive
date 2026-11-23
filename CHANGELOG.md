@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.3)
+## v0.2.3 – 2026-11-22
 
 ### Ingredients
 
@@ -29,6 +29,9 @@ a milestone.
 - **Pasteurization temperature and time** ([#54]). Stabilized with
   Pasteurization asks the temperature (in your °F/°C setting) and how many
   minutes, both optional, and reads "Pasteurization · 160 °F for 15 min".
+
+**Updating from v0.2.2:** existing data carries over. Prices already saved
+with a batch's ingredients show as its price paid.
 
 ## v0.2.2 – 2026-11-21
 
