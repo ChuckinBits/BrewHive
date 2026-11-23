@@ -9,13 +9,16 @@ a milestone.
 
 ### Timeline
 
-- **Ingredients go in the stage they were added** ([#61]). An Ingredient
-  entry with "Add to batch ingredients" ticked has a Stage field, set to the
-  stage the batch was in on the entry's date, so a past brew's honey lands
-  in Primary rather than Bottling. Pick another stage to override it.
+- **A Stage for ingredients added from the timeline** ([#61]). An
+  Ingredient entry with "Add to batch ingredients" ticked has a Stage field.
+  It starts on Secondary when the batch was in Secondary on the entry's
+  date, and on Primary otherwise, so a past brew's honey no longer lands in
+  Bottling. Pick another stage to override it.
 - **OG and FG in Primary** ([#63]). A batch created in Secondary, Aging
-  or Bottled shows its OG and FG entries under Primary on the timeline, not
-  in the stage it was created in.
+  or Bottled, with no stage changes on its timeline, shows its OG and FG
+  entries under Primary, not in the stage it was created in.
+- **Winter Spice sample** records its move to Secondary, so its timeline
+  reads Primary, Secondary, Aging. Load the sample data again to see it.
 
 ## v0.2.3 – 2026-11-22
 

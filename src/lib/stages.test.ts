@@ -86,6 +86,20 @@ test('a batch logged in a later stage keeps its OG and FG in Primary', () => {
   // With history added afterwards, the first change recording "from Bottled" still starts in Primary.
   const logged = [...events.slice(0, 1), stage('to-sec', '2026-09-20T10:00', 'bottled', 'secondary')];
   assert.deepEqual(timelineSections(logged, 'bottled').map((s) => s.stage), ['secondary', 'primary']);
+  // With history, the stage changes decide: no OG or FG pulled back into Primary between other entries.
+  const history = [
+    ev('og', '2026-09-01T00:00', { type: 'gravity', value: 1.1, og: true }),
+    ev('read', '2026-09-10T12:00', { type: 'gravity', value: 1.04 }),
+    ev('fg', '2026-09-20T12:00', { type: 'gravity', value: 1.0, final: true }),
+    stage('to-aging', '2026-10-01T10:00', 'secondary', 'aging'),
+  ];
+  assert.deepEqual(
+    timelineSections(history, 'aging').map((s) => [s.stage, s.events.map((e) => e.id)]),
+    [
+      ['aging', ['to-aging']],
+      ['secondary', ['fg', 'read', 'og']],
+    ],
+  );
 });
 
 test('old stage entries without a stored stage are read from their wording', () => {
@@ -125,7 +139,8 @@ test('statusAt finds the stage on a date from stage changes', () => {
   assert.equal(statusAt('2026-04-01T12:00', 'bottled', entries), 'secondary');
   assert.equal(statusAt('2026-06-01T12:00', 'bottled', entries), 'bottled');
   assert.equal(ingredientStageAt('2026-02-10T12:00', 'bottled', entries), 'primary');
-  assert.equal(ingredientStageAt('2026-06-01T12:00', 'bottled', entries), 'bottling');
+  assert.equal(ingredientStageAt('2026-04-01T12:00', 'bottled', entries), 'secondary');
+  assert.equal(ingredientStageAt('2026-06-01T12:00', 'bottled', entries), 'primary');
   // Logged as Bottled, history added after: its first change says it came from Bottled.
   const logged = [change('2026-03-01T09:00', 'bottled', 'secondary'), change('2026-05-01T09:00', 'secondary', 'bottled')];
   assert.equal(statusAt('2026-02-10T12:00', 'bottled', logged), 'primary');

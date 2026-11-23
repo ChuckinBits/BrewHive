@@ -60,9 +60,12 @@ function stageBeforeFirstChange(first: BatchEvent): BatchStatus {
   return from && order.includes(from) && (!to || !order.includes(to) || order.indexOf(from) < order.indexOf(to)) ? from : 'primary';
 }
 
-/** The ingredient stage something added at a date belongs in: the batch's stage then, or Primary. */
+/**
+ * The ingredient stage something added at a date goes in by default: Secondary when the batch was in
+ * Secondary then, otherwise Primary (most additions after primary are recorded against it).
+ */
 export function ingredientStageAt(date: string, current: BatchStatus, entries: BatchEvent[]): IngredientStage {
-  return stageForNewIngredient(statusAt(date, current, entries));
+  return statusAt(date, current, entries) === 'secondary' ? 'secondary' : 'primary';
 }
 
 export interface IngredientGroup {
@@ -138,16 +141,13 @@ export function timelineSections(events: BatchEvent[], currentStatus: BatchStatu
   const oldestFirst = [...events].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
   const firstStage = oldestFirst.find((e) => stageOfEntry(e) !== undefined);
   let stage: BatchStatus = firstStage ? stageBeforeFirstChange(firstStage) : currentStatus;
-  let changed = false;
+  const changed = firstStage !== undefined;
   const sections: TimelineSection[] = [];
   for (const e of oldestFirst) {
     const next = stageOfEntry(e);
-    if (next !== undefined) {
-      stage = next;
-      changed = true;
-    }
-    // The OG and FG belong to primary fermentation: before any stage change they go in Primary,
-    // even for a batch logged in a later stage.
+    if (next !== undefined) stage = next;
+    // The OG and FG belong to primary fermentation: a batch logged in a later stage, with no stage
+    // history, shows them in Primary. With history, its stage changes say where they go.
     const at = !changed && (e.og || e.final) && e.type === 'gravity' ? 'primary' : stage;
     const last = sections[sections.length - 1];
     if (last && last.stage === at) last.events.push(e);

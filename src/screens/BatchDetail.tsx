@@ -841,7 +841,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
           </label>
         )}
         {kind === 'ingredient' && !linkedLine && addToList && (
-          <Field label="Stage" hint={pickedLineStage ? undefined : 'The stage the batch was in on this date.'}>
+          <Field label="Stage" hint={pickedLineStage ? undefined : 'Secondary while the batch was in Secondary on this date, otherwise Primary.'}>
             <select value={lineStage} onChange={(e) => setLineStage(e.target.value as IngredientStage)}>
               {INGREDIENT_STAGES.map((st) => (
                 <option key={st.id} value={st.id}>
