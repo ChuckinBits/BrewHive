@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BatchEvent, BatchStatus, IngredientLine } from '../db/types.ts';
-import { addedLines, currentIngredientStage, groupByStage, joinAmount, splitAmount, stageForNewIngredient, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
+import { addedLines, currentIngredientStage, ingredientStageAt, statusAt, groupByStage, joinAmount, splitAmount, stageForNewIngredient, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
 
 const base = { createdAt: '2026-11-01T00:00:00Z', updatedAt: '', deletedAt: null };
 const line = (id: string, stage?: IngredientLine['stage'], amount = ''): IngredientLine => ({ id, name: id, amount, stage });
@@ -97,4 +97,20 @@ test('a timeline entry and its ingredient line carry the same name, amount and l
   const other = lineFromEntry(line, { ingredient: 'Clover honey', amount: '3 lb', quantity: '3', unit: 'lb', ingredientId: 'i2' });
   assert.equal(other.name, 'Clover honey');
   assert.equal(other.cost, undefined, 'another ingredient drops the old price');
+});
+
+test('statusAt finds the stage on a date from stage changes', () => {
+  const change = (date: string, fromStatus: BatchEvent['fromStatus'], toStatus: BatchEvent['toStatus']) => ({ id: date, batchId: 'b', type: 'status', date, value: null, note: '', fromStatus, toStatus, createdAt: '', updatedAt: '' }) as BatchEvent;
+  const entries = [change('2026-03-01T09:00', 'primary', 'secondary'), change('2026-05-01T09:00', 'secondary', 'bottled')];
+  assert.equal(statusAt('2026-02-10T12:00', 'bottled', entries), 'primary');
+  assert.equal(statusAt('2026-03-01T09:00', 'bottled', entries), 'secondary');
+  assert.equal(statusAt('2026-04-01T12:00', 'bottled', entries), 'secondary');
+  assert.equal(statusAt('2026-06-01T12:00', 'bottled', entries), 'bottled');
+  assert.equal(ingredientStageAt('2026-02-10T12:00', 'bottled', entries), 'primary');
+  assert.equal(ingredientStageAt('2026-06-01T12:00', 'bottled', entries), 'bottling');
+  // Logged as Bottled, history added after: its first change says it came from Bottled.
+  const logged = [change('2026-03-01T09:00', 'bottled', 'secondary'), change('2026-05-01T09:00', 'secondary', 'bottled')];
+  assert.equal(statusAt('2026-02-10T12:00', 'bottled', logged), 'primary');
+    // No stage changes: the batch's stage now.
+  assert.equal(statusAt('2026-02-10T12:00', 'aging', []), 'aging');
 });

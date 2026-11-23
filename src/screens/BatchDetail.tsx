@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
 import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
 import { batches, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type Settings, type TempUnit } from '../db/types.ts';
+import { BATCH_STATUSES, EVENT_TYPES, INGREDIENT_STAGES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, useIngredientFields } from '../components/StagedIngredients.tsx';
 import { CostFacts, currentCost } from '../components/CostCard.tsx';
@@ -32,7 +32,7 @@ import {
   projectedAbv,
   targetReached,
 } from '../lib/batch.ts';
-import { addedLines, currentIngredientStage, entryFromLine, ingredientStageLabel, lineFromEntry, stageForNewIngredient, timelineSections } from '../lib/stages.ts';
+import { addedLines, currentIngredientStage, entryFromLine, ingredientStageAt, lineFromEntry, timelineSections } from '../lib/stages.ts';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
 import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, suggestCount, totalMl, type BottleLine, type BottleUnit } from '../lib/bottling.ts';
 import { Link, navigate } from '../lib/router.tsx';
@@ -569,6 +569,10 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const stageEntries = batchEntries.filter((e) => e.type === 'status' && e.toStatus && e.id !== existing?.id);
   // The newest stage entry decides the batch's stage; an older one only records history.
   const stageIsNewest = !stageEntries.some((e) => e.date.slice(0, 16) > (date || nowLocal()));
+  // An ingredient added to the batch's list goes in the stage the batch was in on the entry's date,
+  // unless one is picked.
+  const [pickedLineStage, setLineStage] = useState<IngredientStage | null>(null);
+  const lineStage = pickedLineStage ?? ingredientStageAt(date || nowLocal(), batch.status, batchEntries);
   const [final, setFinal] = useState<FinalReading>(NO_FINAL_READING);
   // Moving from fermenting to Aging or Bottled this way asks for the final reading, as the stage buttons do.
   const stageAsksFinal = newStage && stageIsNewest && (stage === 'aging' || stage === 'bottled') && !isFermentationComplete(batch) && !finalReading(batchEntries);
@@ -661,7 +665,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       await events.save({ ...existing, ...fields, type });
       if (updateList) await batches.save({ ...batch, ingredients: batch.ingredients.map((l) => (l.id === linkedLine.id ? lineFromEntry(l, fields) : l)) });
     } else if (kind === 'ingredient' && addToList) {
-      const line: IngredientLine = { id: newId(), name: picked?.name ?? '', amount: picked?.amount ?? '', quantity: picked?.quantity, unit: picked?.unit, ingredientId: picked?.ingredientId, stage: stageForNewIngredient(batch.status) };
+      const line: IngredientLine = { id: newId(), name: picked?.name ?? '', amount: picked?.amount ?? '', quantity: picked?.quantity, unit: picked?.unit, ingredientId: picked?.ingredientId, stage: lineStage };
       line.cost = currentCost(line, await ingredients.list());
       await batches.save({ ...batch, ingredients: [...batch.ingredients, line] });
       await events.save({ ...(existing ?? {}), ...fields, type, ingredientLineId: line.id });
@@ -833,8 +837,19 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
         {kind === 'ingredient' && !linkedLine && (
           <label className="check-field">
             <input type="checkbox" checked={addToList} onChange={(e) => setAddToList(e.target.checked)} />
-            Add to batch ingredients ({ingredientStageLabel(stageForNewIngredient(batch.status))})
+            Add to batch ingredients
           </label>
+        )}
+        {kind === 'ingredient' && !linkedLine && addToList && (
+          <Field label="Stage" hint={pickedLineStage ? undefined : 'The stage the batch was in on this date.'}>
+            <select value={lineStage} onChange={(e) => setLineStage(e.target.value as IngredientStage)}>
+              {INGREDIENT_STAGES.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         )}
         {kind === 'method' && (
           <Field label="Method">

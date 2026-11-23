@@ -34,6 +34,30 @@ export function stageForNewIngredient(status: BatchStatus): IngredientStage {
   return currentIngredientStage(status) ?? 'primary';
 }
 
+/**
+ * The stage a batch was in at a date, from its stage change entries: the newest one at or before it.
+ * Before the first one, the stage that entry moved from (Primary if it doesn't say); with no stage
+ * changes at all, the batch's stage now.
+ */
+export function statusAt(date: string, current: BatchStatus, entries: BatchEvent[]): BatchStatus {
+  const changes = entries.filter((e) => e.type === 'status' && e.toStatus && !e.deletedAt).sort((a, b) => a.date.localeCompare(b.date));
+  if (changes.length === 0) return current;
+  const at = date.slice(0, 16);
+  const last = changes.filter((e) => e.date.slice(0, 16) <= at).pop();
+  if (last?.toStatus) return last.toStatus;
+  // Before the first change: the stage it moved from, when that comes earlier. A batch logged as
+  // Bottled and given its history afterwards says it moved from Bottled, which can't be.
+  const order: BatchStatus[] = ['primary', 'secondary', 'aging', 'bottled'];
+  const from = changes[0].fromStatus;
+  const to = changes[0].toStatus as BatchStatus;
+  return from && order.includes(from) && (!order.includes(to) || order.indexOf(from) < order.indexOf(to)) ? from : 'primary';
+}
+
+/** The ingredient stage something added at a date belongs in: the batch's stage then, or Primary. */
+export function ingredientStageAt(date: string, current: BatchStatus, entries: BatchEvent[]): IngredientStage {
+  return stageForNewIngredient(statusAt(date, current, entries));
+}
+
 export interface IngredientGroup {
   stage: IngredientStage;
   lines: IngredientLine[];

@@ -5,6 +5,15 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.4)
+
+### Timeline
+
+- **Ingredients go in the stage they were added** ([#61]). An Ingredient
+  entry with "Add to batch ingredients" ticked has a Stage field, set to the
+  stage the batch was in on the entry's date, so a past brew's honey lands
+  in Primary rather than Bottling. Pick another stage to override it.
+
 ## v0.2.3 – 2026-11-22
 
 ### Ingredients
@@ -317,3 +326,4 @@ themes; sample data.
 [#54]: https://github.com/ChuckinBits/BrewHive/issues/54
 [#55]: https://github.com/ChuckinBits/BrewHive/issues/55
 [#56]: https://github.com/ChuckinBits/BrewHive/issues/56
+[#61]: https://github.com/ChuckinBits/BrewHive/issues/61
