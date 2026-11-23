@@ -136,11 +136,23 @@ export function fmtRating(rating: number | null | undefined): string {
 }
 
 /** Parses a number typed by a person. Accepts a comma as the decimal mark. Empty or invalid gives null. */
+const VULGAR: Record<string, number> = { '¼': 1 / 4, '½': 1 / 2, '¾': 3 / 4, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 1 / 8, '⅜': 3 / 8, '⅝': 5 / 8, '⅞': 7 / 8 };
+
+/**
+ * A number as typed: "1.5", "1,5", and fractions "1/2", "1 1/2", "½", "1½". Null if it isn't one.
+ */
 export function parseNum(text: string): number | null {
   const cleaned = text.trim().replace(',', '.');
   if (cleaned === '') return null;
   const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  if (Number.isFinite(n)) return n;
+  // A whole number (optional), then a fraction: 1/2, 1 1/2, ½, 1½, 1 ½.
+  // "1 1/2" needs the space; "11/2" is eleven halves. "1½" doesn't.
+  const vulgar = cleaned.match(/^(\d+)?\s*([¼½¾⅓⅔⅛⅜⅝⅞])$/);
+  if (vulgar) return (vulgar[1] ? Number(vulgar[1]) : 0) + VULGAR[vulgar[2]];
+  const slash = cleaned.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/);
+  if (!slash || Number(slash[3]) === 0) return null;
+  return (slash[1] ? Number(slash[1]) : 0) + Number(slash[2]) / Number(slash[3]);
 }
 
 export function plural(count: number, one: string, many = one + 's'): string {

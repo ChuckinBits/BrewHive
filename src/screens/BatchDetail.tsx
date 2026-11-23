@@ -59,10 +59,27 @@ const EVENT_ICONS: Record<EventType, IconName> = {
   note: 'note',
 };
 
+/**
+ * When a tapped ingredient went in: primary ingredients went in when the batch was started,
+ * except nutrients, which are usually staggered. Everything else goes in now.
+ */
+async function logDateFor(line: IngredientLine, batch: Batch): Promise<string> {
+  const now = nowLocal();
+  if ((line.stage ?? 'primary') !== 'primary' || batch.startDate === today()) return now;
+  const library = await ingredients.list();
+  const item = line.ingredientId ? library.find((i) => i.id === line.ingredientId) : library.find((i) => i.name.trim().toLowerCase() === line.name.trim().toLowerCase());
+  if (item?.category === 'nutrient') return now;
+  return `${batch.startDate}T00:00`;
+}
+
 /** The short value shown after an entry's title, such as "1.045", "3.60" or "1 oz". */
 function eventValue(event: BatchEvent, settings: Settings): string {
   if (event.type === 'ingredient') return event.amount ?? '';
-  if (event.type === 'stabilize') return event.method ?? '';
+  if (event.type === 'stabilize') {
+    // Pasteurization: "Pasteurization · 160 °F for 15 min".
+    const held = [event.value != null ? fmtTempBoth(event.value, event.tempUnit, settings.tempUnit) : '', event.minutes != null ? `${event.minutes} min` : ''].filter(Boolean).join(' for ');
+    return [event.method ?? '', held].filter(Boolean).join(' · ');
+  }
   if (event.value == null) return '';
   if (event.type === 'gravity') return fmtSG(event.value);
   if (event.type === 'feeding' || event.type === 'backsweeten') return `→ ${fmtSG(event.value)}`;
@@ -271,7 +288,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         <section className="card">
           <div className="card-head">
             <h2>Ingredients</h2>
-            <Link to={`/batches/${batch.id}/edit`} className="btn btn-quiet btn-small">
+            <Link to={`/batches/${batch.id}/edit?section=ingredients`} className="btn btn-quiet btn-small" aria-label="Edit ingredients">
               Edit
             </Link>
           </div>
@@ -286,7 +303,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
               await events.save({
                 batchId: batch.id,
                 type: 'ingredient',
-                date: nowLocal(),
+                date: await logDateFor(line, batch),
                 value: null,
                 note: '',
                 ...entryFromLine(line),
@@ -489,6 +506,13 @@ interface EventSheetProps {
 }
 
 /** What a new entry can be: the entry types, plus a stage change. */
+/** The stage after this one: Planned → Primary → Secondary → Aging → Bottled. */
+function nextStage(status: BatchStatus): BatchStatus {
+  const order: BatchStatus[] = ['planned', 'primary', 'secondary', 'aging', 'bottled'];
+  const i = order.indexOf(status);
+  return i < 0 ? 'bottled' : order[Math.min(i + 1, order.length - 1)];
+}
+
 const ENTRY_CHOICES = [...EVENT_TYPES.slice(0, 1), ...[...EVENT_TYPES.slice(1), { id: 'status' as EventType, label: 'Stage change' }].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))];
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
@@ -499,7 +523,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // The OG's entry: its value is the batch's OG, so it stays a gravity reading and is never the final one.
   const isOg = existing?.type === 'gravity' && existing.og === true;
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
-  const [stage, setStage] = useState<BatchStatus>(existing?.toStatus ?? stageFromNote(existing?.note ?? '') ?? batch.status);
+  // A new stage change starts on the stage after the batch's current one, the one it's most likely moving to.
+  const [stage, setStage] = useState<BatchStatus>(existing ? (existing.toStatus ?? stageFromNote(existing.note ?? '') ?? batch.status) : nextStage(batch.status));
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
   const [value, setValue] = useState(existing ? valueToInput(existing, settings) : '');
   const [place, setPlace] = useState(existing?.place ?? '');
@@ -524,6 +549,9 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // Older entries that aren't on the list can be added too, but aren't by default.
   const [addToList, setAddToList] = useState(!existing);
   const [method, setMethod] = useState(existing?.method ?? STABILIZE_METHODS[0]);
+  // Pasteurization's temperature and hold time, both optional.
+  const [pasteurTemp, setPasteurTemp] = useState(existing?.type === 'stabilize' && existing.value != null ? tempToInput(existing.value, existing.tempUnit ?? settings.tempUnit) : '');
+  const [minutes, setMinutes] = useState(existing?.minutes != null ? String(existing.minutes) : '');
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
 
   const [taster, setTaster] = useState(existing?.taster ?? '');
@@ -545,6 +573,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // Moving from fermenting to Aging or Bottled this way asks for the final reading, as the stage buttons do.
   const stageAsksFinal = newStage && stageIsNewest && (stage === 'aging' || stage === 'bottled') && !isFermentationComplete(batch) && !finalReading(batchEntries);
   const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
+  const pasteurizing = kind === 'method' && method === 'Pasteurization';
   // The batch's current final gravity reading, other than this one.
   const otherFinal = finalReading((allEntries ?? []).filter((e) => e.batchId === batch.id && e.id !== existing?.id));
   // A step feeding, or a backsweetening ticked to ferment, logged after the final reading.
@@ -568,6 +597,12 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
     } else if (kind === 'sg-after' && value.trim() !== '') {
       parsed = parseNum(value);
       if (parsed == null || parsed < 0.98 || parsed > 1.2) return setError('Enter the gravity after adding, between 0.980 and 1.200, or leave it empty.');
+    } else if (pasteurizing) {
+      if (pasteurTemp.trim() !== '') {
+        parsed = tempFromInput(pasteurTemp, tempUnit);
+        if (parsed == null) return setError('Enter the temperature, or leave it empty.');
+      }
+      if (minutes.trim() !== '' && !((parseNum(minutes) ?? -1) > 0)) return setError('Enter how many minutes, or leave it empty.');
     } else if (kind === 'place' && !place.trim()) {
       return setError('Enter where the batch went, such as Basement.');
     } else if (kind === 'ingredient' && !ingredient.name.trim()) {
@@ -592,7 +627,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       method: kind === 'method' ? method : undefined,
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
-      tempUnit: kind === 'temp' ? tempUnit : undefined,
+      tempUnit: kind === 'temp' || (pasteurizing && parsed != null) ? tempUnit : undefined,
+      minutes: pasteurizing && minutes.trim() !== '' ? (parseNum(minutes) ?? undefined) : undefined,
       // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
       final: type === 'gravity' && !isOg ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
     };
@@ -694,7 +730,7 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
         )}
         {newStage && (
           <>
-            <Field label="Stage" hint={
+            <Field label="Move to" hint={
                 !stageIsNewest
                   ? 'Earlier than the latest stage change, so this only records when it happened.'
                   : stage === batch.status
@@ -810,6 +846,22 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
               ))}
             </select>
           </Field>
+        )}
+        {pasteurizing && (
+          <div className="form-pair">
+            <UnitField
+              label="Temperature (optional)"
+              value={pasteurTemp}
+              placeholder={tempUnit === 'F' ? '160' : '70'}
+              onChange={setPasteurTemp}
+              unit={tempUnit}
+              units={TEMP_UNITS}
+              onUnit={setTempUnit}
+            />
+            <Field label="Time (minutes)">
+              <input type="text" inputMode="decimal" value={minutes} placeholder="15" onChange={(e) => setMinutes(e.target.value)} />
+            </Field>
+          </div>
         )}
         {kind === 'rating' && (
           <>

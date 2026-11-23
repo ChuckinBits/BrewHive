@@ -410,6 +410,8 @@ export interface BatchEvent extends Base {
   ingredientLineId?: string;
   /** For "stabilize" entries: how it was stabilized, one of STABILIZE_METHODS. */
   method?: string;
+  /** For pasteurization: how long it was held, in minutes. Its temperature is `value` (°C, typed in `tempUnit`). */
+  minutes?: number;
   /** For "tasting" and "review" entries: a 0 to 10 rating, or null. */
   rating?: number | null;
   /** For "tasting" entries: who tasted it, if not the user. Optional. */

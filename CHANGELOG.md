@@ -5,6 +5,31 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.3)
+
+### Ingredients
+
+- **Fractions in quantities** ([#52]). Type 1/2, 1 1/2 or ½ for an amount;
+  it's priced and scaled like 0.5 or 1.5.
+- **Price paid** ([#55]). Batch Edit's ingredient sheet asks what you paid
+  and for how much, starting from the price saved with the line or your
+  ingredients' price. "Also update the price in your ingredients" saves it
+  to your list too; it's ticked when your list has no price yet.
+- **Edit ingredients** ([#53]). The Edit button on a batch's Ingredients
+  card opens Batch Edit at the Ingredients section.
+- **Primary ingredients log at the start date** ([#56]). Tapping a primary
+  ingredient to log it dates the entry when the batch was started, since
+  that's when it went in. Nutrients, which are usually staggered, and later
+  stages still log now.
+
+### Timeline
+
+- **Stage change starts on the next stage.** Picking Stage change in Add
+  entry shows "Move to", set to the stage after the batch's current one.
+- **Pasteurization temperature and time** ([#54]). Stabilized with
+  Pasteurization asks the temperature (in your °F/°C setting) and how many
+  minutes, both optional, and reads "Pasteurization · 160 °F for 15 min".
+
 ## v0.2.2 – 2026-11-21
 
 ### Fermentation
@@ -284,3 +309,8 @@ themes; sample data.
 [#44]: https://github.com/ChuckinBits/BrewHive/issues/44
 [#46]: https://github.com/ChuckinBits/BrewHive/issues/46
 [#49]: https://github.com/ChuckinBits/BrewHive/issues/49
+[#52]: https://github.com/ChuckinBits/BrewHive/issues/52
+[#53]: https://github.com/ChuckinBits/BrewHive/issues/53
+[#54]: https://github.com/ChuckinBits/BrewHive/issues/54
+[#55]: https://github.com/ChuckinBits/BrewHive/issues/55
+[#56]: https://github.com/ChuckinBits/BrewHive/issues/56
