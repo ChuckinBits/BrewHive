@@ -11,7 +11,8 @@ a milestone.
 
 - **Icons instead of a list** ([#57]). What happened? is a grid of icon
   buttons, most used first: Gravity, Ingredient, Tasting, Note, Stage
-  change and so on.
+  change and so on. Estimated ABV moved into Gravity: "No reading? Enter an
+  estimated ABV", as when finishing a batch.
 - **Fining, Nutrients and Yeast pitched are Ingredient entries.** Pick the
   ingredient and the entry takes its title and icon from the ingredient's
   category: "Fining: Gelatin finings 2 tsp", "Nutrients: Fermaid O 2 g",

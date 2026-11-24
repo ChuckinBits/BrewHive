@@ -2480,9 +2480,10 @@ button.library-row {
   background: var(--surface);
   color: var(--muted);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.2;
   text-align: center;
+  hyphens: manual;
   cursor: pointer;
 }
 .entry-choice svg {

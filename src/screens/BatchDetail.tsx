@@ -537,8 +537,12 @@ function isLaterStage(to: BatchStatus, from: BatchStatus): boolean {
  * Yeast pitched are Ingredient entries now, titled by the ingredient's category; older entries of
  * those types keep their own.
  */
-const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'temperature', 'ph', 'moved', 'estimate'];
-const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change', estimate: 'Est. ABV', feeding: 'Step feed' };
+// An Estimated ABV entry is made from Gravity ("No reading? Enter an estimated ABV"), so it has no button of its own.
+const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'temperature', 'ph', 'moved'];
+// A soft hyphen lets Backsweetened break across two lines on a narrow button.
+const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change', feeding: 'Step feed', backsweeten: 'Back\u00ADsweetened' };
+/** The grid button an entry type is under: an Estimated ABV is a kind of gravity entry. */
+const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravity' : type);
 const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
 
 /** An ingredient entry's category, from your ingredients: by its link, or by name. */
@@ -759,12 +763,12 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             <legend className="field-label">What happened?</legend>
             <div className="entry-grid" role="radiogroup" aria-label="What happened?">
               {/* An older Fining, Nutrients or Yeast pitched entry keeps its own type. */}
-              {[...ENTRY_CHOICES, ...(ENTRY_CHOICES.some((t) => t.id === type) ? [] : [{ id: type, label: eventLabel(type) }])].map((t) => (
+              {[...ENTRY_CHOICES, ...(ENTRY_CHOICES.some((t) => t.id === gridChoice(type)) ? [] : [{ id: type, label: eventLabel(type) }])].map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   role="radio"
-                  aria-checked={type === t.id}
+                  aria-checked={gridChoice(type) === t.id}
                   aria-label={t.label}
                   className="entry-choice"
                   onClick={() => {
@@ -833,6 +837,21 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
                   : 'Tick this for the reading where fermentation ended.'}
             </p>
           </>
+        )}
+        {type === 'gravity' && !existing && (
+          <button
+            type="button"
+            className="btn btn-quiet btn-small"
+            // Start the estimate at the ABV so far, so it's easy to keep or adjust.
+            onClick={() => {
+              const soFar = batchAbv(batch, batchEntries);
+              setType('estimate');
+              setValue(soFar != null ? soFar.toFixed(1) : '');
+              setError('');
+            }}
+          >
+            No reading? Enter an estimated ABV
+          </button>
         )}
         {kind === 'temp' && (
           <UnitField
@@ -954,9 +973,24 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
           </>
         )}
         {kind === 'abv' && (
-          <Field label="Estimated ABV (%)" hint="Shown with ≈. A gravity reading logged after it replaces it.">
-            <input type="text" inputMode="decimal" value={value} placeholder="12" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
-          </Field>
+          <>
+            <Field label="Estimated ABV (%)" hint="Shown with ≈. A gravity reading logged after it replaces it.">
+              <input type="text" inputMode="decimal" value={value} placeholder="12" autoFocus={!existing} onChange={(e) => setValue(e.target.value)} />
+            </Field>
+            {!existing && (
+              <button
+                type="button"
+                className="btn btn-quiet btn-small"
+                onClick={() => {
+                  setType('gravity');
+                  setValue('');
+                  setError('');
+                }}
+              >
+                Enter a gravity reading instead
+              </button>
+            )}
+          </>
         )}
         {removesFinal && otherFinal && (
           <p className="warning" role="note">
