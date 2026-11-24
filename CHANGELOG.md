@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.4)
+## v0.2.4 – 2026-11-23
 
 ### Add entry
 
@@ -40,6 +40,9 @@ a milestone.
   Primary with a Bottled section.
 - **Winter Spice sample** records its move to Secondary, so its timeline
   reads Primary, Secondary, Aging. Load the sample data again to see it.
+
+**Updating from v0.2.3:** existing data carries over. Fining, Nutrients and
+Yeast pitched entries already saved keep their titles and icons.
 
 ## v0.2.3 – 2026-11-22
 
