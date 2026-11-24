@@ -15,8 +15,10 @@ a milestone.
   date, and on Primary otherwise, so a past brew's honey no longer lands in
   Bottling. Pick another stage to override it.
 - **OG and FG in Primary** ([#63]). A batch created in Secondary, Aging
-  or Bottled, with no stage changes on its timeline, shows its OG and FG
-  entries under Primary, not in the stage it was created in.
+  or Bottled, with no stage changes on its timeline, shows everything up to
+  its FG (its OG, without one) under Primary, and later entries in the stage
+  it's in. Additions and readings dated on the start date no longer split
+  Primary with a Bottled section.
 - **Winter Spice sample** records its move to Secondary, so its timeline
   reads Primary, Secondary, Aging. Load the sample data again to see it.
 

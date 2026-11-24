@@ -83,6 +83,23 @@ test('a batch logged in a later stage keeps its OG and FG in Primary', () => {
       ['primary', ['fg', 'og']],
     ],
   );
+  // Entries on the start date, between the OG and FG, stay in Primary too: no Bottled section between.
+  const bottled = [
+    ev('og', '2026-09-01T00:00', { type: 'gravity', value: 1.1, og: true }),
+    ev('fermaid', '2026-09-01T12:00', { type: 'ingredient' }),
+    ev('ph', '2026-09-01T12:05', { type: 'ph', value: 3.6 }),
+    ev('fg', '2026-10-01T12:00', { type: 'gravity', value: 1.01, final: true }),
+    ev('label', '2026-11-01T12:00', { type: 'note' }),
+  ];
+  assert.deepEqual(
+    timelineSections(bottled, 'bottled').map((s) => [s.stage, s.events.map((e) => e.id)]),
+    [
+      ['bottled', ['label']],
+      ['primary', ['fg', 'ph', 'fermaid', 'og']],
+    ],
+  );
+  // Without an FG, only the OG is Primary.
+  assert.deepEqual(timelineSections(bottled.filter((e) => e.id !== 'fg'), 'bottled').map((s) => [s.stage, s.events.length]), [['bottled', 3], ['primary', 1]]);
   // With history added afterwards, the first change recording "from Bottled" still starts in Primary.
   const logged = [...events.slice(0, 1), stage('to-sec', '2026-09-20T10:00', 'bottled', 'secondary')];
   assert.deepEqual(timelineSections(logged, 'bottled').map((s) => s.stage), ['secondary', 'primary']);
@@ -144,6 +161,9 @@ test('statusAt finds the stage on a date from stage changes', () => {
   // Logged as Bottled, history added after: its first change says it came from Bottled.
   const logged = [change('2026-03-01T09:00', 'bottled', 'secondary'), change('2026-05-01T09:00', 'secondary', 'bottled')];
   assert.equal(statusAt('2026-02-10T12:00', 'bottled', logged), 'primary');
-    // No stage changes: the batch's stage now.
+    // No stage changes: the batch's stage now, or Primary up to its FG.
   assert.equal(statusAt('2026-02-10T12:00', 'aging', []), 'aging');
+  const fg = { ...change('2026-03-01T09:00', undefined, undefined), type: 'gravity', value: 1.0, final: true } as BatchEvent;
+  assert.equal(statusAt('2026-02-10T12:00', 'aging', [fg]), 'primary');
+  assert.equal(statusAt('2026-04-10T12:00', 'aging', [fg]), 'aging');
 });

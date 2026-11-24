@@ -41,7 +41,11 @@ export function stageForNewIngredient(status: BatchStatus): IngredientStage {
  */
 export function statusAt(date: string, current: BatchStatus, entries: BatchEvent[]): BatchStatus {
   const changes = entries.filter((e) => e.type === 'status' && e.toStatus && !e.deletedAt).sort((a, b) => a.date.localeCompare(b.date));
-  if (changes.length === 0) return current;
+  if (changes.length === 0) {
+    // Logged in a later stage with no history: primary up to its FG.
+    const fg = entries.filter((e) => e.type === 'gravity' && e.final && !e.deletedAt).map((e) => e.date.slice(0, 16)).sort().pop();
+    return current !== 'planned' && fg && date.slice(0, 16) <= fg ? 'primary' : current;
+  }
   const at = date.slice(0, 16);
   const last = changes.filter((e) => e.date.slice(0, 16) <= at).pop();
   if (last?.toStatus) return last.toStatus;
@@ -141,19 +145,27 @@ export function timelineSections(events: BatchEvent[], currentStatus: BatchStatu
   const oldestFirst = [...events].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
   const firstStage = oldestFirst.find((e) => stageOfEntry(e) !== undefined);
   let stage: BatchStatus = firstStage ? stageBeforeFirstChange(firstStage) : currentStatus;
-  const changed = firstStage !== undefined;
+  // A batch logged in a later stage, with no stage history: everything up to its FG (or its OG,
+  // without one) was primary fermentation, and what follows is the stage it's in.
+  const primaryThrough = firstStage ? -1 : primaryEndIndex(oldestFirst, currentStatus);
   const sections: TimelineSection[] = [];
-  for (const e of oldestFirst) {
+  for (const [i, e] of oldestFirst.entries()) {
     const next = stageOfEntry(e);
     if (next !== undefined) stage = next;
-    // The OG and FG belong to primary fermentation: a batch logged in a later stage, with no stage
-    // history, shows them in Primary. With history, its stage changes say where they go.
-    const at = !changed && (e.og || e.final) && e.type === 'gravity' ? 'primary' : stage;
+    const at = i <= primaryThrough ? 'primary' : stage;
     const last = sections[sections.length - 1];
     if (last && last.stage === at) last.events.push(e);
     else sections.push({ stage: at, events: [e] });
   }
   return sections.reverse().map((s) => ({ ...s, events: s.events.reverse() }));
+}
+
+/** For a batch with no stage history in a later stage: the index of the last primary entry (its FG, else its OG). */
+function primaryEndIndex(oldestFirst: BatchEvent[], currentStatus: BatchStatus): number {
+  if (currentStatus === 'primary' || currentStatus === 'planned') return -1;
+  const isGravity = (e: BatchEvent, key: 'final' | 'og') => e.type === 'gravity' && !!e[key];
+  const fg = oldestFirst.map((e, i) => (isGravity(e, 'final') ? i : -1)).filter((i) => i >= 0).pop();
+  return fg ?? oldestFirst.findIndex((e) => isGravity(e, 'og'));
 }
 
 /** Drops ingredients without a name and trims the rest, before saving. */
