@@ -25,11 +25,21 @@ export function currentCost(line: IngredientLine, library: LibraryIngredient[]):
   return libraryItemFor(line, library)?.cost ?? undefined;
 }
 
+/** What isn't counted, one short line per reason: "No cost: Cinnamon sticks, Oak cubes." */
 const WHY: Record<MissingReason, string> = {
-  'no cost': 'no cost',
-  'no amount': 'no amount',
-  units: "its cost is in other units",
+  'no cost': 'No cost',
+  'no amount': 'No amount',
+  units: 'Cost in other units',
 };
+
+function notCountedLines(missing: { name: string; reason: MissingReason }[]): string[] {
+  const lines: string[] = [];
+  for (const reason of Object.keys(WHY) as MissingReason[]) {
+    const names = missing.filter((m) => m.reason === reason).map((m) => m.name);
+    if (names.length) lines.push(`${WHY[reason]}: ${names.join(', ')}.`);
+  }
+  return lines;
+}
 
 interface Props {
   lines: IngredientLine[];
@@ -57,7 +67,7 @@ function useCost(lines: IngredientLine[], volumeL: number | null, useSaved: bool
     perVolume: hasVolume ? money(summary.total / (Math.round(((volumeL as number) / perVolume) * 1e6) / 1e6)) : null,
     perVolumeName: gallons ? 'gallon' : 'liter',
     perVolumeShort: fmtVolume(perVolume, volumeUnitOf(settings)).replace(/^1 /, ''),
-    notCounted: summary.missing.length > 0 ? `Not counted: ${summary.missing.map((m) => `${m.name} (${WHY[m.reason]})`).join(', ')}.` : null,
+    notCounted: summary.missing.length > 0 ? notCountedLines(summary.missing).join(' ') : null,
   };
 }
 

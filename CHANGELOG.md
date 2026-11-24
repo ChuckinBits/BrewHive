@@ -5,6 +5,15 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.5)
+
+### Cost
+
+- **Shorter "not counted" line.** Ingredients left out of the cost are
+  grouped by why: "No cost: Cinnamon sticks, Oak cubes." in place of
+  "Not counted: Cinnamon sticks (no cost), Oak cubes (no cost)." Lines for
+  "No amount" and "Cost in other units" follow when they apply.
+
 ## v0.2.4 – 2026-11-23
 
 ### Add entry
