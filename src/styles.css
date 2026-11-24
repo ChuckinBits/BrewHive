@@ -2453,3 +2453,52 @@ button.library-row {
 .ingredient-editor {
   scroll-margin-top: 16px;
 }
+
+/* Add entry: what happened, as a grid of icon buttons. */
+.entry-types {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+.entry-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  hyphens: manual;
+  cursor: pointer;
+}
+.entry-choice svg {
+  color: var(--ink);
+}
+.entry-choice[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.entry-choice[aria-checked='true'] svg {
+  color: var(--accent-ink);
+}
+.entry-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
