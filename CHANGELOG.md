@@ -9,6 +9,12 @@ a milestone.
 
 ### Timeline
 
+- **Stage changes on the timeline only move forward.** Add entry → Stage
+  change starts on the stage after the timeline's latest (Secondary when it
+  only has Primary entries, Aging after Secondary, and so on). It moves the
+  batch only when that's later than its current stage; filling in a past
+  brew's history leaves a Bottled batch in Bottled. The stage buttons at the
+  top still move a batch back.
 - **A Stage for ingredients added from the timeline** ([#61]). An
   Ingredient entry with "Add to batch ingredients" ticked has a Stage field.
   It starts on Secondary when the batch was in Secondary on the entry's

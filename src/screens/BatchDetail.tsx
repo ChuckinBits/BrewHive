@@ -506,11 +506,17 @@ interface EventSheetProps {
 }
 
 /** What a new entry can be: the entry types, plus a stage change. */
+const STAGE_ORDER: BatchStatus[] = ['planned', 'primary', 'secondary', 'aging', 'bottled'];
+
 /** The stage after this one: Planned → Primary → Secondary → Aging → Bottled. */
 function nextStage(status: BatchStatus): BatchStatus {
-  const order: BatchStatus[] = ['planned', 'primary', 'secondary', 'aging', 'bottled'];
-  const i = order.indexOf(status);
-  return i < 0 ? 'bottled' : order[Math.min(i + 1, order.length - 1)];
+  const i = STAGE_ORDER.indexOf(status);
+  return i < 0 ? 'bottled' : STAGE_ORDER[Math.min(i + 1, STAGE_ORDER.length - 1)];
+}
+
+/** Whether `to` comes after `from` (Archived never does: it's set from the stage buttons). */
+function isLaterStage(to: BatchStatus, from: BatchStatus): boolean {
+  return to !== 'archived' && STAGE_ORDER.indexOf(to) > STAGE_ORDER.indexOf(from);
 }
 
 const ENTRY_CHOICES = [...EVENT_TYPES.slice(0, 1), ...[...EVENT_TYPES.slice(1), { id: 'status' as EventType, label: 'Stage change' }].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))];
@@ -523,8 +529,8 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   // The OG's entry: its value is the batch's OG, so it stays a gravity reading and is never the final one.
   const isOg = existing?.type === 'gravity' && existing.og === true;
   const [type, setType] = useState<EventType>(existing?.type ?? 'gravity');
-  // A new stage change starts on the stage after the batch's current one, the one it's most likely moving to.
-  const [stage, setStage] = useState<BatchStatus>(existing ? (existing.toStatus ?? stageFromNote(existing.note ?? '') ?? batch.status) : nextStage(batch.status));
+  // A new stage change starts on the stage after the timeline's latest (see below), unless one is picked.
+  const [pickedStage, setStage] = useState<BatchStatus | null>(existing ? (existing.toStatus ?? stageFromNote(existing.note ?? '') ?? batch.status) : null);
   const [date, setDate] = useState(existing ? existing.date.slice(0, 16) : nowLocal());
   const [value, setValue] = useState(existing ? valueToInput(existing, settings) : '');
   const [place, setPlace] = useState(existing?.place ?? '');
@@ -567,15 +573,21 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
   const newStage = !existing && type === 'status';
   const batchEntries = (allEntries ?? []).filter((e) => e.batchId === batch.id && !e.deletedAt);
   const stageEntries = batchEntries.filter((e) => e.type === 'status' && e.toStatus && e.id !== existing?.id);
+  // The timeline's latest stage: its newest stage change, or Primary (where its first entries are)
+  // when it has none. A new stage change starts on the one after it.
+  const latestOnTimeline = [...stageEntries].sort((a, b) => a.date.localeCompare(b.date)).pop()?.toStatus ?? (batch.status === 'planned' ? 'planned' : 'primary');
+  const stage = pickedStage ?? nextStage(latestOnTimeline);
   // The newest stage entry decides the batch's stage; an older one only records history.
   const stageIsNewest = !stageEntries.some((e) => e.date.slice(0, 16) > (date || nowLocal()));
+  // A stage change on the timeline only moves the batch forward; the stage buttons move it back.
+  const stageMovesBatch = stageIsNewest && isLaterStage(stage, batch.status);
   // An ingredient added to the batch's list goes in the stage the batch was in on the entry's date,
   // unless one is picked.
   const [pickedLineStage, setLineStage] = useState<IngredientStage | null>(null);
   const lineStage = pickedLineStage ?? ingredientStageAt(date || nowLocal(), batch.status, batchEntries);
   const [final, setFinal] = useState<FinalReading>(NO_FINAL_READING);
   // Moving from fermenting to Aging or Bottled this way asks for the final reading, as the stage buttons do.
-  const stageAsksFinal = newStage && stageIsNewest && (stage === 'aging' || stage === 'bottled') && !isFermentationComplete(batch) && !finalReading(batchEntries);
+  const stageAsksFinal = newStage && stageMovesBatch && (stage === 'aging' || stage === 'bottled') && !isFermentationComplete(batch) && !finalReading(batchEntries);
   const kind = isStage ? undefined : isReview ? 'rating' : EVENT_TYPES.find((t) => t.id === type)?.value;
   const pasteurizing = kind === 'method' && method === 'Pasteurization';
   // The batch's current final gravity reading, other than this one.
@@ -643,18 +655,18 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
       }
       // Where the batch was before this change: the stage entry just before it, or the batch's stage now.
       const before = [...stageEntries].filter((e) => e.date.slice(0, 16) <= fields.date).sort((a, b) => a.date.localeCompare(b.date)).pop();
-      const fromStatus = stageIsNewest ? batch.status : (before?.toStatus ?? 'primary');
+      const fromStatus = stageMovesBatch ? batch.status : (before?.toStatus ?? 'primary');
       if (stageAsksFinal) await saveFinalReading(batch.id, { ...final, date: final.date || fields.date }, fields.date);
       await events.save({ ...fields, type: 'status', value: null, toStatus: stage, fromStatus, auto: false });
-      if (stageIsNewest && stage !== batch.status) await batches.save({ ...batch, status: stage });
-      toast(stageIsNewest && stage !== batch.status ? `Moved to ${statusLabel(stage)}` : 'Added to the timeline');
+      if (stageMovesBatch) await batches.save({ ...batch, status: stage });
+      toast(stageMovesBatch ? `Moved to ${statusLabel(stage)}` : 'Added to the timeline');
       return onClose();
     }
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
       await events.save({ ...existing, ...fields, value: null, toStatus: stage, auto: false });
-      // The newest stage entry decides the batch's stage.
-      if (stageIsNewest && stage !== batch.status && stage !== 'archived') await batches.save({ ...batch, status: stage });
+      // The newest stage entry moves the batch forward, never back.
+      if (stageMovesBatch) await batches.save({ ...batch, status: stage });
     } else if (existing && isOg) {
       await events.save({ ...existing, ...fields, type, og: true });
       if (parsed !== batch.og) await batches.save({ ...batch, og: parsed });
@@ -739,7 +751,9 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
                   ? 'Earlier than the latest stage change, so this only records when it happened.'
                   : stage === batch.status
                     ? 'The batch is already in this stage; this records when it got there.'
-                    : 'The batch moves to this stage.'
+                    : stageMovesBatch
+                      ? 'The batch moves to this stage.'
+                      : `The batch is already in ${statusLabel(batch.status)}, so this only records when it happened. Use the stage buttons at the top to move it back.`
               }>
               <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
                 {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((s) => (
