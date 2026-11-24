@@ -160,8 +160,14 @@ export function statusLabel(status: BatchStatus): string {
   return BATCH_STATUSES.find((s) => s.id === status)?.label ?? status;
 }
 
-/** The heading a timeline entry shows, such as "Moved to Secondary" or "Relocated to Basement". */
-export function eventTitle(event: BatchEvent): string {
+/** Ingredient categories whose entries are titled by the category, as the old entry types were: "Fining: Gelatin finings". */
+const CATEGORY_TITLES: Record<string, string> = { yeast: 'Yeast pitched', nutrient: 'Nutrients', fining: 'Fining' };
+
+/**
+ * The heading a timeline entry shows, such as "Moved to Secondary" or "Relocated to Basement".
+ * `category` is an ingredient entry's category, from your ingredients.
+ */
+export function eventTitle(event: BatchEvent, category?: string): string {
   if (event.type === 'status') {
     if (event.toStatus === 'bottled') return 'Bottled';
     if (event.toStatus === 'archived') return 'Archived';
@@ -172,7 +178,11 @@ export function eventTitle(event: BatchEvent): string {
   }
   if (event.type === 'gravity' && event.og) return 'Original gravity';
   if (event.type === 'moved') return event.place ? `Relocated to ${event.place}` : 'Relocated';
-  if (event.type === 'ingredient') return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
+  if (event.type === 'ingredient') {
+    const byCategory = category ? CATEGORY_TITLES[category] : undefined;
+    if (byCategory) return event.ingredient ? `${byCategory}: ${event.ingredient}` : byCategory;
+    return event.ingredient ? `Added ${event.ingredient}` : 'Ingredient';
+  }
   if (event.type === 'tasting') return event.taster ? `Tasting by ${event.taster}` : 'Tasting';
   if (event.type === 'review') return 'Batch rating';
   return eventLabel(event.type);

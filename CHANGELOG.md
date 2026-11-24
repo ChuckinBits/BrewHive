@@ -7,6 +7,18 @@ a milestone.
 
 ## Unreleased (v0.2.4)
 
+### Add entry
+
+- **Icons instead of a list** ([#57]). What happened? is a grid of icon
+  buttons, most used first: Gravity, Ingredient, Tasting, Note, Stage
+  change and so on.
+- **Fining, Nutrients and Yeast pitched are Ingredient entries.** Pick the
+  ingredient and the entry takes its title and icon from the ingredient's
+  category: "Fining: Gelatin finings 2 tsp", "Nutrients: Fermaid O 2 g",
+  "Yeast pitched: Lalvin 71B 1 packet". Other ingredients read "Added …"
+  with their category's icon. Older entries of those three types keep
+  showing as they are.
+
 ### Timeline
 
 - **Stage changes on the timeline only move forward.** Add entry → Stage
@@ -340,5 +352,6 @@ themes; sample data.
 [#54]: https://github.com/ChuckinBits/BrewHive/issues/54
 [#55]: https://github.com/ChuckinBits/BrewHive/issues/55
 [#56]: https://github.com/ChuckinBits/BrewHive/issues/56
+[#57]: https://github.com/ChuckinBits/BrewHive/issues/57
 [#61]: https://github.com/ChuckinBits/BrewHive/issues/61
 [#63]: https://github.com/ChuckinBits/BrewHive/issues/63

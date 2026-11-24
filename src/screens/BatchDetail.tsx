@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
 import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
-import { batches, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, INGREDIENT_STAGES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit } from '../db/types.ts';
+import { batches, categoriesOf, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
+import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type LibraryIngredient, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, useIngredientFields } from '../components/StagedIngredients.tsx';
 import { CostFacts, currentCost } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
 import { Icon, type IconName } from '../icons/Icon.tsx';
+import { CategoryIcon } from '../icons/CategoryIcon.tsx';
+import { categoryIcon } from '../lib/library.ts';
 import {
   abvEstimate,
   fmtPoints,
@@ -105,6 +107,17 @@ export function BatchDetailScreen({ id }: { id: string }) {
       recipe: batch.recipeId ? ((await recipes.get(batch.recipeId)) ?? null) : null,
     };
   }, [id]);
+
+  const library = useQuery(() => ingredients.list()) ?? [];
+  const categories = categoriesOf(settings);
+  // An ingredient entry shows its category's icon; other entries, their type's.
+  const iconFor = (event: BatchEvent) => {
+    const category = entryCategory(event, library);
+    const found = category ? categories.find((c) => c.id === category) : undefined;
+    const id = found ? categoryIcon(found) : null;
+    return id ? <CategoryIcon id={id} size={20} strokeWidth={1.75} /> : <Icon name={EVENT_ICONS[event.type]} size={20} />;
+  };
+  const titleOf = (event: BatchEvent) => eventTitle(event, entryCategory(event, library));
 
   // null: closed. 'new': adding an entry. An event: editing that entry.
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
@@ -348,16 +361,16 @@ export function BatchDetailScreen({ id }: { id: string }) {
                     className="timeline-entry"
                     // The Bottled entry opens bottling, to add bottles; its own date and removal are a tap further.
                     onClick={() => (isBottledEntry(event) ? setBottling({ entry: event }) : setEntry(event))}
-                    aria-label={isBottledEntry(event) ? `Bottling, ${fmtDate(event.date)}` : `Edit ${eventTitle(event)}, ${fmtDate(event.date)}`}
+                    aria-label={isBottledEntry(event) ? `Bottling, ${fmtDate(event.date)}` : `Edit ${titleOf(event)}, ${fmtDate(event.date)}`}
                   >
                     <span className="timeline-icon">
-                      <Icon name={EVENT_ICONS[event.type]} size={20} />
+                      {iconFor(event)}
                     </span>
                     <span className="timeline-body">
                       <span className="timeline-head">
                         <strong className="timeline-title">
                           <span>
-                            {eventTitle(event)}
+                            {titleOf(event)}
                             {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
                             {event.type === 'gravity' && event.final && (
                               <>
@@ -519,7 +532,22 @@ function isLaterStage(to: BatchStatus, from: BatchStatus): boolean {
   return to !== 'archived' && STAGE_ORDER.indexOf(to) > STAGE_ORDER.indexOf(from);
 }
 
-const ENTRY_CHOICES = [...EVENT_TYPES.slice(0, 1), ...[...EVENT_TYPES.slice(1), { id: 'status' as EventType, label: 'Stage change' }].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))];
+/**
+ * What a new entry can be, most used first, as the Add entry grid shows them. Fining, Nutrients and
+ * Yeast pitched are Ingredient entries now, titled by the ingredient's category; older entries of
+ * those types keep their own.
+ */
+const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'temperature', 'ph', 'moved', 'estimate'];
+const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change', estimate: 'Est. ABV', feeding: 'Step feed' };
+const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
+
+/** An ingredient entry's category, from your ingredients: by its link, or by name. */
+function entryCategory(event: BatchEvent, library: LibraryIngredient[]): string | undefined {
+  if (event.type !== 'ingredient') return undefined;
+  const name = event.ingredient?.trim().toLowerCase();
+  const item = (event.ingredientId && library.find((i) => i.id === event.ingredientId)) || (name ? library.find((i) => i.name.trim().toLowerCase() === name) : undefined);
+  return item?.category;
+}
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
 function EventSheet({ batch, settings, existing, onClose, onRestart }: EventSheetProps) {
@@ -727,22 +755,31 @@ function EventSheet({ batch, settings, existing, onClose, onRestart }: EventShee
             </select>
           </Field>
         ) : isOg ? null : (
-          <Field label="What happened?">
-            <select
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as EventType);
-                setValue('');
-                setError('');
-              }}
-            >
-              {ENTRY_CHOICES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
+          <fieldset className="entry-types">
+            <legend className="field-label">What happened?</legend>
+            <div className="entry-grid" role="radiogroup" aria-label="What happened?">
+              {/* An older Fining, Nutrients or Yeast pitched entry keeps its own type. */}
+              {[...ENTRY_CHOICES, ...(ENTRY_CHOICES.some((t) => t.id === type) ? [] : [{ id: type, label: eventLabel(type) }])].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={type === t.id}
+                  aria-label={t.label}
+                  className="entry-choice"
+                  onClick={() => {
+                    if (type === t.id) return;
+                    setType(t.id);
+                    setValue('');
+                    setError('');
+                  }}
+                >
+                  <Icon name={EVENT_ICONS[t.id]} size={22} />
+                  <span>{SHORT_LABELS[t.id] ?? t.label}</span>
+                </button>
               ))}
-            </select>
-          </Field>
+            </div>
+          </fieldset>
         )}
         {newStage && (
           <>
