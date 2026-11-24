@@ -5,6 +5,29 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.4)
+
+### Timeline
+
+- **Stage changes on the timeline only move forward.** Add entry → Stage
+  change starts on the stage after the timeline's latest (Secondary when it
+  only has Primary entries, Aging after Secondary, and so on). It moves the
+  batch only when that's later than its current stage; filling in a past
+  brew's history leaves a Bottled batch in Bottled. The stage buttons at the
+  top still move a batch back.
+- **A Stage for ingredients added from the timeline** ([#61]). An
+  Ingredient entry with "Add to batch ingredients" ticked has a Stage field.
+  It starts on Secondary when the batch was in Secondary on the entry's
+  date, and on Primary otherwise, so a past brew's honey no longer lands in
+  Bottling. Pick another stage to override it.
+- **OG and FG in Primary** ([#63]). A batch created in Secondary, Aging
+  or Bottled, with no stage changes on its timeline, shows everything up to
+  its FG (its OG, without one) under Primary, and later entries in the stage
+  it's in. Additions and readings dated on the start date no longer split
+  Primary with a Bottled section.
+- **Winter Spice sample** records its move to Secondary, so its timeline
+  reads Primary, Secondary, Aging. Load the sample data again to see it.
+
 ## v0.2.3 – 2026-11-22
 
 ### Ingredients
@@ -317,3 +340,5 @@ themes; sample data.
 [#54]: https://github.com/ChuckinBits/BrewHive/issues/54
 [#55]: https://github.com/ChuckinBits/BrewHive/issues/55
 [#56]: https://github.com/ChuckinBits/BrewHive/issues/56
+[#61]: https://github.com/ChuckinBits/BrewHive/issues/61
+[#63]: https://github.com/ChuckinBits/BrewHive/issues/63

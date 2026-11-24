@@ -271,6 +271,7 @@ export async function loadSampleData(): Promise<void> {
     event(b3.id, 'gravity', at(106), 1.04),
     event(b3.id, 'gravity', at(92), 1.008),
     { ...event(b3.id, 'gravity', at(75), 1.002), final: true },
+    stage(b3.id, at(74, 17), 'primary', 'secondary'),
     event(b3.id, 'rack', at(74)),
     { ...event(b3.id, 'moved', at(73)), place: 'Basement' },
     { ...event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'), method: 'Chemical' },

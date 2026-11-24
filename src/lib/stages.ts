@@ -34,6 +34,44 @@ export function stageForNewIngredient(status: BatchStatus): IngredientStage {
   return currentIngredientStage(status) ?? 'primary';
 }
 
+/**
+ * The stage a batch was in at a date, from its stage change entries: the newest one at or before it.
+ * Before the first one, the stage that entry moved from (Primary if it doesn't say); with no stage
+ * changes at all, the batch's stage now.
+ */
+export function statusAt(date: string, current: BatchStatus, entries: BatchEvent[]): BatchStatus {
+  const changes = entries.filter((e) => e.type === 'status' && e.toStatus && !e.deletedAt).sort((a, b) => a.date.localeCompare(b.date));
+  if (changes.length === 0) {
+    // Logged in a later stage with no history: primary up to its FG.
+    const fg = entries.filter((e) => e.type === 'gravity' && e.final && !e.deletedAt).map((e) => e.date.slice(0, 16)).sort().pop();
+    return current !== 'planned' && fg && date.slice(0, 16) <= fg ? 'primary' : current;
+  }
+  const at = date.slice(0, 16);
+  const last = changes.filter((e) => e.date.slice(0, 16) <= at).pop();
+  if (last?.toStatus) return last.toStatus;
+  return stageBeforeFirstChange(changes[0]);
+}
+
+/**
+ * The stage before a batch's first stage change: the stage it moved from, when that comes earlier,
+ * else Primary. A batch logged as Bottled and given its history afterwards says it moved from
+ * Bottled, which can't be.
+ */
+function stageBeforeFirstChange(first: BatchEvent): BatchStatus {
+  const order: BatchStatus[] = ['primary', 'secondary', 'aging', 'bottled'];
+  const from = first.fromStatus;
+  const to = stageOfEntry(first);
+  return from && order.includes(from) && (!to || !order.includes(to) || order.indexOf(from) < order.indexOf(to)) ? from : 'primary';
+}
+
+/**
+ * The ingredient stage something added at a date goes in by default: Secondary when the batch was in
+ * Secondary then, otherwise Primary (most additions after primary are recorded against it).
+ */
+export function ingredientStageAt(date: string, current: BatchStatus, entries: BatchEvent[]): IngredientStage {
+  return statusAt(date, current, entries) === 'secondary' ? 'secondary' : 'primary';
+}
+
 export interface IngredientGroup {
   stage: IngredientStage;
   lines: IngredientLine[];
@@ -106,16 +144,28 @@ function stageOfEntry(e: BatchEvent): BatchStatus | undefined {
 export function timelineSections(events: BatchEvent[], currentStatus: BatchStatus): TimelineSection[] {
   const oldestFirst = [...events].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
   const firstStage = oldestFirst.find((e) => stageOfEntry(e) !== undefined);
-  let stage: BatchStatus = firstStage ? (firstStage.fromStatus ?? 'primary') : currentStatus;
+  let stage: BatchStatus = firstStage ? stageBeforeFirstChange(firstStage) : currentStatus;
+  // A batch logged in a later stage, with no stage history: everything up to its FG (or its OG,
+  // without one) was primary fermentation, and what follows is the stage it's in.
+  const primaryThrough = firstStage ? -1 : primaryEndIndex(oldestFirst, currentStatus);
   const sections: TimelineSection[] = [];
-  for (const e of oldestFirst) {
+  for (const [i, e] of oldestFirst.entries()) {
     const next = stageOfEntry(e);
     if (next !== undefined) stage = next;
+    const at = i <= primaryThrough ? 'primary' : stage;
     const last = sections[sections.length - 1];
-    if (last && last.stage === stage) last.events.push(e);
-    else sections.push({ stage, events: [e] });
+    if (last && last.stage === at) last.events.push(e);
+    else sections.push({ stage: at, events: [e] });
   }
   return sections.reverse().map((s) => ({ ...s, events: s.events.reverse() }));
+}
+
+/** For a batch with no stage history in a later stage: the index of the last primary entry (its FG, else its OG). */
+function primaryEndIndex(oldestFirst: BatchEvent[], currentStatus: BatchStatus): number {
+  if (currentStatus === 'primary' || currentStatus === 'planned') return -1;
+  const isGravity = (e: BatchEvent, key: 'final' | 'og') => e.type === 'gravity' && !!e[key];
+  const fg = oldestFirst.map((e, i) => (isGravity(e, 'final') ? i : -1)).filter((i) => i >= 0).pop();
+  return fg ?? oldestFirst.findIndex((e) => isGravity(e, 'og'));
 }
 
 /** Drops ingredients without a name and trims the rest, before saving. */
