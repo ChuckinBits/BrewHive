@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.7)
+## v0.2.7 – 2026-11-24
 
 ### Behind the scenes
 
@@ -17,6 +17,9 @@ a milestone.
 - **TypeScript 7.** Type checks run on TypeScript 7, the native compiler,
   and finish several times faster. It no longer picks up Node's types on its
   own, so the config names them for the tests.
+
+**Updating from v0.2.6:** nothing to do. Existing data carries over and the
+app looks and works the same.
 
 ## v0.2.6 – 2026-11-24
 
