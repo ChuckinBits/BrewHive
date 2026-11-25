@@ -42,6 +42,7 @@ Other commands:
 | `npm run preview` | Serves the built app locally, with offline support switched on |
 | `npm test` | Runs the unit tests (brewing math, costs, ingredient library and more) |
 | `npm run typecheck` | Checks the TypeScript types |
+| `npm run checks` | Runs the browser checks against the built app (see [checks/README.md](checks/README.md)) |
 
 ## Put it online
 
@@ -111,7 +112,7 @@ The app has only two runtime dependencies, React and React DOM. Volumes are stor
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `npm test` and `npm run typecheck` before opening a pull request.
+Issues and pull requests are welcome. Please run `npm test`, `npm run typecheck` and `npm run checks` before opening a pull request; they also run on every pull request.
 
 ## License
 

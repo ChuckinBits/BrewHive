@@ -1,6 +1,7 @@
-# Writes package-lock.json, which pins every package to the exact version tested, and pushes it
-# to the add-lockfile branch to merge. Run it by hand: Actions > Update lockfile > Run workflow.
-# Run it again whenever package.json's dependencies change.
+# Writes package-lock.json, which pins every package to the exact version tested.
+# Run it by hand: Actions > Update lockfile > Run workflow, choosing the branch.
+# On main it pushes to the add-lockfile branch, to merge with a pull request; on any other
+# branch (a pull request that changes package.json) it commits to that branch.
 name: Update lockfile
 
 on:
@@ -18,12 +19,17 @@ jobs:
         with:
           node-version: 22
       - run: npm install --package-lock-only --ignore-scripts
-      - name: Push to the add-lockfile branch
+      - name: Commit the lockfile
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b add-lockfile
           git add package-lock.json
-          git commit -m "Add package-lock.json"
-          git push --force origin add-lockfile
-          echo "Pushed. Open a pull request from add-lockfile into main to merge it." >> "$GITHUB_STEP_SUMMARY"
+          if git diff --cached --quiet; then echo "The lockfile is already up to date." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          git commit -m "Update package-lock.json"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            git push --force origin HEAD:add-lockfile
+            echo "Pushed to add-lockfile. Open a pull request from it into main." >> "$GITHUB_STEP_SUMMARY"
+          else
+            git push origin HEAD:"$GITHUB_REF_NAME"
+            echo "Committed to $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
+          fi

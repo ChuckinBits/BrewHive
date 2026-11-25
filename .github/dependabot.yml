@@ -1,5 +1,6 @@
-# Dependabot opens a pull request when a package or a workflow action has an update,
-# so security fixes and runtime changes (like the move to Node 24) don't go unnoticed.
+# Dependabot opens pull requests when packages or workflow actions have updates.
+# Minor and patch updates come grouped in one PR; each major version comes on its own,
+# since a major (a new Vite or TypeScript, say) can need changes and deserves its own look.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -7,8 +8,8 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm:
-        patterns: ['*']
+      npm-minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:

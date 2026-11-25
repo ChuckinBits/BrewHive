@@ -22,3 +22,22 @@ jobs:
       - run: npm run build
       # The built page must carry the Content-Security-Policy (added by vite.config.ts).
       - run: grep -q 'http-equiv="Content-Security-Policy"' dist/index.html
+
+  # The browser checks (checks/): the built app in headless Chromium, every screen and flow.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run checks
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: check-screenshots
+          path: checks/.shots
+          retention-days: 7

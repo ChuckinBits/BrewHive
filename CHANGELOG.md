@@ -26,7 +26,11 @@ a milestone.
   installs exactly the package versions that were tested.
 - The workflows use the Node 24 versions of GitHub's actions, CI fails if
   the built page is missing its Content-Security-Policy, and Dependabot
-  proposes package and action updates weekly.
+  proposes package and action updates weekly (minor and patch updates
+  grouped, each major version on its own).
+- **Browser checks in the repo.** The 42 checks that drive the app in a
+  headless browser now live in `checks/`, run with `npm run checks`, and run
+  on every pull request.
 
 ## v0.2.5 – 2026-11-24
 
