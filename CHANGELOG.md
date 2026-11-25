@@ -5,6 +5,16 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.7)
+
+### Behind the scenes
+
+- **Vite 8.** The app is built with Vite 8 (Rolldown and Oxc) and its React
+  plugin v6. Builds take a fraction of a second, and the app's code is a
+  little smaller. The build targets Chrome and Edge 111, Firefox 114 and
+  Safari 16.4 or newer, Vite's default. Nothing you'd see changes: the
+  styles already needed iOS 16.2 or newer for their full look.
+
 ## v0.2.6 – 2026-11-24
 
 ### Fixes
