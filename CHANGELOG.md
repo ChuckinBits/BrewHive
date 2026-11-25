@@ -11,8 +11,9 @@ a milestone.
 
 - **Vite 8.** The app is built with Vite 8 (Rolldown and Oxc) and its React
   plugin v6. Builds take a fraction of a second, and the app's code is a
-  little smaller. Supported browsers are now Chrome and Edge 111, Firefox
-  114 and Safari 16.4 (iOS 16.4) or newer.
+  little smaller. The build targets Chrome and Edge 111, Firefox 114 and
+  Safari 16.4 or newer, Vite's default. Nothing you'd see changes: the
+  styles already needed iOS 16.2 or newer for their full look.
 
 ## v0.2.6 – 2026-11-24
 
