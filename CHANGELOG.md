@@ -5,6 +5,18 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.8)
+
+### Batch page
+
+- **ABV is the highlighted number.** The accent color moves from Potential
+  to ABV (or ABV so far), the number you actually have.
+- **Potential shows only while fermenting.** In Primary and Secondary it
+  still shows where the batch is heading and any target. From Aging on the
+  batch is done, so the tiles are OG, FG and ABV. Backsweetening that you
+  expect to ferment moves the batch back to Secondary, and Potential comes
+  back with it.
+
 ## v0.2.7 – 2026-11-24
 
 ### Behind the scenes

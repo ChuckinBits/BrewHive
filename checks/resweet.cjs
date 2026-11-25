@@ -17,7 +17,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const b = await chromium.launch();
   const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' })).newPage();
   const errors = []; p.on('pageerror', e => errors.push(e.message)); p.on('console', m => m.type() === 'error' && errors.push(m.text()));
-  const potential = async () => p.locator('.stat-projected .stat-value').textContent();
+  const potential = async () => p.locator('.stat', { has: p.locator('.stat-label', { hasText: /^Potential$/ }) }).locator('.stat-value').textContent();
   const add = async (type, opts = {}) => {
     await p.getByRole('button', { name: 'Add entry' }).click();
     await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel(type), exact: true }).click();
@@ -32,16 +32,18 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Aging' }).click();
   await p.getByRole('textbox', { name: 'Final gravity (optional)' }).fill('1.000');
   await p.getByRole('button', { name: 'Move to Aging' }).click(); await p.waitForTimeout(400);
-  ok(await until(async () => (await potential() === '13.1%')), 'A: final reading 1.000, Potential 13.1%');
+  const hasPotential = () => p.locator('.stat-label', { hasText: /^Potential$/ }).count();
+  ok(await until(async () => ((await p.locator('.stat-highlight .stat-label').textContent()) === 'ABV' && await p.locator('.stat-highlight .stat-value').textContent() === '13.1%')), 'A: in Aging the ABV tile (13.1%) is the highlighted one');
+  ok(await until(async () => (await hasPotential() === 0 && await p.locator('.stats-3 .stat').count() === 3)), 'A: no Potential tile once fermentation is done; three tiles');
   await add('stabilize');
   await add('backsweeten', { sg: '1.015' });
-  ok(await until(async () => (await potential() === '13.1%')), 'A: backsweetened after stabilizing, box left unticked: Potential stays 13.1%');
+  ok(await until(async () => (await hasPotential() === 0)), 'A: backsweetened after stabilizing, box left unticked: still no Potential');
   await p.getByRole('button', { name: /^Edit Backsweetened/ }).click();
   await p.getByLabel('This will ferment').check();
   await p.getByRole('button', { name: 'Save changes' }).click(); await p.waitForTimeout(300);
-  // Ticking it while Aging offers a move back to Secondary (issue #26); keep it in Aging here.
-  if (await p.getByRole('button', { name: 'Keep it here' }).count()) { await p.getByRole('button', { name: 'Keep it here' }).click(); await p.waitForTimeout(200); }
-  ok(await until(async () => (await potential() === '15.1%')), 'A: box ticked: Potential rises to 15.1%');
+  // Ticking it while Aging offers a move back to Secondary (issue #26); fermenting again, the Potential comes back.
+  await p.getByRole('dialog').getByRole('button', { name: 'Move to Secondary' }).click(); await p.waitForTimeout(300);
+  ok(await until(async () => (await potential() === '15.1%')), 'A: box ticked and back in Secondary: Potential is back, at 15.1%');
   ok(await until(async () => ((await p.locator('.stat-value').nth(2).textContent()) === '13.1%')), 'A: ABV stays 13.1% until it ferments again');
 
   // Flow B: backsweeten without a gravity, then a separate reading

@@ -163,39 +163,42 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="stats">
+      {/* ABV is the number that matters, so it gets the accent. Potential only says where the batch
+          is heading, so it shows while fermenting and drops out from Aging on. */}
+      <div className={complete ? 'stats stats-3' : 'stats'}>
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
         <Stat label={complete || finalReading(data.events) ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
-        <Stat label={complete || finalReading(data.events) ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} extra={estimated ? 'Estimated' : undefined} />
-        <Stat
-          label="Potential"
-          value={fmtPercent(projected?.potential)}
-          highlight
-          extra={
-            projected == null ? undefined : projected.mode === 'abv' && projected.target != null ? (
-              // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show the range of sugar it needs (to 0.990 and to 1.000).
-              <>
-                Target {fmtPercent(projected.target)}
-                <br />
-                {projected.reachable ? (
-                  `FG ${fmtSG(projected.targetFG)}`
-                ) : (
-                  // Its own line, so the range fits a phone-width tile.
-                  <>
-                    needs
-                    <br />
-                    {fmtPoints(pointsNeeded(projected.targetFG))} pts
-                  </>
-                )}
-              </>
-            ) : projected.showTarget && projected.target != null ? (
-              `Target ${fmtPercent(projected.target)}`
-            ) : projected.potentialFG < 0.9995 ? (
-              // Worked out to a target FG below 1.000.
-              `at ${fmtSG(projected.potentialFG)}`
-            ) : undefined
-          }
-        />
+        <Stat label={complete || finalReading(data.events) ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} highlight extra={estimated ? 'Estimated' : undefined} />
+        {!complete && (
+          <Stat
+            label="Potential"
+            value={fmtPercent(projected?.potential)}
+            extra={
+              projected == null ? undefined : projected.mode === 'abv' && projected.target != null ? (
+                // Two lines, so it fits a phone. Drier than 0.990 can't be counted on: show the range of sugar it needs (to 0.990 and to 1.000).
+                <>
+                  Target {fmtPercent(projected.target)}
+                  <br />
+                  {projected.reachable ? (
+                    `FG ${fmtSG(projected.targetFG)}`
+                  ) : (
+                    // Its own line, so the range fits a phone-width tile.
+                    <>
+                      needs
+                      <br />
+                      {fmtPoints(pointsNeeded(projected.targetFG))} pts
+                    </>
+                  )}
+                </>
+              ) : projected.showTarget && projected.target != null ? (
+                `Target ${fmtPercent(projected.target)}`
+              ) : projected.potentialFG < 0.9995 ? (
+                // Worked out to a target FG below 1.000.
+                `at ${fmtSG(projected.potentialFG)}`
+              ) : undefined
+            }
+          />
+        )}
       </div>
 
       {reached && projected?.target != null && (

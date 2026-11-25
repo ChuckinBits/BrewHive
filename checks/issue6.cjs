@@ -18,7 +18,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const b = await chromium.launch();
   const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'en-US' })).newPage();
   const errors = []; p.on('pageerror', e => errors.push(e.message)); p.on('console', m => m.type() === 'error' && errors.push(m.text()));
-  const potential = async () => p.locator('.stat-projected .stat-value').textContent();
+  const potential = async () => p.locator('.stat', { has: p.locator('.stat-label', { hasText: /^Potential$/ }) }).locator('.stat-value').textContent();
   const titles = () => p.locator('.timeline-entry strong').allTextContents();
   await p.goto(BASE + '/');
   await p.getByRole('button', { name: 'Load sample data' }).click(); await p.waitForSelector('.shelf-item');
