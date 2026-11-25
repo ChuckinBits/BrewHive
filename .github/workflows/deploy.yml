@@ -24,7 +24,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      # npm ci installs exactly what package-lock.json lists, once it's committed (see lockfile.yml).
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3

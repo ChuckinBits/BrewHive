@@ -3,8 +3,8 @@
 
 import { getAll, putMany, type StoreName } from './idb.ts';
 import { upgradeSettings } from '../lib/units.ts';
-import { ensureOgEntries, rememberTheme } from './store.ts';
-import type { Settings } from './types.ts';
+import { ensureOgEntries, loadSettings, rememberTheme } from './store.ts';
+import { cleanRecord, cleanSettings } from './validate.ts';
 
 const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
 
@@ -40,16 +40,20 @@ interface Stamped {
   updatedAt?: string;
 }
 
-function isStamped(value: unknown): value is Stamped {
-  return typeof value === 'object' && value !== null && typeof (value as Stamped).id === 'string';
+export interface RestoreResult {
+  /** Records saved. */
+  written: number;
+  /** Records left out because they couldn't be read (see validate.ts). */
+  skipped: number;
 }
 
 /**
  * Merges a backup into the database. Records are matched by id; when both
  * sides have the same record, the one edited most recently wins. Nothing that
- * is only on this device is removed. Returns how many records were written.
+ * is only on this device is removed. Each record is checked first, and one
+ * that can't be used is skipped.
  */
-export async function restoreBackup(input: unknown): Promise<number> {
+export async function restoreBackup(input: unknown): Promise<RestoreResult> {
   if (typeof input !== 'object' || input === null) throw new Error('That file is not a BrewHive backup.');
   const file = input as Partial<BackupFile>;
   if (file.app !== 'brewhive' || typeof file.data !== 'object' || file.data === null) {
@@ -60,11 +64,15 @@ export async function restoreBackup(input: unknown): Promise<number> {
   }
 
   let written = 0;
+  let skipped = 0;
   for (const store of DATA_STORES) {
     const incoming = file.data[store];
     if (!Array.isArray(incoming)) continue;
+    const records = incoming.map((value) => cleanRecord(store, value));
+    const usable = records.filter((record): record is Record<string, unknown> & Stamped => record !== null);
+    skipped += records.length - usable.length;
     const existing = new Map((await getAll<Stamped>(store)).map((r) => [r.id, r]));
-    const winners = incoming.filter(isStamped).filter((record) => {
+    const winners = usable.filter((record) => {
       const mine = existing.get(record.id);
       return !mine || (record.updatedAt ?? '') >= (mine.updatedAt ?? '');
     });
@@ -74,15 +82,16 @@ export async function restoreBackup(input: unknown): Promise<number> {
 
   const settings = file.data.settings;
   if (Array.isArray(settings)) {
-    const app = settings.find((s) => isStamped(s) && s.id === 'app') as Settings | undefined;
+    const app = settings.find((s) => typeof s === 'object' && s !== null && (s as Stamped).id === 'app');
     if (app) {
-      // Backups from v0.2.0 and earlier have volumeUnit; it becomes units.
-      const upgraded = upgradeSettings(app) as Settings;
-      await putMany('settings', [upgraded]);
-      rememberTheme(upgraded.theme);
+      // Backups from v0.2.0 and earlier have volumeUnit; it becomes units. Fields that don't make
+      // sense keep this device's value.
+      const next = cleanSettings(upgradeSettings(app as object), await loadSettings());
+      await putMany('settings', [next]);
+      rememberTheme(next.theme);
     }
   }
   // A backup from before the OG had a timeline entry gets them.
   await ensureOgEntries();
-  return written;
+  return { written, skipped };
 }
