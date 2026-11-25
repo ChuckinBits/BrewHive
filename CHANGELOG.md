@@ -16,6 +16,29 @@ a milestone.
   batch is done, so the tiles are OG, FG and ABV. Backsweetening that you
   expect to ferment moves the batch back to Secondary, and Potential comes
   back with it.
+- **How sweet it is.** While fermenting, the Gravity tile says how sweet the
+  mead would be if it stopped there (Dry, Semi-sweet, Sweet or Dessert), for
+  stopping early at the sweetness you want. From Aging on, the fourth tile is
+  **Now**: the gravity in the batch now and its sweetness. After
+  backsweetening it differs from the FG, which stays where fermentation
+  ended. Backsweetened entries, the final reading, and readings after
+  stabilizing or backsweetening show their sweetness on the timeline too.
+- **Stabilizing ends fermentation.** Adding a Stabilized entry in Primary or
+  Secondary offers to move the batch to Aging and log the final reading, or
+  to keep it where it is.
+- **Sugar goes in at once on the chart.** A step feeding, or backsweetening
+  that will ferment, is drawn straight up on its day instead of as a slow
+  climb from the reading before. Only fermentation slopes.
+
+### Fixes
+
+- **Unticking "This will ferment" brings the FG back.** Ticking it on
+  backsweetening after the final reading took the Final mark off that reading
+  for good, so unticking left the FG at the backsweetened gravity. The mark
+  now stays: while sugar that will ferment follows it, the reading just
+  doesn't count as final, and unticking or deleting that entry makes it count
+  again. A reading that already lost its mark this way needs "Final gravity"
+  ticked again once.
 
 ## v0.2.7 – 2026-11-24
 

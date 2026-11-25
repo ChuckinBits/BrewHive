@@ -20,7 +20,10 @@ import {
   finalReading,
   pointsNeeded,
   currentGravity,
-  chartPoints,
+  chartLine,
+  gravityNow,
+  sweetnessEntries,
+  sweetnessOf,
   attenuation,
   daysToTarget,
   fermentationRate,
@@ -76,7 +79,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [archiving, setArchiving] = useState(false);
   // Moving from fermenting to Aging asks for the final reading.
-  const [finishing, setFinishing] = useState(false);
+  // 'stabilized': offered after a Stabilized entry, rather than asked for by the Aging button.
+  const [finishing, setFinishing] = useState<false | true | 'stabilized'>(false);
   // An ingredient being logged from the Ingredients card.
   const [logging, setLogging] = useState<IngredientLine | null>(null);
   // Backsweetening ticked to ferment after fermentation ended: offer to go back to Secondary.
@@ -102,6 +106,11 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const { addedSugar } = analyzeGravity(batch, data.events);
   // Sugar added later by step feeding or backsweetening raises the potential.
   const projected = projectedAbv(og == null ? null : og + addedSugar, batch);
+  // How sweet it is: under Gravity while fermenting (where it would stop), and in its own tile after,
+  // where backsweetening can take it above the FG.
+  const now = gravityNow(batch, data.events);
+  const final = finalReading(data.events);
+  const sweetShown = sweetnessEntries(data.events);
   const reached = targetReached(batch, data.events);
   // Progress, in Details: how far it has fermented, how fast (while fermenting), and how long to go.
   const attenuationNow = attenuation(batch, data.events);
@@ -164,12 +173,14 @@ export function BatchDetailScreen({ id }: { id: string }) {
       )}
 
       {/* ABV is the number that matters, so it gets the accent. Potential only says where the batch
-          is heading, so it shows while fermenting and drops out from Aging on. */}
-      <div className={complete ? 'stats stats-3' : 'stats'}>
+          is heading, so while fermenting it's the fourth tile; from Aging on that tile is the gravity now. */}
+      <div className="stats">
         <Stat label="OG" value={fmtSG(og)} extra={addedSugar > 0.0005 ? `+${Math.round(addedSugar * 1000)} pts fed` : undefined} />
-        <Stat label={complete || finalReading(data.events) ? 'FG' : 'Gravity'} value={fmtSG(sg)} />
-        <Stat label={complete || finalReading(data.events) ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} highlight extra={estimated ? 'Estimated' : undefined} />
-        {!complete && (
+        <Stat label={complete || final ? 'FG' : 'Gravity'} value={fmtSG(sg)} extra={!complete && sg != null ? sweetnessOf(sg).label : undefined} />
+        <Stat label={complete || final ? 'ABV' : 'ABV so far'} value={estimated ? `≈ ${fmtPercent(abv)}` : fmtPercent(abv)} highlight extra={estimated ? 'Estimated' : undefined} />
+        {complete ? (
+          <Stat label="Now" value={now == null ? '—' : fmtSG(now)} extra={now == null ? 'Take a reading' : sweetnessOf(now).label} />
+        ) : (
           <Stat
             label="Potential"
             value={fmtPercent(projected?.potential)}
@@ -207,7 +218,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </p>
       )}
 
-      <GravityChart points={chartPoints(batch, data.events)} />
+      <GravityChart line={chartLine(batch, data.events)} />
 
       <section className="card">
         <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
@@ -333,7 +344,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
                           <span>
                             {titleOf(event)}
                             {eventValue(event, settings) && <span className="timeline-value"> {eventValue(event, settings)}</span>}
-                            {event.type === 'gravity' && event.final && (
+                            {sweetShown.has(event.id) && event.value != null && <span className="timeline-sweet"> · {sweetnessOf(event.value).label}</span>}
+                            {event.type === 'gravity' && event.id === final?.id && (
                               <>
                                 {' '}
                                 <span className="final-chip">Final</span>
@@ -408,10 +420,10 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && (
-        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} />
+        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} />
       )}
       {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} />}
-      {finishing && <FinishSheet batch={batch} timeline={data.events} onClose={() => setFinishing(false)} />}
+      {finishing && <FinishSheet batch={batch} timeline={data.events} stabilized={finishing === 'stabilized'} onClose={() => setFinishing(false)} />}
       {restarting && (
         <ConfirmSheet
           title="Fermenting again?"

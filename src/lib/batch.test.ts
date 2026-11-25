@@ -11,6 +11,10 @@ import {
   gravityPoints,
   ogEntry,
   chartPoints,
+  chartLine,
+  gravityNow,
+  markedFinals,
+  sweetnessEntries,
   fermentationRate,
   attenuation,
   daysToTarget,
@@ -492,4 +496,69 @@ test('sweetness by the BJCP ranges', () => {
   assert.equal(sweetnessOf(1.015).label, 'Semi-sweet');
   assert.equal(sweetnessOf(1.03).label, 'Sweet');
   assert.equal(sweetnessOf(1.06).label, 'Dessert');
+});
+
+// --- The final reading keeps its mark; fermenting sugar after it only pauses it
+
+test('ticking "This will ferment" after the final reading pauses it; unticking brings it back', () => {
+  const fg = final('2026-11-09T10:00', 1.0);
+  const ticked = [fg, entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true })];
+  assert.equal(finalReading(ticked), null, 'fermenting sugar follows it: no final reading for now');
+  assert.equal(currentGravity(batch({ status: 'secondary' }), ticked), 1.015, 'the gravity is the backsweetened one while it ferments');
+  assert.deepEqual(markedFinals(ticked), [fg], 'the mark itself stays');
+  const unticked = [fg, entry('stabilize', '2026-11-10T10:00'), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: false })];
+  assert.equal(finalReading(unticked), fg, 'unticked: the final reading counts again');
+  assert.equal(currentGravity(batch({ status: 'aging' }), unticked), 1.0, 'and the FG is 1.000 again');
+  const removed = [fg, { ...entry('feeding', '2026-11-11T10:00', 1.02), deletedAt: '2026-11-12T00:00:00Z' }];
+  assert.equal(finalReading(removed), fg, 'a deleted step feeding no longer pauses it');
+  assert.equal(finalReading([entry('feeding', '2026-11-05T10:00', 1.02), fg]), fg, 'sugar before the final reading changes nothing');
+});
+
+test('a paused final reading is a measurement: the ABV counts the sugar after it fermenting', () => {
+  // OG 1.100 to 1.000 (marked final), backsweetened +15 points ticked to ferment, then down to 1.005.
+  const events = [final('2026-11-09T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00', 1.015, { ferments: true }), reading('2026-11-20T10:00', 1.005)];
+  const g = analyzeGravity(batch({ status: 'secondary' }), events);
+  near(g.fermented, 0.11, '100 points, then 10 more');
+  near(g.addedSugar, 0.015, 'the backsweetening counts as sugar');
+});
+
+// --- Sweetness
+
+test('gravity now: the latest reading, backsweetening included; unknown after backsweetening without one', () => {
+  const b = batch({ status: 'aging' });
+  assert.equal(gravityNow(b, []), 1.1, 'no readings: the OG');
+  assert.equal(gravityNow(b, [final('2026-11-09T10:00', 1.0), sweeten('2026-11-11T10:00', 1.015)]), 1.015, 'backsweetened to 1.015');
+  assert.equal(gravityNow(b, [final('2026-11-09T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00')]), null, 'backsweetened without a gravity: not known yet');
+  assert.equal(gravityNow(b, [final('2026-11-09T10:00', 1.0), entry('backsweeten', '2026-11-11T10:00'), reading('2026-11-12T10:00', 1.012)]), 1.012, 'until a reading after it');
+});
+
+test('sweetness shows on backsweetening, the final reading, and readings after stabilizing or backsweetening', () => {
+  const r1 = reading('2026-11-05T10:00', 1.03);
+  const fg = final('2026-11-09T10:00', 1.0);
+  const st = entry('stabilize', '2026-11-10T10:00');
+  const bs = sweeten('2026-11-11T10:00', 1.015);
+  const r2 = reading('2026-11-12T10:00', 1.014);
+  const ids = sweetnessEntries([r1, fg, st, bs, r2]);
+  assert.deepEqual([...ids].sort(), [fg.id, bs.id, r2.id].sort());
+  const early = sweetnessEntries([reading('2026-11-05T10:00', 1.03), entry('stabilize', '2026-11-06T10:00'), reading('2026-11-08T10:00', 1.02)]);
+  assert.deepEqual([...early], ['2026-11-08T10:00'], 'stopped early by stabilizing: the reading after it shows its sweetness');
+});
+
+// --- Chart: sugar goes in at once
+
+test('chart line: a rise is flat to the day the sugar went in, then straight up', () => {
+  const b = batch();
+  const feed = entry('feeding', '2026-11-20T09:00', 1.02);
+  const line = chartLine(b, [reading('2026-11-10T09:00', 1.0), feed]);
+  assert.deepEqual(
+    line.map((v) => [v.date, v.sg, !!v.corner]),
+    [['2026-11-01', 1.1, false], ['2026-11-10T09:00', 1.0, false], ['2026-11-20T09:00', 1.0, true], ['2026-11-20T09:00', 1.02, false]],
+  );
+  // Logged without a gravity, then a reading: the step is on the feeding's date.
+  const later = chartLine(b, [reading('2026-11-10T09:00', 1.0), entry('feeding', '2026-11-15T09:00'), reading('2026-11-20T09:00', 1.012)]);
+  assert.deepEqual(
+    later.map((v) => [v.date, v.sg, !!v.corner]),
+    [['2026-11-01', 1.1, false], ['2026-11-10T09:00', 1.0, false], ['2026-11-15T09:00', 1.0, true], ['2026-11-15T09:00', 1.012, true], ['2026-11-20T09:00', 1.012, false]],
+  );
+  assert.equal(chartLine(b, [reading('2026-11-10T09:00', 1.0), reading('2026-11-20T09:00', 0.998)]).filter((v) => v.corner).length, 0, 'drops are plain slopes');
 });

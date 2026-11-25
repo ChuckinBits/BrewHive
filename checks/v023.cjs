@@ -12,6 +12,7 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
 };
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
+const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 const pad = (n) => String(n).padStart(2, '0');
 const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -89,7 +90,7 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   await d.getByRole('textbox', { name: 'Temperature (optional)' }).fill('160');
   await d.getByRole('textbox', { name: 'Time (minutes)' }).fill('15');
   await p.screenshot({ path: out + '/v023-pasteur.png' });
-  await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
+  await d.getByRole('button', { name: 'Save entry' }).click(); await keepStage(p); await d.waitFor({ state: 'detached' });
   const entry = (await p.locator('.timeline-entry', { hasText: 'Stabilized' }).textContent());
   ok(/Pasteurization · 160 °F.* for 15 min/.test(entry), 'entry reads Pasteurization · 160 °F for 15 min: ' + entry);
   await p.locator('.timeline-entry', { hasText: 'Stabilized' }).click(); await d.waitFor();

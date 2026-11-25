@@ -971,6 +971,12 @@ a.shelf-item:hover .shelf-visual {
   color: var(--accent-ink);
 }
 
+/* "· Semi-sweet" after a gravity: quieter than the number it describes. */
+.timeline-sweet {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .timeline-body p {
   margin-top: 2px;
   color: var(--muted);

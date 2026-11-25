@@ -7,7 +7,7 @@ import { useIngredientFields } from '../../components/StagedIngredients.tsx';
 import { currentCost } from '../../components/CostCard.tsx';
 import { Field, RatingInput, Sheet, TEMP_UNITS, UnitField, toast } from '../../components/ui.tsx';
 import { Icon } from '../../icons/Icon.tsx';
-import { batchAbv, finalReading, sweetnessOf, isFermentationComplete } from '../../lib/batch.ts';
+import { batchAbv, finalReading, markedFinals, sweetnessOf, isFermentationComplete } from '../../lib/batch.ts';
 import { ingredientStageAt, lineFromEntry, stageAfterRemoving } from '../../lib/stages.ts';
 import { fmtDateShort, fmtRating, fmtSG, fmtTemp, newId, nowLocal, parseNum, tempFromInput, tempToInput } from '../../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingError, saveFinalReading, type FinalReading } from '../../components/FinalReading.tsx';
@@ -34,6 +34,8 @@ interface EventSheetProps {
   onClose: () => void;
   /** Called after a backsweetening ticked to ferment is added to a batch that is past fermentation. */
   onRestart: () => void;
+  /** Called after a Stabilized entry is added to a batch that is still fermenting. */
+  onStabilized: () => void;
 }
 
 /** The stages in order, for working out the next one. */
@@ -64,7 +66,7 @@ const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravi
 const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-export function EventSheet({ batch, settings, existing, onClose, onRestart }: EventSheetProps) {
+export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   // "Batch rating" entries come from the rating slider; they are edited, not added, here.
   const isReview = existing?.type === 'review';
@@ -138,7 +140,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
   const otherFinal = finalReading((allEntries ?? []).filter((e) => e.batchId === batch.id && e.id !== existing?.id));
   // A step feeding, or a backsweetening ticked to ferment, logged after the final reading.
   const fermentingSugar = type === 'feeding' || (type === 'backsweeten' && ferments);
-  const removesFinal = !!otherFinal && fermentingSugar && (date || nowLocal()) >= otherFinal.date.slice(0, 16);
+  // Only shown: the final reading keeps its mark, and counts again if this sugar is unticked or removed.
+  const pausesFinal = !!otherFinal && fermentingSugar && (date || nowLocal()) >= otherFinal.date.slice(0, 16);
 
   const save = async () => {
     let parsed: number | null = null;
@@ -232,15 +235,15 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
     }
     // "Set as the batch rating": updates the batch only. The tasting itself is the timeline record,
     // so no separate "Batch rating" entry is added or replaced.
-    // Only one final gravity: a new one takes over from the old.
-    if (fields.final && otherFinal) await events.save({ ...otherFinal, final: false });
-    // Sugar that ferments after the final reading means fermentation isn't over: that reading stops being final.
-    if (removesFinal && otherFinal) await events.save({ ...otherFinal, final: false });
+    // Only one final gravity: a new one takes over from any other marked final.
+    if (fields.final) for (const other of markedFinals(batchEntries)) if (other.id !== existing?.id) await events.save({ ...other, final: false });
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
     toast(rateBatch ? 'Saved, and the batch rating updated' : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
     if (type === 'backsweeten' && fields.ferments && !(existing?.ferments) && isFermentationComplete(batch)) onRestart();
+    // Stabilizing stops fermentation, so offer to finish it: the final reading and the move to Aging.
+    if (type === 'stabilize' && !existing && (batch.status === 'primary' || batch.status === 'secondary')) onStabilized();
   };
 
   const whenField = (
@@ -504,9 +507,9 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
             )}
           </>
         )}
-        {removesFinal && otherFinal && (
+        {pausesFinal && otherFinal && (
           <p className="warning" role="note">
-            This will remove the Final tag from the {fmtSG(otherFinal.value)} gravity reading on {fmtDateShort(otherFinal.date)}, since fermentation isn't over yet.
+            Fermentation isn't over while this sugar ferments, so the {fmtSG(otherFinal.value)} reading on {fmtDateShort(otherFinal.date)} won't count as the final gravity{type === 'backsweeten' ? '. Untick "This will ferment" and it counts again.' : '.'}
           </p>
         )}
         {kind === 'place' && (

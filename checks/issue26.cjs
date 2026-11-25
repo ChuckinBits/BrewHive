@@ -125,14 +125,14 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await stat('ABV') === settled && await stat('FG') === '1.002')), 'a later lower reading does not change the ABV or FG (' + settled + ')');
   await addReading('1.012');
   ok(await until(async () => (await stat('ABV') === settled)), 'nor does a later higher one');
-  // A step feeding after the final reading warns, then takes the Final tag away
+  // A step feeding after the final reading warns, then the reading stops counting as final (its mark is kept)
   await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('feeding'), exact: true }).click();
-  await d.getByText(/This will remove the Final tag/).waitFor({ timeout: 3000 }).catch(() => {});
-  ok(await until(async () => (await d.getByText(/This will remove the Final tag from the 1\.002 gravity reading/).count() === 1)), 'a step feeding after the final reading warns it will remove the Final tag');
+  await d.getByText(/won't count as the final gravity/).waitFor({ timeout: 3000 }).catch(() => {});
+  ok(await until(async () => (await d.getByText(/the 1\.002 reading on .* won't count as the final gravity\.$/).count() === 1)), 'a step feeding after the final reading warns it won\'t count as the final gravity');
   await p.screenshot({ path: out + '/26-warn.png' });
   await d.getByRole('textbox', { name: /Gravity after adding/ }).fill('1.030'); await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   if (await d.getByRole('button', { name: 'Keep it here' }).count()) { await d.getByRole('button', { name: 'Keep it here' }).click(); await p.waitForTimeout(200); }
-  ok(await until(async () => (await p.locator('.final-chip').count() === 0)), 'saving it removes the Final tag');
+  ok(await until(async () => (await p.locator('.final-chip').count() === 0)), 'saving it: the reading no longer shows Final');
 
   // A new batch entered as Bottled (an old batch) asks for the final reading
   await p.goto(BASE + '/#/batches/new'); await p.waitForSelector('form');

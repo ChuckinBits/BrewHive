@@ -66,10 +66,24 @@ export function currentGravity(batch: Batch, events: BatchEvent[]): number | nul
   return points.length ? points[points.length - 1].sg : null;
 }
 
-/** The batch's final gravity reading, if one is marked. There is only ever one; the latest wins if old data has more. */
+/** Gravity readings marked as the final gravity, oldest first. There is normally one; old data can have more. */
+export function markedFinals(events: BatchEvent[]): BatchEvent[] {
+  return readings(events).filter((e) => e.type === 'gravity' && e.final === true);
+}
+
+/**
+ * The batch's final gravity reading: the latest one marked final, as long as no sugar that is
+ * expected to ferment comes after it (a step feeding, or backsweetening with "This will ferment").
+ * While such sugar follows it, fermentation isn't over and there is no final reading. The mark
+ * itself is kept, so unticking "This will ferment" or deleting the entry brings it back.
+ */
 export function finalReading(events: BatchEvent[]): BatchEvent | null {
-  const marked = readings(events).filter((e) => e.type === 'gravity' && e.final);
-  return marked.length ? marked[marked.length - 1] : null;
+  const marked = markedFinals(events);
+  const last = marked[marked.length - 1];
+  if (!last) return null;
+  const live = events.filter((e) => !e.deletedAt).sort(byTime);
+  const after = live.slice(live.indexOf(last) + 1);
+  return after.some((e) => isSugar(e) && sugarFerments(e)) ? null : last;
 }
 
 /** The latest gravity reading on the timeline (not the OG), or null when there is none. */
@@ -142,6 +156,7 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
   if (og == null) return result;
 
   const steps = gravitySteps(batch, events);
+  const final = finalReading(events);
 
   let level = og;
   // A feeding or backsweetening entry logged without a gravity, waiting for the next reading.
@@ -154,7 +169,7 @@ export function analyzeGravity(batch: Batch, events: BatchEvent[]): GravityAnaly
     }
     result.hasReadings = true;
     const source = isSugar(event) ? event : pending;
-    if (event.type === 'gravity' && event.final) {
+    if (event === final) {
       // The final reading settles the ABV: later readings, up or down, no longer change it.
       if (sg <= level) result.fermented += level - sg;
       break;
@@ -383,6 +398,37 @@ export function chartPoints(batch: Batch, events: BatchEvent[]): GravityPoint[] 
   return gravityPoints(batch, events.filter(chartable));
 }
 
+/** A corner of the chart's line. Corners added for a step up carry no dot. */
+export interface ChartVertex extends GravityPoint {
+  corner?: true;
+}
+
+/**
+ * The chart's line. Fermentation only lowers the gravity, so the line slopes down between readings,
+ * but sugar goes in all at once: a rise is drawn flat up to the day the sugar went in, then straight
+ * up. That day is the rising entry's own date, or the date of a step feeding or fermenting
+ * backsweetening logged before it without a gravity.
+ */
+export function chartLine(batch: Batch, events: BatchEvent[]): ChartVertex[] {
+  const points = chartPoints(batch, events);
+  // Sugar entries logged without a gravity: the next rise happened on their date.
+  const sugarDates = events
+    .filter((e) => !e.deletedAt && isSugar(e) && sugarFerments(e) && e.value == null)
+    .map((e) => e.date)
+    .sort();
+  const line: ChartVertex[] = [];
+  points.forEach((point, i) => {
+    const prev = points[i - 1];
+    if (prev && point.sg > prev.sg) {
+      const added = sugarDates.filter((d) => d > prev.date && d <= point.date)[0] ?? point.date;
+      line.push({ date: added, sg: prev.sg, corner: true });
+      if (added !== point.date) line.push({ date: added, sg: point.sg, corner: true });
+    }
+    line.push(point);
+  });
+  return line;
+}
+
 /** Hours since the epoch for a yyyy-mm-dd or local yyyy-mm-ddThh:mm string. */
 const hoursOf = (date: string) => new Date(date.length === 10 ? `${date}T00:00` : date).getTime() / 3_600_000;
 
@@ -422,6 +468,35 @@ export function daysToTarget(batch: Batch, events: BatchEvent[]): { days: number
   const points = (sg - targetFG) * 1000;
   if (points <= 0.5) return null;
   return { days: points / rate, targetFG };
+}
+
+/**
+ * The gravity in the batch now: the latest reading of any kind, backsweetening included, or the OG
+ * before any. Null when a backsweetening entry without a gravity came after the latest reading, since
+ * then nobody knows it yet.
+ */
+export function gravityNow(batch: Batch, events: BatchEvent[]): number | null {
+  const live = events.filter((e) => !e.deletedAt && !e.og).sort(byTime);
+  const lastReading = readings(live).pop();
+  const unknown = live.some((e) => e.type === 'backsweeten' && e.value == null && (!lastReading || byTime(e, lastReading) > 0));
+  if (unknown) return null;
+  return lastReading ? (lastReading.value as number) : originalGravity(batch, events);
+}
+
+/**
+ * Timeline entries that show how sweet the batch is: backsweetening with a gravity, the final reading,
+ * and gravity readings after backsweetening or stabilizing, when the sweetness is where it stays.
+ */
+export function sweetnessEntries(events: BatchEvent[]): Set<string> {
+  const ids = new Set<string>();
+  let settled = false;
+  const final = finalReading(events);
+  for (const e of events.filter((x) => !x.deletedAt).sort(byTime)) {
+    if (e.type === 'stabilize' || e.type === 'backsweeten') settled = true;
+    if (e.value == null || e.og) continue;
+    if (e.type === 'backsweeten' || (e.type === 'gravity' && (settled || e === final))) ids.add(e.id);
+  }
+  return ids;
 }
 
 /** How sweet a finished mead at this gravity is, by the BJCP ranges (Dessert above them). */
