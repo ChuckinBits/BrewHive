@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { applyTheme } from './lib/theme.ts';
+// The app's two fonts, bundled with it (so they work offline and load nothing from elsewhere).
+import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/bricolage-grotesque/wght.css';
 import './styles.css';
 
 // Apply a manually chosen theme before the first paint, so there is no flash.

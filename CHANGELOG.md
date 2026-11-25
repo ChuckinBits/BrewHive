@@ -7,6 +7,13 @@ a milestone.
 
 ## Unreleased (v0.2.6)
 
+### Look
+
+- **The app's fonts are bundled.** Inter (text) and Bricolage Grotesque
+  (headings) now ship with the app, so every device shows them, offline too.
+  Before, they only appeared where they happened to be installed, and most
+  phones fell back to their own system font.
+
 ### Safety
 
 - **Backups are checked before restoring.** Each record is checked for the
