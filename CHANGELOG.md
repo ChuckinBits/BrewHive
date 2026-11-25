@@ -13,7 +13,7 @@ a milestone.
   to ABV (or ABV so far), the number you actually have.
 - **Potential shows only while fermenting.** In Primary and Secondary it
   still shows where the batch is heading and any target. From Aging on the
-  batch is done, so the tiles are OG, FG and ABV. Backsweetening that you
+  batch is done, and its place goes to Now (below). Backsweetening that you
   expect to ferment moves the batch back to Secondary, and Potential comes
   back with it.
 - **How sweet it is.** While fermenting, the Gravity tile says how sweet the
@@ -39,6 +39,13 @@ a milestone.
   doesn't count as final, and unticking or deleting that entry makes it count
   again. A reading that already lost its mark this way needs "Final gravity"
   ticked again once.
+- **No more blank screens.** If the browser's storage doesn't answer,
+  BrewHive now says so after 10 seconds, with the browser's reason and what
+  usually fixes it: another BrewHive tab, even one paused in the background,
+  can hold on to the storage, so close the others or restart the browser.
+  Before, the page just stayed blank. A screen that fails to draw shows the
+  error and a Reload button instead of blanking the whole app, and Erase
+  everything says so if it can't finish.
 
 ## v0.2.7 – 2026-11-24
 
