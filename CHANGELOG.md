@@ -7,6 +7,18 @@ a milestone.
 
 ## Unreleased (v0.2.6)
 
+### Fixes
+
+- **Restoring a backup keeps your ingredient edits.** Restoring onto a new
+  device, or after Erase everything, quietly undid changes to the starter
+  ingredients: prices you'd set were dropped, starters you'd deleted came
+  back, and metric default units went back to US. The fresh starters made at
+  install looked newer than your backup and won. An untouched starter now
+  always gives way to the backup.
+- **Dates in your time zone.** A backup file was named for the UTC date, a
+  day ahead on an American evening, and so was a recipe's "Updated from …
+  on" date. Both use your local date now.
+
 ### Look
 
 - **The app's fonts are bundled.** Inter (text) and Bricolage Grotesque

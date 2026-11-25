@@ -137,3 +137,22 @@ export function cleanSettings(incoming: unknown, current: Settings): Settings {
   if (typeof incoming.hideIngredientAdd === 'boolean') out.hideIngredientAdd = incoming.hideIngredientAdd;
   return out;
 }
+
+/**
+ * Whether a backup's copy of a record should replace this device's. The one edited most recently
+ * wins, except that a starter ingredient nobody has touched here (created and never edited, as a
+ * fresh install or Erase everything leaves them) always gives way: it was made just now, so it
+ * would otherwise look newer than the backup and undo the prices, units and deletions it carries.
+ */
+export function backupWins(incoming: StampedRecord, mine: StampedRecord | undefined): boolean {
+  if (!mine) return true;
+  const untouchedStarter = mine.id.startsWith('starter-') && mine.createdAt !== undefined && mine.createdAt === mine.updatedAt;
+  return untouchedStarter || (incoming.updatedAt ?? '') >= (mine.updatedAt ?? '');
+}
+
+/** What backupWins needs of a record. */
+interface StampedRecord {
+  id: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

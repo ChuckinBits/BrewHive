@@ -3,8 +3,9 @@
 
 import { getAll, putMany, type StoreName } from './idb.ts';
 import { upgradeSettings } from '../lib/units.ts';
+import { today } from '../lib/format.ts';
 import { ensureOgEntries, loadSettings, rememberTheme } from './store.ts';
-import { cleanRecord, cleanSettings } from './validate.ts';
+import { backupWins, cleanRecord, cleanSettings } from './validate.ts';
 
 const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
 
@@ -28,7 +29,8 @@ export function downloadBackup(backup: BackupFile): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `brewhive-backup-${backup.exportedAt.slice(0, 10)}.json`;
+  // Named for today where you are (exportedAt is UTC, a day ahead on an American evening).
+  link.download = `brewhive-backup-${today()}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -37,6 +39,7 @@ export function downloadBackup(backup: BackupFile): void {
 
 interface Stamped {
   id: string;
+  createdAt?: string;
   updatedAt?: string;
 }
 
@@ -72,10 +75,7 @@ export async function restoreBackup(input: unknown): Promise<RestoreResult> {
     const usable = records.filter((record): record is Record<string, unknown> & Stamped => record !== null);
     skipped += records.length - usable.length;
     const existing = new Map((await getAll<Stamped>(store)).map((r) => [r.id, r]));
-    const winners = usable.filter((record) => {
-      const mine = existing.get(record.id);
-      return !mine || (record.updatedAt ?? '') >= (mine.updatedAt ?? '');
-    });
+    const winners = usable.filter((record) => backupWins(record, existing.get(record.id)));
     await putMany(store, winners);
     written += winners.length;
   }
