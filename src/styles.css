@@ -1584,7 +1584,10 @@ input::placeholder {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  /* Wraps at a space rather than spilling out of the tile when a phone's font runs wide. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 /* A bubble with an extra line pulls up its value so the row stays one height. */
