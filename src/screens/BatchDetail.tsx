@@ -6,7 +6,7 @@ import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../d
 import { batches, categoriesOf, cellar, events, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type LibraryIngredient, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
-import { LoggableIngredients, useIngredientFields } from '../components/StagedIngredients.tsx';
+import { LoggableIngredients, anyToLog, useIngredientFields } from '../components/StagedIngredients.tsx';
 import { CostFacts, currentCost } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
 import { ConfirmSheet, Field, RatingBadge, RatingInput, Sheet, Stat, TEMP_UNITS, TopBar, UnitField, toast } from '../components/ui.tsx';
@@ -198,6 +198,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
   const currentStage = currentIngredientStage(batch.status);
   const added = addedLines(data.events);
+  // Hide Add and the "Tap an ingredient" hint only show while something is left to log.
+  const toLog = anyToLog(batch.ingredients, currentStage, added);
 
   const setStatus = async (status: BatchStatus) => {
     // Bottling asks how many bottles first, then fills the cellar. Tapping Bottled again adds more.
@@ -346,7 +348,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
                 Edit
               </Link>
               {/* For people who keep the list but don't log it: hides + Add on every batch. */}
-              {currentStage && (
+              {toLog && (
                 <button
                   type="button"
                   className="btn btn-quiet btn-small"
@@ -358,7 +360,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
               )}
             </div>
           </div>
-          {currentStage && !settings.hideIngredientAdd && added.size < batch.ingredients.length && (
+          {toLog && !settings.hideIngredientAdd && (
             <p className="field-hint">Tap an ingredient when it goes in, to log it on the timeline.</p>
           )}
           <LoggableIngredients

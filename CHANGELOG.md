@@ -21,7 +21,8 @@ a milestone.
   final reading or bottles where they would.
 - **Hide Add.** Under Edit on the Ingredients card, "Hide Add" hides the
   + Add buttons on every batch, for keeping the list without logging it on
-  the timeline. "Show Add" brings them back.
+  the timeline. "Show Add" brings them back. Hide Add and the "Tap an
+  ingredient" hint only show while something is left to log.
 
 ## v0.2.4 – 2026-11-23
 

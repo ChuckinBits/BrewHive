@@ -65,6 +65,16 @@ export function IngredientsByStage({ lines }: { lines: IngredientLine[] }) {
 }
 
 const STAGE_INDEX: Record<IngredientStage, number> = { primary: 0, secondary: 1, aging: 2, bottling: 3 };
+/** Whether a stage's ingredients can be logged: the batch's current stage or an earlier one. */
+export function stageReached(stage: IngredientStage, current: IngredientStage | null): boolean {
+  return current != null && STAGE_INDEX[stage] <= STAGE_INDEX[current];
+}
+
+/** Whether any ingredient is left to log: not logged yet, in a stage the batch has reached. */
+export function anyToLog(lines: IngredientLine[], current: IngredientStage | null, added: Map<string, BatchEvent>): boolean {
+  return lines.some((line) => line.name.trim() !== '' && !added.has(line.id) && stageReached(line.stage ?? 'primary', current));
+}
+
 const MOVE_LABEL: Record<IngredientStage, string> = { primary: 'Primary', secondary: 'Secondary', aging: 'Aging', bottling: 'Bottled' };
 
 /**
@@ -73,7 +83,7 @@ const MOVE_LABEL: Record<IngredientStage, string> = { primary: 'Primary', second
  */
 export function LoggableIngredients({ lines, current, added, onLog, onMoveTo, canAdd = true }: LoggableProps) {
   const groups = groupByStage(lines);
-  const reached = (stage: IngredientStage) => current != null && STAGE_INDEX[stage] <= STAGE_INDEX[current];
+  const reached = (stage: IngredientStage) => stageReached(stage, current);
   const next = onMoveTo ? groups.find((g) => !reached(g.stage))?.stage : undefined;
   return (
     <div className="staged-ingredients">
