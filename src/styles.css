@@ -2551,3 +2551,19 @@ button.library-row {
   gap: 5px;
   padding: 0 11px;
 }
+
+/* When BrewHive can't go on: what happened, the browser's own words, and ways out. */
+.problem {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.problem-detail {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2, var(--line));
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

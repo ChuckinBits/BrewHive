@@ -178,12 +178,17 @@ export function MoreScreen() {
           confirmLabel="Erase everything"
           onClose={() => setErasing(false)}
           onConfirm={async () => {
-            await clearAll();
-            // Like a fresh install, which starts with the starter ingredients.
-            await ensureStarterIngredients();
-            rememberTheme('system');
+            try {
+              await clearAll();
+              // Like a fresh install, which starts with the starter ingredients.
+              await ensureStarterIngredients();
+              rememberTheme('system');
+              toast('Everything was erased');
+            } catch (error) {
+              console.error(error);
+              toast(error instanceof Error ? `Erasing didn't finish: ${error.message}` : "Erasing didn't finish.");
+            }
             setErasing(false);
-            toast('Everything was erased');
           }}
         />
       )}
