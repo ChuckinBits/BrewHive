@@ -13,6 +13,10 @@ a milestone.
   (headings) now ship with the app, so every device shows them, offline too.
   Before, they only appeared where they happened to be installed, and most
   phones fell back to their own system font.
+- **Filters stay on one line.** With Inter, the Batches filters (Active,
+  Bottled, Archived, All) were a little too wide and All wrapped to a second
+  line on phones up to 390 px. They're slightly more compact now and fit from
+  375 px; on narrower phones the row scrolls sideways instead of wrapping.
 
 ### Safety
 

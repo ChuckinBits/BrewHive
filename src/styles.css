@@ -2523,3 +2523,24 @@ button.library-row {
   align-items: flex-end;
   gap: 2px;
 }
+
+/*
+ * The list filters (Active, Bottled, Archived, All) stay on one line: a little less padding fits
+ * them at common phone widths in Inter, and the narrowest phones scroll them sideways rather than
+ * wrapping All onto a line of its own.
+ */
+.toolbar .chips {
+  flex-wrap: nowrap;
+  gap: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.toolbar .chips::-webkit-scrollbar {
+  display: none;
+}
+.toolbar .chip {
+  flex: none;
+  gap: 5px;
+  padding: 0 11px;
+}
