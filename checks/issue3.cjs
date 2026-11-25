@@ -13,6 +13,7 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
+const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
   const b = await chromium.launch();
@@ -60,7 +61,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await stat(3) === '15.8%' && await stat(2) === '14.4%')), 'a 0.002 rise on a plain reading changes nothing');
 
   // Stabilize, then backsweeten: not expected to ferment
-  await add('stabilize', null, { when: t(17) });
+  await add('stabilize', null, { when: t(17) }); await keepStage(p); // stabilized mid-ferment: offered Aging, kept in Primary
   await add('backsweeten', '1.020', { when: t(18), shot: '3-backsweeten-sheet', check: async () => {
     ok(await until(async () => (!(await p.getByLabel('This will ferment').isChecked()))), 'backsweetening after stabilizing: "This will ferment" is unchecked by default');
   } });

@@ -1,16 +1,19 @@
 // Gravity over time, drawn as a small SVG line chart.
 
-import type { GravityPoint } from '../lib/batch.ts';
+import type { ChartVertex } from '../lib/batch.ts';
 import { fmtDateShort, fmtSG } from '../lib/format.ts';
 
 const W = 320;
 const H = 150;
 const PAD = { left: 44, right: 14, top: 12, bottom: 26 };
 
-export function GravityChart({ points }: { points: GravityPoint[] }) {
+/** The line comes from chartLine: readings, plus corners where sugar went in (no dot on those). */
+export function GravityChart({ line: vertices }: { line: ChartVertex[] }) {
+  const points = vertices.filter((v) => !v.corner);
   if (points.length < 2) return null;
 
-  const times = points.map((p) => Date.parse(p.date.length <= 10 ? p.date + 'T00:00:00' : p.date));
+  const timeOf = (date: string) => Date.parse(date.length <= 10 ? date + 'T00:00:00' : date);
+  const times = points.map((p) => timeOf(p.date));
   const t0 = times[0];
   const span = Math.max(1, times[times.length - 1] - t0);
   const values = points.map((p) => p.sg);
@@ -20,7 +23,7 @@ export function GravityChart({ points }: { points: GravityPoint[] }) {
   const x = (t: number) => PAD.left + ((t - t0) / span) * (W - PAD.left - PAD.right);
   const y = (sg: number) => PAD.top + ((high - sg) / (high - low)) * (H - PAD.top - PAD.bottom);
 
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(times[i]).toFixed(1)} ${y(p.sg).toFixed(1)}`).join('');
+  const line = vertices.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(timeOf(p.date)).toFixed(1)} ${y(p.sg).toFixed(1)}`).join('');
   const ticks = [high - 0.004, (high + low) / 2, low + 0.004];
   const first = points[0];
   const last = points[points.length - 1];

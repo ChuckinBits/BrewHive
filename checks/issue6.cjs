@@ -13,6 +13,7 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
+const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
   const b = await chromium.launch();
@@ -70,7 +71,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await open('stabilize');
   const methods = await p.getByLabel('Method').locator('option').allTextContents();
   ok(JSON.stringify(methods) === JSON.stringify(['Chemical', 'Pasteurization', 'Filtration', 'Nagardo', 'Other']), '5: Method dropdown: ' + methods.join(', '));
-  await p.getByLabel('Method').selectOption('Pasteurization'); await save();
+  await p.getByLabel('Method').selectOption('Pasteurization'); await save(); await keepStage(p);
   ok(await until(async () => ((await titles()).includes('Stabilized Pasteurization'))), '5: the timeline shows "Stabilized Pasteurization"');
 
   // 7: ingredient

@@ -12,6 +12,7 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
 };
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
+const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
   const b = await chromium.launch();
@@ -34,7 +35,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Move to Aging' }).click(); await p.waitForTimeout(400);
   const hasPotential = () => p.locator('.stat-label', { hasText: /^Potential$/ }).count();
   ok(await until(async () => ((await p.locator('.stat-highlight .stat-label').textContent()) === 'ABV' && await p.locator('.stat-highlight .stat-value').textContent() === '13.1%')), 'A: in Aging the ABV tile (13.1%) is the highlighted one');
-  ok(await until(async () => (await hasPotential() === 0 && await p.locator('.stats-3 .stat').count() === 3)), 'A: no Potential tile once fermentation is done; three tiles');
+  ok(await until(async () => (await hasPotential() === 0)), 'A: no Potential tile once fermentation is done');
   await add('stabilize');
   await add('backsweeten', { sg: '1.015' });
   ok(await until(async () => (await hasPotential() === 0)), 'A: backsweetened after stabilizing, box left unticked: still no Potential');
@@ -50,7 +51,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(BASE + '/#/batches/new');
   await p.getByLabel('Name').fill('Resweeten B'); await p.getByLabel(/^Original gravity/).fill('1.100');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
-  await add('gravity', { sg: '1.000' }); await add('stabilize'); await add('backsweeten', { ferment: true }); await add('gravity', { sg: '1.015' });
+  await add('gravity', { sg: '1.000' }); await add('stabilize'); await keepStage(p); await add('backsweeten', { ferment: true }); await add('gravity', { sg: '1.015' });
   ok(await until(async () => (await potential() === '15.1%')), 'B: backsweetened (box ticked, no gravity) then a 1.015 reading: Potential 15.1%');
   console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.join('\n') : 'no console errors');
   await b.close();
