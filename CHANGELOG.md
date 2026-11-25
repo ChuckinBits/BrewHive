@@ -18,6 +18,14 @@ a milestone.
 - **Dates in your time zone.** A backup file was named for the UTC date, a
   day ahead on an American evening, and so was a recipe's "Updated from …
   on" date. Both use your local date now.
+- **Removing the latest stage change moves the batch back.** Removing, say,
+  the "Moved to Secondary" entry takes the batch back to the stage before,
+  so its stage matches its timeline; the confirmation says where it goes.
+  Removing an earlier stage change only removes it from the history.
+- **Bottling more than the batch holds** gets a note ("That's more than this
+  batch holds"), so a mistyped count is easy to catch. It doesn't stop you.
+- **Long names show in full.** A batch's, recipe's or bottle's name at the
+  top of its page wraps to up to three lines instead of being cut off.
 
 ### Look
 

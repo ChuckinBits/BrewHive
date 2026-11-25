@@ -61,6 +61,29 @@ function stageBeforeFirstChange(first: BatchEvent): BatchStatus {
 }
 
 /**
+ * The stage a batch goes back to when a stage change entry is removed, or null to leave it as it is.
+ * Only the latest stage change moves the batch, and only when the batch is in the stage that entry
+ * moved it to: it goes back to the stage before, from the previous stage change (or, without one,
+ * the stage the entry moved from when that comes earlier, else Primary).
+ */
+export function stageAfterRemoving(entry: BatchEvent, current: BatchStatus, entries: BatchEvent[]): BatchStatus | null {
+  if (entry.type !== 'status' || !entry.toStatus || current !== entry.toStatus) return null;
+  const others = entries.filter((e) => e.type === 'status' && e.toStatus && !e.deletedAt && e.id !== entry.id);
+  const at = (e: BatchEvent) => e.date.slice(0, 16);
+  const later = (e: BatchEvent) => at(e) > at(entry) || (at(e) === at(entry) && e.createdAt > entry.createdAt);
+  if (others.some(later)) return null;
+  const previous = others.sort((a, b) => at(a).localeCompare(at(b)) || a.createdAt.localeCompare(b.createdAt)).pop();
+  let back: BatchStatus;
+  if (previous?.toStatus) back = previous.toStatus;
+  else {
+    const order: BatchStatus[] = ['planned', 'primary', 'secondary', 'aging', 'bottled'];
+    const from = entry.fromStatus;
+    back = from && order.includes(from) && order.indexOf(from) < order.indexOf(entry.toStatus) ? from : 'primary';
+  }
+  return back === current ? null : back;
+}
+
+/**
  * The ingredient stage something added at a date goes in by default: Secondary when the batch was in
  * Secondary then, otherwise Primary (most additions after primary are recorded against it).
  */

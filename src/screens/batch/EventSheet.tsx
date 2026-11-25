@@ -8,7 +8,7 @@ import { currentCost } from '../../components/CostCard.tsx';
 import { Field, RatingInput, Sheet, TEMP_UNITS, UnitField, toast } from '../../components/ui.tsx';
 import { Icon } from '../../icons/Icon.tsx';
 import { batchAbv, finalReading, sweetnessOf, isFermentationComplete } from '../../lib/batch.ts';
-import { ingredientStageAt, lineFromEntry } from '../../lib/stages.ts';
+import { ingredientStageAt, lineFromEntry, stageAfterRemoving } from '../../lib/stages.ts';
 import { fmtDateShort, fmtRating, fmtSG, fmtTemp, newId, nowLocal, parseNum, tempFromInput, tempToInput } from '../../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingError, saveFinalReading, type FinalReading } from '../../components/FinalReading.tsx';
 import { EVENT_ICONS } from './entries.ts';
@@ -123,6 +123,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
   const stageIsNewest = !stageEntries.some((e) => e.date.slice(0, 16) > (date || nowLocal()));
   // A stage change on the timeline only moves the batch forward; the stage buttons move it back.
   const stageMovesBatch = stageIsNewest && isLaterStage(stage, batch.status);
+  // Removing the latest stage change takes the batch back to the stage before it.
+  const removalGoesBackTo = existing ? stageAfterRemoving(existing, batch.status, batchEntries) : null;
   // An ingredient added to the batch's list goes in the stage the batch was in on the entry's date,
   // unless one is picked.
   const [pickedLineStage, setLineStage] = useState<IngredientStage | null>(null);
@@ -530,7 +532,13 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
         {existing &&
           (confirmingDelete ? (
             <div className="confirm-inline" role="group" aria-label="Confirm removal">
-              <p>{isOg ? "Remove the OG? This also clears the batch's original gravity." : 'Remove this entry from the timeline?'}</p>
+              <p>
+                {isOg
+                  ? "Remove the OG? This also clears the batch's original gravity."
+                  : removalGoesBackTo
+                    ? `Remove this entry? It's the latest stage change, so the batch goes back to ${statusLabel(removalGoesBackTo)}.`
+                    : 'Remove this entry from the timeline?'}
+              </p>
               <div className="button-row">
                 <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
                   Keep it
@@ -541,7 +549,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart }: Ev
                   onClick={async () => {
                     await events.remove(existing.id);
                     if (isOg) await batches.save({ ...batch, og: null });
-                    toast(isOg ? 'OG removed' : 'Entry removed');
+                    if (removalGoesBackTo) await batches.save({ ...batch, status: removalGoesBackTo, ...(batch.status === 'archived' ? { statusBeforeArchive: null } : {}) });
+                    toast(isOg ? 'OG removed' : removalGoesBackTo ? `Entry removed; back to ${statusLabel(removalGoesBackTo)}` : 'Entry removed');
                     onClose();
                   }}
                 >

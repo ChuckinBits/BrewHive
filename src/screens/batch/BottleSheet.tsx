@@ -183,6 +183,12 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
           {volumeMl != null && ` of ${fmtBottle(volumeMl)}`}
           <span className="field-hint">A guide only; some loss when bottling is normal.</span>
         </p>
+        {/* More than the batch holds (a little over is rounding): worth a second look, but not blocked. */}
+        {volumeMl != null && total > volumeMl * 1.02 && (
+          <p className="warning" role="note">
+            That's more than this batch holds ({fmtBottle(volumeMl)}). Check the bottle count, or the batch's volume in Batch Edit.
+          </p>
+        )}
         <div className="form-pair">
           <Field label="Bottled on">
             <input type="date" value={bottledDate} onChange={(e) => setBottledDate(e.target.value)} />

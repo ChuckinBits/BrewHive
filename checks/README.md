@@ -47,6 +47,7 @@ Most are named after the issue or release they were written for:
 | `fonts` | Inter and Bricolage Grotesque load from the app itself |
 | `filterrow` | List filters stay on one line on phones |
 | `badbackup` | A damaged backup restores its good records and skips the rest |
+| `huntfixes` | Removing the latest stage change, bottling more than the batch holds, long names |
 | `roundtrip` | Back up, erase, restore: every record and setting comes back as it was |
 
 New features get a check here, in the same style.
