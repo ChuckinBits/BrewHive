@@ -41,7 +41,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForURL(/#\/batches\/[^n]/); await p.waitForSelector('.hero');
   const page = p.url();
   ok(await until(async () => (await extra('Potential') === 'Target 14.0% · needs · 17–27 pts')), 'the batch page shows it needs 17–27 more points (' + await extra('Potential') + ')');
-  ok(await until(async () => (await noSideScroll() && await p.locator('.stat-projected, .stat').last().evaluate((el) => [...el.querySelectorAll('.stat-extra')].every((x) => x.scrollWidth <= el.clientWidth)))), 'the range fits inside its tile on a phone');
+  ok(await until(async () => (await noSideScroll() && await p.locator('.stat').last().evaluate((el) => [...el.querySelectorAll('.stat-extra')].every((x) => x.scrollWidth <= el.clientWidth)))), 'the range fits inside its tile on a phone');
   await p.screenshot({ path: out + '/27-range.png', clip: { x: 0, y: 300, width: 390, height: 260 } });
   const before = await extra('Potential');
 
