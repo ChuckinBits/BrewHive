@@ -44,6 +44,7 @@ Most are named after the issue or release they were written for:
 | `unitsetting`, `unitsfollow`, `starters`, `catorder`, `picknote`, `nopitch` | Settings and the ingredient library |
 | `listmemory` | Lists remembering their search and filters |
 | `csp` | No Content-Security-Policy violations on any screen |
+| `fonts` | Inter and Bricolage Grotesque load from the app itself |
 | `badbackup` | A damaged backup restores its good records and skips the rest |
 
 New features get a check here, in the same style.
