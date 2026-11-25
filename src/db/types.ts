@@ -490,4 +490,6 @@ export interface Settings {
   ingredientCategories?: IngredientCategory[];
   /** ISO 4217 code, such as USD. Missing means the locale's currency. */
   currency?: string;
+  /** Hides the + Add buttons on batches' ingredients, for people who keep the list but don't log it. */
+  hideIngredientAdd?: boolean;
 }

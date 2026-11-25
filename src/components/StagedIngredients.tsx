@@ -48,11 +48,15 @@ export function EditableIngredients({ lines, onEdit }: EditableProps) {
 
 interface LoggableProps {
   lines: IngredientLine[];
-  /** The stage whose ingredients can be logged, or null when none can (a planned batch). */
+  /** The stage the batch is at: its ingredients, and any earlier stage's, can be logged. Null when none can (a planned batch). */
   current: IngredientStage | null;
   /** The timeline entry that logged each ingredient, by line id. */
   added: Map<string, BatchEvent>;
   onLog: (line: IngredientLine) => void;
+  /** Moves the batch on to a later stage, from the button on that stage's ingredients. Omitted where it can't move (archived). */
+  onMoveTo?: (stage: IngredientStage) => void;
+  /** False hides the + Add buttons (the Hide Add setting); the list and its ✓ dates stay. */
+  canAdd?: boolean;
 }
 
 /** Read-only, as on a recipe: grouped by stage, nothing to tap. */
@@ -60,17 +64,42 @@ export function IngredientsByStage({ lines }: { lines: IngredientLine[] }) {
   return <LoggableIngredients lines={lines} current={null} added={new Map()} onLog={() => {}} />;
 }
 
-/** On the batch page: ingredients for the current stage can be tapped to log them on the timeline. */
-export function LoggableIngredients({ lines, current, added, onLog }: LoggableProps) {
+const STAGE_INDEX: Record<IngredientStage, number> = { primary: 0, secondary: 1, aging: 2, bottling: 3 };
+/** Whether a stage's ingredients can be logged: the batch's current stage or an earlier one. */
+export function stageReached(stage: IngredientStage, current: IngredientStage | null): boolean {
+  return current != null && STAGE_INDEX[stage] <= STAGE_INDEX[current];
+}
+
+/** Whether any ingredient is left to log: not logged yet, in a stage the batch has reached. */
+export function anyToLog(lines: IngredientLine[], current: IngredientStage | null, added: Map<string, BatchEvent>): boolean {
+  return lines.some((line) => line.name.trim() !== '' && !added.has(line.id) && stageReached(line.stage ?? 'primary', current));
+}
+
+const MOVE_LABEL: Record<IngredientStage, string> = { primary: 'Primary', secondary: 'Secondary', aging: 'Aging', bottling: 'Bottled' };
+
+/**
+ * On the batch page: ingredients for the current stage, or any earlier one, can be tapped to log
+ * them on the timeline. The next stage that has ingredients offers to move the batch on to it.
+ */
+export function LoggableIngredients({ lines, current, added, onLog, onMoveTo, canAdd = true }: LoggableProps) {
+  const groups = groupByStage(lines);
+  const reached = (stage: IngredientStage) => stageReached(stage, current);
+  const next = onMoveTo ? groups.find((g) => !reached(g.stage))?.stage : undefined;
   return (
     <div className="staged-ingredients">
-      {groupByStage(lines).map((group) => {
+      {groups.map((group) => {
         const isCurrent = group.stage === current;
+        const canLog = canAdd && reached(group.stage);
         return (
           <section key={group.stage} aria-label={`${ingredientStageLabel(group.stage)} ingredients`}>
             <h3 className={isCurrent ? 'stage-divider stage-divider-current' : 'stage-divider'}>
               {ingredientStageLabel(group.stage)} ingredients
               {isCurrent && <span className="stage-now">Now</span>}
+              {group.stage === next && onMoveTo && (
+                <button type="button" className="btn btn-small stage-move" onClick={() => onMoveTo(group.stage)}>
+                  Move to {MOVE_LABEL[group.stage]}
+                </button>
+              )}
             </h3>
             <ul className="staged-list">
               {group.lines.map((line) => {
@@ -89,7 +118,7 @@ export function LoggableIngredients({ lines, current, added, onLog }: LoggablePr
                     </li>
                   );
                 }
-                if (isCurrent) {
+                if (canLog) {
                   return (
                     <li key={line.id}>
                       <button type="button" className="staged-row staged-row-open" onClick={() => onLog(line)} aria-label={`Log ${line.name} as added`}>

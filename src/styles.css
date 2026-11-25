@@ -2502,3 +2502,28 @@ button.library-row {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* "Move to Secondary" on the next stage's ingredients: after the divider's line. */
+.stage-divider::after {
+  order: 1;
+}
+.stage-divider .stage-move {
+  order: 2;
+  flex: none;
+  white-space: nowrap;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* A card head with more than one action, stacked on the right: Edit, then Hide Add. */
+.card-head-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
