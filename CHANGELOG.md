@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.8)
+## v0.2.8 – 2026-11-25
 
 ### Batch page
 
@@ -46,6 +46,10 @@ a milestone.
   Before, the page just stayed blank. A screen that fails to draw shows the
   error and a Reload button instead of blanking the whole app, and Erase
   everything says so if it can't finish.
+
+**Updating from v0.2.7:** nothing to do. If a batch's FG jumped to its
+backsweetened gravity after you ticked and unticked "This will ferment", open
+its final reading and tick "Final gravity" again.
 
 ## v0.2.7 – 2026-11-24
 
