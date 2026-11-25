@@ -15,7 +15,6 @@ const batch = (patch: Partial<Batch> = {}): Batch => ({
   startDate: '2026-11-01',
   volumeL: 3.785,
   og: 1.114,
-  fg: null,
   targetFG: 1.01,
   ingredients: [
     { id: 'l1', name: 'Clover honey', amount: '3 lb', stage: 'primary' },
