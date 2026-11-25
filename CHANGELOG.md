@@ -24,6 +24,13 @@ a milestone.
   the timeline. "Show Add" brings them back. Hide Add and the "Tap an
   ingredient" hint only show while something is left to log.
 
+### Cost
+
+- **Shorter "not counted" line.** Ingredients left out of the cost are
+  grouped by why: "No cost: Cinnamon sticks, Oak cubes." in place of
+  "Not counted: Cinnamon sticks (no cost), Oak cubes (no cost)." Lines for
+  "No amount" and "Cost in other units" follow when they apply.
+
 ## v0.2.4 – 2026-11-23
 
 ### Add entry
