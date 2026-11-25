@@ -6,7 +6,7 @@ BrewHive is an open source, private-by-default brew log that makes tracking brew
 
 **Use it at [brewhive.app](https://brewhive.app).** It runs in any modern browser and can be installed to your home screen or desktop from there.
 
-The latest release is **v0.2.5**: a complete local brew log that installs as an app from the browser, with an ingredient library and batch costs. The next milestone, **v0.3**, adds equipment and inventory. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
+The latest release is **v0.2.6**: a complete local brew log that installs as an app from the browser, with an ingredient library and batch costs. The next milestone, **v0.3**, adds equipment and inventory. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
 
 ## What it does today
 
@@ -103,7 +103,7 @@ The app has only two runtime dependencies, React and React DOM. Volumes are stor
 | Version | Focus |
 | --- | --- |
 | **v0.1** (released) | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
-| **v0.2** (released, latest v0.2.5) | Ingredient library: categories, icons, 100 starter ingredients, costs and batch totals |
+| **v0.2** (released, latest v0.2.6) | Ingredient library: categories, icons, 100 starter ingredients, costs and batch totals |
 | **v0.3** (next) | Equipment screen (vessels and ingredient inventory), calculators, photos, reminders, Simple / Advanced mode |
 | v0.4 | iOS and Android apps with Capacitor |
 | v0.5 | Optional sync through a self-hosted server |
