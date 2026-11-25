@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.6)
+## v0.2.6 – 2026-11-24
 
 ### Fixes
 
@@ -59,7 +59,7 @@ a milestone.
   the built page is missing its Content-Security-Policy, and Dependabot
   proposes package and action updates weekly (minor and patch updates
   grouped, each major version on its own).
-- **Browser checks in the repo.** The 42 checks that drive the app in a
+- **Browser checks in the repo.** The 46 checks that drive the app in a
   headless browser now live in `checks/`, run with `npm run checks`, and run
   on every pull request.
 - The batch page's code is split into one file per sheet
@@ -67,6 +67,11 @@ a milestone.
   change in behavior.
 - The browser checks wait for what they expect instead of reading the page
   the instant after a save, so slower machines don't make them flaky.
+
+**Updating from v0.2.5:** existing data carries over. If you restored a
+backup onto a new device with an earlier version and your ingredient prices
+or units went missing, restore the same backup again: this version brings
+them back.
 
 ## v0.2.5 – 2026-11-24
 
