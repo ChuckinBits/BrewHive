@@ -45,6 +45,7 @@ Most are named after the issue or release they were written for:
 | `listmemory` | Lists remembering their search and filters |
 | `csp` | No Content-Security-Policy violations on any screen |
 | `fonts` | Inter and Bricolage Grotesque load from the app itself |
+| `filterrow` | List filters stay on one line on phones |
 | `badbackup` | A damaged backup restores its good records and skips the rest |
 
 New features get a check here, in the same style.
