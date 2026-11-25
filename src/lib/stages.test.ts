@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BatchEvent, BatchStatus, IngredientLine } from '../db/types.ts';
-import { addedLines, currentIngredientStage, ingredientStageAt, statusAt, groupByStage, joinAmount, splitAmount, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
+import { addedLines, stageAfterRemoving, currentIngredientStage, ingredientStageAt, statusAt, groupByStage, joinAmount, splitAmount, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
 
 const base = { createdAt: '2026-11-01T00:00:00Z', updatedAt: '', deletedAt: null };
 const line = (id: string, stage?: IngredientLine['stage'], amount = ''): IngredientLine => ({ id, name: id, amount, stage });
@@ -165,4 +165,24 @@ test('statusAt finds the stage on a date from stage changes', () => {
   const fg = { ...change('2026-03-01T09:00', undefined, undefined), type: 'gravity', value: 1.0, final: true } as BatchEvent;
   assert.equal(statusAt('2026-02-10T12:00', 'aging', [fg]), 'primary');
   assert.equal(statusAt('2026-04-10T12:00', 'aging', [fg]), 'aging');
+});
+
+test('removing the latest stage change moves the batch back a stage', () => {
+  const change = (id: string, date: string, fromStatus: BatchEvent['fromStatus'], toStatus: BatchEvent['toStatus']) =>
+    ({ id, batchId: 'b', type: 'status', date, value: null, note: '', fromStatus, toStatus, createdAt: date, updatedAt: date }) as BatchEvent;
+  const toSecondary = change('s', '2026-03-01T09:00', 'primary', 'secondary');
+  const toAging = change('a', '2026-05-01T09:00', 'secondary', 'aging');
+  // The latest: back to the stage of the change before it.
+  assert.equal(stageAfterRemoving(toAging, 'aging', [toSecondary, toAging]), 'secondary');
+  // The only one: back to where it moved from.
+  assert.equal(stageAfterRemoving(toSecondary, 'secondary', [toSecondary]), 'primary');
+  assert.equal(stageAfterRemoving(change('p', '2026-02-01T09:00', 'planned', 'primary'), 'primary', []), 'planned');
+  // Not the latest: the batch stays.
+  assert.equal(stageAfterRemoving(toSecondary, 'aging', [toSecondary, toAging]), null);
+  // The batch has since moved on with the stage buttons (not to this entry's stage): it stays.
+  assert.equal(stageAfterRemoving(toAging, 'bottled', [toSecondary, toAging]), null);
+  // A "from" that comes later (a batch logged as Bottled, history added after) means Primary.
+  assert.equal(stageAfterRemoving(change('x', '2026-03-01T09:00', 'bottled', 'secondary'), 'secondary', []), 'primary');
+  // Not a stage entry: nothing to do.
+  assert.equal(stageAfterRemoving({ ...toAging, type: 'note' } as BatchEvent, 'aging', [toAging]), null);
 });

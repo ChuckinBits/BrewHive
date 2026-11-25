@@ -178,11 +178,18 @@ textarea {
   font-weight: 700;
 }
 
+/* A page's own title (a batch, recipe or bottle) wraps to up to three lines, so a long name shows
+   in full; only past that is it cut off with an ellipsis. */
 .topbar-title-small {
-  font-size: 20px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  font-size: 20px;
+  line-height: 1.2;
+  text-wrap: balance;
 }
 
 .topbar-actions {
