@@ -31,6 +31,9 @@ a milestone.
 - **Browser checks in the repo.** The 42 checks that drive the app in a
   headless browser now live in `checks/`, run with `npm run checks`, and run
   on every pull request.
+- The batch page's code is split into one file per sheet
+  (`src/screens/batch/`), and dead code and unused styles are removed. No
+  change in behavior.
 
 ## v0.2.5 – 2026-11-24
 
