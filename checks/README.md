@@ -23,6 +23,8 @@ To check a server you already run, such as `npm run dev`, set `BREWHIVE_URL`:
 BREWHIVE_URL=http://localhost:5173 npm run checks
 ```
 
+Assertions that read the page wait for their condition (up to 5 seconds, or `CHECK_WAIT`
+milliseconds), since the page can lag a moment behind a click or a save on a slow machine.
 A failing check runs once more. If it passes then, it's reported as **flaky**: usually the
 check read the page a moment too early, and it should wait for what it expects instead.
 Screenshots land in `checks/.shots/` (not committed); CI keeps them when a run fails.

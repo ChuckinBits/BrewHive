@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -27,14 +37,14 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   await pickIngredient('Wildflower honey');
   await d.getByRole('textbox', { name: 'Quantity' }).fill('1 1/2');
   await d.getByRole('combobox', { name: 'Unit', exact: true }).first().selectOption('lb');
-  ok(await d.getByRole('group', { name: 'Price paid (optional)' }).count() === 1, 'batch ingredient sheet asks the price paid');
+  ok(await until(async () => (await d.getByRole('group', { name: 'Price paid (optional)' }).count() === 1)), 'batch ingredient sheet asks the price paid');
   await d.getByRole('textbox', { name: /^Price/ }).fill('30');
   await d.getByRole('textbox', { name: 'Amount' }).fill('12');
   await d.getByRole('group', { name: 'Price paid (optional)' }).getByRole('combobox', { name: 'Unit' }).selectOption('lb');
   const hint = (await d.locator('.cost-fields .field-hint').textContent()).trim();
   ok(hint === '= $3.75 in this batch.', 'fraction quantity is priced: ' + hint);
   const upd = d.getByRole('checkbox', { name: 'Also update the price in your ingredients' });
-  ok(await upd.isChecked(), 'update-library box is ticked when the library has no price');
+  ok(await until(async () => (await upd.isChecked())), 'update-library box is ticked when the library has no price');
   await p.screenshot({ path: out + '/v023-price.png' });
   await d.getByRole('button', { name: 'Add ingredient' }).click(); await d.waitFor({ state: 'detached' });
 
@@ -45,15 +55,15 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   await d.getByRole('button', { name: 'Add ingredient' }).click(); await d.waitFor({ state: 'detached' });
 
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
-  ok(await fact('Ingredient cost') === '$3.75', 'batch cost $3.75: ' + await fact('Ingredient cost'));
+  ok(await until(async () => (await fact('Ingredient cost') === '$3.75')), 'batch cost $3.75: ' + await fact('Ingredient cost'));
   const batchUrl = p.url();
 
   // #56: honey logs at the start date, the nutrient now.
   await p.getByRole('button', { name: 'Log Wildflower honey as added' }).click();
-  ok((await d.getByLabel('When').inputValue()).startsWith(day(-10)), 'honey starts at the start date');
+  ok(await until(async () => ((await d.getByLabel('When').inputValue()).startsWith(day(-10)))), 'honey starts at the start date');
   await d.getByRole('button', { name: 'Add to timeline' }).click(); await d.waitFor({ state: 'detached' });
   await p.getByRole('button', { name: 'Log Fermaid O as added' }).click();
-  ok((await d.getByLabel('When').inputValue()).startsWith(day(-10)), 'so does the nutrient, a primary ingredient');
+  ok(await until(async () => ((await d.getByLabel('When').inputValue()).startsWith(day(-10)))), 'so does the nutrient, a primary ingredient');
   await d.getByLabel('When').fill(day(0) + 'T08:00');
   await d.getByRole('button', { name: 'Add to timeline' }).click(); await d.waitFor({ state: 'detached' });
   await p.locator('.timeline-entry', { hasText: 'Fermaid O' }).waitFor();
@@ -67,14 +77,14 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   // Stage change starts on the next stage.
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
   await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stage change' }), exact: true }).click();
-  ok(await d.getByRole('combobox', { name: 'Move to' }).inputValue() === 'secondary', 'Stage change shows Move to, starting on Secondary for a Primary batch');
-  ok(await d.getByText('The batch moves to this stage.').count() === 1, 'and says the batch moves');
+  ok(await until(async () => (await d.getByRole('combobox', { name: 'Move to' }).inputValue() === 'secondary')), 'Stage change shows Move to, starting on Secondary for a Primary batch');
+  ok(await until(async () => (await d.getByText('The batch moves to this stage.').count() === 1)), 'and says the batch moves');
   await d.getByRole('button', { name: 'Close' }).first().click(); await d.waitFor({ state: 'detached' });
 
   // #54: Pasteurization with temperature and time.
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
   await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stabilized' }), exact: true }).click();
-  ok(await d.getByRole('textbox', { name: 'Temperature (optional)' }).count() === 0, 'no temperature for Chemical');
+  ok(await until(async () => (await d.getByRole('textbox', { name: 'Temperature (optional)' }).count() === 0)), 'no temperature for Chemical');
   await d.getByRole('combobox', { name: 'Method' }).selectOption('Pasteurization');
   await d.getByRole('textbox', { name: 'Temperature (optional)' }).fill('160');
   await d.getByRole('textbox', { name: 'Time (minutes)' }).fill('15');
@@ -83,7 +93,7 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   const entry = (await p.locator('.timeline-entry', { hasText: 'Stabilized' }).textContent());
   ok(/Pasteurization · 160 °F.* for 15 min/.test(entry), 'entry reads Pasteurization · 160 °F for 15 min: ' + entry);
   await p.locator('.timeline-entry', { hasText: 'Stabilized' }).click(); await d.waitFor();
-  ok(await d.getByRole('textbox', { name: 'Temperature (optional)' }).inputValue() === '160' && await d.getByRole('textbox', { name: 'Time (minutes)' }).inputValue() === '15', 'editing keeps temperature and time');
+  ok(await until(async () => (await d.getByRole('textbox', { name: 'Temperature (optional)' }).inputValue() === '160' && await d.getByRole('textbox', { name: 'Time (minutes)' }).inputValue() === '15')), 'editing keeps temperature and time');
   await d.getByRole('button', { name: 'Close' }).first().click(); await d.waitFor({ state: 'detached' });
 
   // #53: Edit ingredients opens Batch Edit at the Ingredients section.
@@ -96,12 +106,12 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
 
   // #55: editing the line starts from its saved price; the library now has a price, so the box is unticked when changed.
   await p.locator('fieldset.ingredient-editor').getByText('Wildflower honey').first().click(); await d.waitFor();
-  ok(await d.getByRole('textbox', { name: /^Price/ }).inputValue() === '30', 'edit starts from the price paid');
+  ok(await until(async () => (await d.getByRole('textbox', { name: /^Price/ }).inputValue() === '30')), 'edit starts from the price paid');
   await d.getByRole('textbox', { name: /^Price/ }).fill('36');
-  ok(!(await d.getByRole('checkbox', { name: 'Also update the price in your ingredients' }).isChecked()), 'update box is unticked when the library has a price');
+  ok(await until(async () => (!(await d.getByRole('checkbox', { name: 'Also update the price in your ingredients' }).isChecked()))), 'update box is unticked when the library has a price');
   await d.getByRole('button', { name: 'Save ingredient' }).click(); await d.waitFor({ state: 'detached' });
   await p.getByRole('button', { name: 'Save changes' }).click(); await p.waitForSelector('.hero');
-  ok(await fact('Ingredient cost') === '$4.50', 'batch cost now $4.50: ' + await fact('Ingredient cost'));
+  ok(await until(async () => (await fact('Ingredient cost') === '$4.50')), 'batch cost now $4.50: ' + await fact('Ingredient cost'));
 
   // Library kept $30 for 12 lb.
   await p.goto(BASE + '/#/ingredients'); await p.getByRole('searchbox').first().fill('Wildflower');

@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 const pad = (n) => String(n).padStart(2, '0');
 const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -25,53 +35,53 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   await addLine('Oak cubes', '1', 'aging');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
 
-  ok(await logBtn('Clover honey').count() === 1 && await logBtn('Raspberries').count() === 0 && await logBtn('Oak cubes').count() === 0, 'in Primary: only Primary ingredients can be logged');
-  ok(await move('Secondary').count() === 1 && await move('Aging').count() === 0, 'Secondary ingredients offer Move to Secondary; Aging does not yet');
-  ok(await p.getByRole('button', { name: 'Hide Add' }).count() === 1 && await p.getByText('Tap an ingredient when it goes in').count() === 1, 'with something to log: Hide Add and the hint show');
+  ok(await until(async () => (await logBtn('Clover honey').count() === 1 && await logBtn('Raspberries').count() === 0 && await logBtn('Oak cubes').count() === 0)), 'in Primary: only Primary ingredients can be logged');
+  ok(await until(async () => (await move('Secondary').count() === 1 && await move('Aging').count() === 0)), 'Secondary ingredients offer Move to Secondary; Aging does not yet');
+  ok(await until(async () => (await p.getByRole('button', { name: 'Hide Add' }).count() === 1 && await p.getByText('Tap an ingredient when it goes in').count() === 1)), 'with something to log: Hide Add and the hint show');
   await p.screenshot({ path: out + '/logstages-primary.png', fullPage: true });
 
   // Logging asks when, starting at the start date for a primary ingredient.
   await logBtn('Clover honey').click(); await d.waitFor();
-  ok((await d.getByLabel('When').inputValue()).startsWith(day(-20)), 'Clover honey starts at the start date');
+  ok(await until(async () => ((await d.getByLabel('When').inputValue()).startsWith(day(-20)))), 'Clover honey starts at the start date');
   await p.screenshot({ path: out + '/logstages-sheet.png' });
   await d.getByRole('button', { name: 'Close' }).first().click(); await d.waitFor({ state: 'detached' });
-  ok(await logBtn('Clover honey').count() === 1, 'closing the sheet logs nothing');
+  ok(await until(async () => (await logBtn('Clover honey').count() === 1)), 'closing the sheet logs nothing');
 
   await move('Secondary').click(); await p.waitForTimeout(400);
-  ok(await status() === 'Secondary', 'Move to Secondary moves the batch');
-  ok((await p.locator('.timeline-title').allTextContents()).some((t) => /Moved to Secondary/.test(t)), 'and adds Moved to Secondary to the timeline');
-  ok(await move('Secondary').count() === 0 && await move('Aging').count() === 1, 'the button moves on to Aging');
-  ok(await logBtn('Raspberries').count() === 1 && await logBtn('Clover honey').count() === 1, 'Secondary and Primary ingredients can both be logged now');
+  ok(await until(async () => (await status() === 'Secondary')), 'Move to Secondary moves the batch');
+  ok(await until(async () => ((await p.locator('.timeline-title').allTextContents()).some((t) => /Moved to Secondary/.test(t)))), 'and adds Moved to Secondary to the timeline');
+  ok(await until(async () => (await move('Secondary').count() === 0 && await move('Aging').count() === 1)), 'the button moves on to Aging');
+  ok(await until(async () => (await logBtn('Raspberries').count() === 1 && await logBtn('Clover honey').count() === 1)), 'Secondary and Primary ingredients can both be logged now');
   await logBtn('Raspberries').click(); await d.waitFor();
-  ok((await d.getByLabel('When').inputValue()).startsWith(day(0)), 'a Secondary ingredient starts at now');
+  ok(await until(async () => ((await d.getByLabel('When').inputValue()).startsWith(day(0)))), 'a Secondary ingredient starts at now');
   await d.getByRole('button', { name: 'Add to timeline' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await p.locator('.staged-row-done', { hasText: 'Raspberries' }).count() === 1, 'Raspberries are logged');
+  ok(await until(async () => (await p.locator('.staged-row-done', { hasText: 'Raspberries' }).count() === 1)), 'Raspberries are logged');
 
   // Aging asks for the final reading, as the stage button does.
   await move('Aging').click(); await d.waitFor();
-  ok(await d.getByRole('heading', { name: 'Move to Aging' }).count() === 1, 'Move to Aging asks for the final reading');
+  ok(await until(async () => (await d.getByRole('heading', { name: 'Move to Aging' }).count() === 1)), 'Move to Aging asks for the final reading');
   await d.getByRole('textbox', { name: 'Final gravity (optional)' }).fill('1.000');
   await d.getByRole('button', { name: 'Move to Aging' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await status() === 'Aging' && await move('Aging').count() === 0, 'now in Aging, no more Move buttons (no Bottling ingredients)');
+  ok(await until(async () => (await status() === 'Aging' && await move('Aging').count() === 0)), 'now in Aging, no more Move buttons (no Bottling ingredients)');
   // Clover honey, never logged, can still be logged from Aging.
   await logBtn('Clover honey').click(); await d.waitFor();
   await d.getByRole('button', { name: 'Add to timeline' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await p.locator('.staged-row-done', { hasText: 'Clover honey' }).count() === 1, 'an earlier stage ingredient is logged from Aging');
+  ok(await until(async () => (await p.locator('.staged-row-done', { hasText: 'Clover honey' }).count() === 1)), 'an earlier stage ingredient is logged from Aging');
   await p.screenshot({ path: out + '/logstages-aging.png', fullPage: true });
   // Hide Add: the list stays, the + Add buttons go, on every batch, until Show Add.
   await p.getByRole('button', { name: 'Hide Add' }).click(); await p.waitForTimeout(300);
-  ok(await p.locator('.staged-action-add').count() === 0 && await p.getByText('Oak cubes').count() >= 1, 'Hide Add hides every + Add, the list stays');
-  ok(await p.locator('.staged-row-done', { hasText: 'Clover honey' }).count() === 1, 'logged ingredients keep their date');
+  ok(await until(async () => (await p.locator('.staged-action-add').count() === 0 && await p.getByText('Oak cubes').count() >= 1)), 'Hide Add hides every + Add, the list stays');
+  ok(await until(async () => (await p.locator('.staged-row-done', { hasText: 'Clover honey' }).count() === 1)), 'logged ingredients keep their date');
   await p.screenshot({ path: out + '/logstages-hidden.png', fullPage: true });
   await p.reload(); await p.waitForSelector('.hero');
-  ok(await p.locator('.staged-action-add').count() === 0 && await p.getByRole('button', { name: 'Show Add' }).count() === 1, 'and stays hidden after a reload');
+  ok(await until(async () => (await p.locator('.staged-action-add').count() === 0 && await p.getByRole('button', { name: 'Show Add' }).count() === 1)), 'and stays hidden after a reload');
   await p.getByRole('button', { name: 'Show Add' }).click(); await p.waitForTimeout(300);
-  ok(await p.locator('.staged-action-add').count() >= 1, 'Show Add brings them back');
+  ok(await until(async () => (await p.locator('.staged-action-add').count() >= 1)), 'Show Add brings them back');
   // Once everything reached is logged, Hide Add and the hint go away.
   await logBtn('Oak cubes').click(); await d.waitFor();
   await d.getByRole('button', { name: 'Add to timeline' }).click(); await d.waitFor({ state: 'detached' });
   await p.waitForTimeout(300);
-  ok(await p.getByRole('button', { name: /^(Hide|Show) Add$/ }).count() === 0 && await p.getByText('Tap an ingredient when it goes in').count() === 0, 'all logged: no Hide Add and no hint');
+  ok(await until(async () => (await p.getByRole('button', { name: /^(Hide|Show) Add$/ }).count() === 0 && await p.getByText('Tap an ingredient when it goes in').count() === 0)), 'all logged: no Hide Add and no hint');
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch((e) => { console.error(e.message); process.exit(1); });

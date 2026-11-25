@@ -210,10 +210,6 @@ textarea {
   background: var(--surface-2);
 }
 
-.icon-btn-quiet {
-  color: var(--muted);
-}
-
 .topbar > .icon-btn:first-child {
   margin-left: -10px;
 }
@@ -876,7 +872,6 @@ a.shelf-item:hover .shelf-visual {
   text-align: left;
 }
 
-.ingredient-list,
 .link-list {
   display: flex;
   flex-direction: column;
@@ -885,7 +880,6 @@ a.shelf-item:hover .shelf-visual {
   list-style: none;
 }
 
-.ingredient-list li,
 .link-list a {
   display: flex;
   justify-content: space-between;
@@ -894,7 +888,6 @@ a.shelf-item:hover .shelf-visual {
   border-top: 1px solid var(--line);
 }
 
-.ingredient-list li > :last-child,
 .link-list a > :last-child {
   flex: none;
   text-align: right;

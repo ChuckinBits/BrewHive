@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -22,31 +32,31 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   await p.getByRole('textbox', { name: 'Name' }).fill('Progress mead'); await p.getByLabel('Start date').fill(day(-10));
   await p.getByRole('textbox', { name: 'Original gravity' }).fill('1.100');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
-  ok(await fact('Attenuation') === null && await fact('Fermentation rate') === null, 'no attenuation or rate with only the OG');
+  ok(await until(async () => (await fact('Attenuation') === null && await fact('Fermentation rate') === null)), 'no attenuation or rate with only the OG');
 
   // A reading 6 days in: 1.040
   await addEntry('Gravity reading');
   await d.getByRole('textbox', { name: 'Specific gravity' }).fill('1.040'); await d.getByLabel('When', { exact: true }).fill(`${day(-4)}T00:00`);
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
   await details.locator('dt', { hasText: /^Attenuation$/ }).waitFor({ timeout: 4000 });
-  ok(await fact('Attenuation') === '60%', 'attenuation 60%: ' + await fact('Attenuation'));
-  ok(await fact('Fermentation rate') === '10 pts/day', 'rate 10 pts/day over 6 days: ' + await fact('Fermentation rate'));
-  ok(await fact('To 1.000') === 'About 4 days', 'about 4 days to 1.000: ' + await fact('To 1.000'));
+  ok(await until(async () => (await fact('Attenuation') === '60%')), 'attenuation 60%: ' + await fact('Attenuation'));
+  ok(await until(async () => (await fact('Fermentation rate') === '10 pts/day')), 'rate 10 pts/day over 6 days: ' + await fact('Fermentation rate'));
+  ok(await until(async () => (await fact('To 1.000') === 'About 4 days')), 'about 4 days to 1.000: ' + await fact('To 1.000'));
   await details.scrollIntoViewIfNeeded(); await p.screenshot({ path: out + '/v022-details.png' });
 
   // Backsweetening: sweetness shows; unticked stays off the chart
   const dotsBefore = await chartDots();
   await addEntry('Backsweetened');
   const sg = d.getByRole('textbox', { name: 'Gravity after adding (optional)' });
-  await sg.fill('1.005'); ok((await d.locator('.sweetness').textContent()).startsWith('Dry'), 'typing 1.005: Dry');
-  await sg.fill('1.018'); ok((await d.locator('.sweetness').textContent()).startsWith('Semi-sweet'), '1.018: Semi-sweet');
-  await sg.fill('1.030'); ok((await d.locator('.sweetness').textContent()).startsWith('Sweet (1.025–1.050)'), '1.030: Sweet (1.025–1.050)');
+  await sg.fill('1.005'); ok(await until(async () => ((await d.locator('.sweetness').textContent()).startsWith('Dry'))), 'typing 1.005: Dry');
+  await sg.fill('1.018'); ok(await until(async () => ((await d.locator('.sweetness').textContent()).startsWith('Semi-sweet'))), '1.018: Semi-sweet');
+  await sg.fill('1.030'); ok(await until(async () => ((await d.locator('.sweetness').textContent()).startsWith('Sweet (1.025–1.050)'))), '1.030: Sweet (1.025–1.050)');
   await p.screenshot({ path: out + '/v022-sweetness.png' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await chartDots() === dotsBefore, 'unticked backsweetening is not charted');
+  ok(await until(async () => (await chartDots() === dotsBefore)), 'unticked backsweetening is not charted');
   await p.locator('.timeline-entry', { hasText: 'Backsweetened' }).click(); await d.waitFor();
   await d.getByRole('checkbox', { name: 'This will ferment' }).check(); await d.getByRole('button', { name: 'Save changes' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await chartDots() === dotsBefore + 1, 'ticked "This will ferment", it is charted');
+  ok(await until(async () => (await chartDots() === dotsBefore + 1)), 'ticked "This will ferment", it is charted');
   await p.locator('.timeline-entry', { hasText: 'Backsweetened' }).click(); await d.waitFor();
   await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await d.waitFor({ state: 'detached' });
 
@@ -54,34 +64,34 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   await addEntry('Relocate');
   await d.getByRole('textbox', { name: /Where/ }).fill('Basement');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await p.locator('.timeline-entry', { hasText: 'Relocated to Basement' }).count() === 1, 'Relocate shows "Relocated to Basement"');
+  ok(await until(async () => (await p.locator('.timeline-entry', { hasText: 'Relocated to Basement' }).count() === 1)), 'Relocate shows "Relocated to Basement"');
 
   // Stage change, backdated: only history
   await addEntry('Stage change');
-  ok((await d.getByRole('combobox', { name: 'Move to' }).locator('option').allTextContents()).join() === 'Planned,Primary,Secondary,Aging,Bottled', 'Stage change offers the stages');
+  ok(await until(async () => ((await d.getByRole('combobox', { name: 'Move to' }).locator('option').allTextContents()).join() === 'Planned,Primary,Secondary,Aging,Bottled')), 'Stage change offers the stages');
   await d.getByRole('combobox', { name: 'Move to' }).selectOption('secondary');
   await d.getByLabel('When', { exact: true }).fill(`${day(-2)}T09:00`);
-  ok(await d.getByText('The batch moves to this stage.').count() === 1, 'newest: it says the batch moves');
+  ok(await until(async () => (await d.getByText('The batch moves to this stage.').count() === 1)), 'newest: it says the batch moves');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await statusBecomes('Secondary') === 'Secondary', 'a newest stage change moves the batch to Secondary');
+  ok(await until(async () => (await statusBecomes('Secondary') === 'Secondary')), 'a newest stage change moves the batch to Secondary');
   await addEntry('Stage change');
   await d.getByRole('combobox', { name: 'Move to' }).selectOption('primary');
   await d.getByLabel('When', { exact: true }).fill(`${day(-10)}T08:00`);
-  ok(await d.getByText(/only records when it happened/).count() === 1, 'backdated: it says it only records history');
+  ok(await until(async () => (await d.getByText(/only records when it happened/).count() === 1)), 'backdated: it says it only records history');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await status() === 'Secondary', 'and the batch stays in Secondary');
-  ok(await p.locator('.timeline-entry', { hasText: 'Moved to Primary' }).count() === 1, 'with "Moved to Primary" on the timeline');
+  ok(await until(async () => (await status() === 'Secondary')), 'and the batch stays in Secondary');
+  ok(await until(async () => (await p.locator('.timeline-entry', { hasText: 'Moved to Primary' }).count() === 1)), 'with "Moved to Primary" on the timeline');
 
   // Stage change to Aging asks for the final reading
   await addEntry('Stage change');
   await d.getByRole('combobox', { name: 'Move to' }).selectOption('aging');
-  ok(await d.getByRole('heading', { name: 'Final reading' }).count() === 1, 'a stage change to Aging asks for the final reading');
+  ok(await until(async () => (await d.getByRole('heading', { name: 'Final reading' }).count() === 1)), 'a stage change to Aging asks for the final reading');
   await d.getByRole('textbox', { name: 'Final gravity (optional)' }).fill('0.998');
   await p.screenshot({ path: out + '/v022-stage.png' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
   await p.locator('.final-chip').waitFor({ timeout: 5000 }).catch(() => {});
-  ok(await status() === 'Aging' && await p.locator('.final-chip').count() === 1, 'Aging, with the final reading 0.998');
-  ok(await fact('Fermentation rate') === null && await fact('To 1.000') === null && await fact('Attenuation') === '102%', 'aging: no rate or days left; attenuation ' + await fact('Attenuation'));
+  ok(await until(async () => (await status() === 'Aging' && await p.locator('.final-chip').count() === 1)), 'Aging, with the final reading 0.998');
+  ok(await until(async () => (await fact('Fermentation rate') === null && await fact('To 1.000') === null && await fact('Attenuation') === '102%')), 'aging: no rate or days left; attenuation ' + await fact('Attenuation'));
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch(e => { console.error(e.message); process.exit(1); });

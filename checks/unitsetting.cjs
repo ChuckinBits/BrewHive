@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const fs = require('fs');
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
@@ -21,13 +31,13 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
     store.put({ id: 'app', volumeUnit: 'L', tempUnit: 'C', theme: 'system', views: {}, sorts: {}, createdAt: t, updatedAt: t, deletedAt: null });
     await new Promise((r) => (tx.oncomplete = r));
   });
-  ok((await stored()).volumeUnit === 'L' && (await stored()).units === undefined, 'set up: an older device with volumeUnit "L"');
+  ok(await until(async () => ((await stored()).volumeUnit === 'L' && (await stored()).units === undefined)), 'set up: an older device with volumeUnit "L"');
   await p.goto(BASE + '/#/more'); await p.waitForTimeout(600);
-  ok(await pressed() === 'Metric', 'it opens as Metric');
+  ok(await until(async () => (await pressed() === 'Metric')), 'it opens as Metric');
   const upgraded = await stored();
   ok(upgraded.units === 'metric' && !('volumeUnit' in upgraded) && upgraded.tempUnit === 'C', 'and the saved setting is converted to units: "metric", keeping the rest');
   await p.goto(BASE + '/#/batches/new'); await p.waitForSelector('form');
-  ok(await p.getByRole('button', { name: 'Liters' }).getAttribute('aria-pressed') === 'true', 'new batches start in liters');
+  ok(await until(async () => (await p.getByRole('button', { name: 'Liters' }).getAttribute('aria-pressed') === 'true')), 'new batches start in liters');
 
   // Changing the setting saves it the new way
   await p.goto(BASE + '/#/more'); await p.waitForTimeout(400);
@@ -52,7 +62,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   s = await stored();
   ok(s.units === 'metric' && !('volumeUnit' in s), 'restoring an older backup with volumeUnit "L" stores units: "metric"');
   await p.goto(BASE + '/#/batches'); await p.goto(BASE + '/#/more'); await p.waitForTimeout(400);
-  ok(await pressed() === 'Metric', 'and More shows Metric');
+  ok(await until(async () => (await pressed() === 'Metric')), 'and More shows Metric');
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch(e => { console.error(e.message); process.exit(1); });

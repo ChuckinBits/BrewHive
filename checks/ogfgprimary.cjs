@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -35,7 +45,7 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   await d.getByRole('combobox', { name: 'Ingredient', exact: true }).fill('Fermaid O'); await d.getByLabel('Quantity').fill('2');
   await d.getByLabel('When').first().fill(day(-60) + 'T12:00');
   const addTo = d.getByRole('checkbox', { name: 'Add to batch ingredients' });
-  if (await addTo.count()) { await addTo.check(); ok(await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'primary', 'Fermaid O defaults to Primary'); }
+  if (await addTo.count()) { await addTo.check(); ok(await until(async () => (await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'primary')), 'Fermaid O defaults to Primary'); }
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
   await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ph'), exact: true }).click();
