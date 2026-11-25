@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanRecord, cleanSettings } from './validate.ts';
+import { backupWins, cleanRecord, cleanSettings } from './validate.ts';
 import type { Settings } from './types.ts';
 
 const stamp = { createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' };
@@ -73,4 +73,31 @@ test('cleanSettings keeps only sensible fields', () => {
   assert.equal(next.hideIngredientAdd, true);
   assert.equal('admin' in next, false);
   assert.deepEqual(cleanSettings('junk', current), current);
+});
+
+
+const rec = (id: string, createdAt: string, updatedAt: string) => ({ id, createdAt, updatedAt });
+
+test('a backup record wins when this device lacks it or has an older copy', () => {
+  assert.equal(backupWins(rec('b1', '2026-01-01', '2026-02-01'), undefined), true);
+  assert.equal(backupWins(rec('b1', '2026-01-01', '2026-02-01'), rec('b1', '2026-01-01', '2026-01-15')), true);
+  assert.equal(backupWins(rec('b1', '2026-01-01', '2026-02-01'), rec('b1', '2026-01-01', '2026-03-01')), false);
+});
+
+test('an untouched starter ingredient gives way to the backup, however new it is', () => {
+  // A fresh install or Erase everything made it just now, never edited.
+  const fresh = rec('starter-clover-honey', '2026-11-25T05:00:00Z', '2026-11-25T05:00:00Z');
+  const priced = rec('starter-clover-honey', '2026-10-01T00:00:00Z', '2026-10-20T00:00:00Z');
+  assert.equal(backupWins(priced, fresh), true);
+});
+
+test('a starter edited on this device still wins when it is newer', () => {
+  const editedHere = rec('starter-clover-honey', '2026-10-01T00:00:00Z', '2026-11-25T05:00:00Z');
+  const older = rec('starter-clover-honey', '2026-10-01T00:00:00Z', '2026-10-20T00:00:00Z');
+  assert.equal(backupWins(older, editedHere), false);
+});
+
+test('only starter ingredients get that exception', () => {
+  const freshBatch = rec('b1', '2026-11-25T05:00:00Z', '2026-11-25T05:00:00Z');
+  assert.equal(backupWins(rec('b1', '2026-10-01', '2026-10-20'), freshBatch), false);
 });

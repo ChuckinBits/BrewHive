@@ -16,7 +16,7 @@ import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, T
 import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { L_PER_GAL, abv } from '../lib/calc.ts';
-import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput } from '../lib/format.ts';
+import { fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth, parseNum, plural, volumeFromInput, volumeToInput, toLocalMinute } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { batchSubtitle } from './Batches.tsx';
 
@@ -120,7 +120,7 @@ export function RecipeDetailScreen({ id }: { id: string }) {
         </p>
         {data.source && recipe.updatedFromAt && (
           <p className="hero-note">
-            Updated from <Link to={`/batches/${data.source.id}`}>{data.source.name}</Link> on {fmtDateShort(recipe.updatedFromAt.slice(0, 10))}
+            Updated from <Link to={`/batches/${data.source.id}`}>{data.source.name}</Link> on {fmtDateShort(toLocalMinute(recipe.updatedFromAt))}
           </p>
         )}
         <Link to={`/batches/new?recipe=${recipe.id}`} className="btn btn-primary">
