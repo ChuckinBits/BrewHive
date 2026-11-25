@@ -34,6 +34,8 @@ a milestone.
 - The batch page's code is split into one file per sheet
   (`src/screens/batch/`), and dead code and unused styles are removed. No
   change in behavior.
+- The browser checks wait for what they expect instead of reading the page
+  the instant after a save, so slower machines don't make them flaky.
 
 ## v0.2.5 – 2026-11-24
 

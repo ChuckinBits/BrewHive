@@ -1,6 +1,16 @@
 // Restores a backup with good and broken records: the good ones arrive, the broken ones are skipped and counted.
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const fs = require('fs');
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
@@ -31,8 +41,8 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const msg = (await toast.textContent()).trim();
   ok(/2 records/.test(msg) && /Skipped 3 records/.test(msg), 'restores 2 good records and skips 3: ' + msg);
   await p.goto(BASE + '/'); await p.getByText('Good mead').first().click(); await p.waitForSelector('.hero');
-  ok(await p.getByText('Clover honey').count() >= 1, 'the good batch opens, with its good ingredient');
-  ok(await p.getByText('No start date').count() === 0, 'the broken batch is not there');
+  ok(await until(async () => (await p.getByText('Clover honey').count() >= 1)), 'the good batch opens, with its good ingredient');
+  ok(await until(async () => (await p.getByText('No start date').count() === 0)), 'the broken batch is not there');
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch((e) => { console.error(e.message); process.exit(1); });

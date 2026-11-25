@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -30,21 +40,21 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
     await d.getByLabel('When', { exact: true }).fill(date + 'T12:00');
   };
   await addIngredient('Early honey', day(-55));
-  ok(await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'primary', 'dated in Primary: Stage is Primary, not Bottling');
+  ok(await until(async () => (await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'primary')), 'dated in Primary: Stage is Primary, not Bottling');
   await d.getByLabel('When', { exact: true }).fill(day(-20) + 'T12:00');
-  ok(await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'secondary', 'moving the date into Secondary follows it');
+  ok(await until(async () => (await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'secondary')), 'moving the date into Secondary follows it');
   await d.getByLabel('When', { exact: true }).fill(day(-55) + 'T12:00');
   await p.screenshot({ path: out + '/stageat.png' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
   const group = (label) => p.locator('.staged-ingredients section', { has: p.locator('.stage-divider', { hasText: label }) });
-  ok(await group('Primary ingredients').getByText('Early honey').count() === 1, 'Early honey lands in Primary ingredients');
+  ok(await until(async () => (await group('Primary ingredients').getByText('Early honey').count() === 1)), 'Early honey lands in Primary ingredients');
   // Picking a stage wins over the date.
   await addIngredient('Oak cubes', day(-55));
   await d.getByRole('combobox', { name: 'Stage' }).selectOption('aging');
   await d.getByLabel('When', { exact: true }).fill(day(-50) + 'T12:00');
-  ok(await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'aging', 'a picked stage stays when the date changes');
+  ok(await until(async () => (await d.getByRole('combobox', { name: 'Stage' }).inputValue() === 'aging')), 'a picked stage stays when the date changes');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await group('Aging ingredients').getByText('Oak cubes').count() === 1, 'Oak cubes land in Aging ingredients');
+  ok(await until(async () => (await group('Aging ingredients').getByText('Oak cubes').count() === 1)), 'Oak cubes land in Aging ingredients');
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch((e) => { console.error(e.message); process.exit(1); });

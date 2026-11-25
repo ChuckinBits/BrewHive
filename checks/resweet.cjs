@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -22,24 +32,24 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Aging' }).click();
   await p.getByRole('textbox', { name: 'Final gravity (optional)' }).fill('1.000');
   await p.getByRole('button', { name: 'Move to Aging' }).click(); await p.waitForTimeout(400);
-  ok(await potential() === '13.1%', 'A: final reading 1.000, Potential 13.1%');
+  ok(await until(async () => (await potential() === '13.1%')), 'A: final reading 1.000, Potential 13.1%');
   await add('stabilize');
   await add('backsweeten', { sg: '1.015' });
-  ok(await potential() === '13.1%', 'A: backsweetened after stabilizing, box left unticked: Potential stays 13.1%');
+  ok(await until(async () => (await potential() === '13.1%')), 'A: backsweetened after stabilizing, box left unticked: Potential stays 13.1%');
   await p.getByRole('button', { name: /^Edit Backsweetened/ }).click();
   await p.getByLabel('This will ferment').check();
   await p.getByRole('button', { name: 'Save changes' }).click(); await p.waitForTimeout(300);
   // Ticking it while Aging offers a move back to Secondary (issue #26); keep it in Aging here.
   if (await p.getByRole('button', { name: 'Keep it here' }).count()) { await p.getByRole('button', { name: 'Keep it here' }).click(); await p.waitForTimeout(200); }
-  ok(await potential() === '15.1%', 'A: box ticked: Potential rises to 15.1%');
-  ok((await p.locator('.stat-value').nth(2).textContent()) === '13.1%', 'A: ABV stays 13.1% until it ferments again');
+  ok(await until(async () => (await potential() === '15.1%')), 'A: box ticked: Potential rises to 15.1%');
+  ok(await until(async () => ((await p.locator('.stat-value').nth(2).textContent()) === '13.1%')), 'A: ABV stays 13.1% until it ferments again');
 
   // Flow B: backsweeten without a gravity, then a separate reading
   await p.goto(BASE + '/#/batches/new');
   await p.getByLabel('Name').fill('Resweeten B'); await p.getByLabel(/^Original gravity/).fill('1.100');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
   await add('gravity', { sg: '1.000' }); await add('stabilize'); await add('backsweeten', { ferment: true }); await add('gravity', { sg: '1.015' });
-  ok(await potential() === '15.1%', 'B: backsweetened (box ticked, no gravity) then a 1.015 reading: Potential 15.1%');
+  ok(await until(async () => (await potential() === '15.1%')), 'B: backsweetened (box ticked, no gravity) then a 1.015 reading: Potential 15.1%');
   console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.join('\n') : 'no console errors');
   await b.close();
 })().catch(e => { console.error(e.message); process.exit(1); });

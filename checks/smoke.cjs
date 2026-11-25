@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const fs = require('fs');
 const shots = process.argv[2];
 const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); console.log('ok  ' + msg); };
@@ -31,14 +41,14 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   await page.waitForSelector('.hero');
   await page.getByLabel('Rating').fill('9.5');
   await page.waitForTimeout(300);
-  assert((await page.locator('.hero .rating').textContent()) === '9.5', 'rating slider sets the badge to 9.5');
+  assert(await until(async () => ((await page.locator('.hero .rating').textContent()) === '9.5')), 'rating slider sets the badge to 9.5');
   const abvText = await page.locator('.stat-value').nth(2).textContent();
   assert(abvText === '10.9%', 'live ABV from OG 1.114 and latest reading 1.031 is 10.9%: ' + abvText);
 
   // Status change is logged
   await page.getByRole('button', { name: 'Secondary' }).click();
   await page.waitForTimeout(300);
-  assert(await page.getByText('Moved to Secondary').count() === 1, 'status change appears in the timeline');
+  assert(await until(async () => (await page.getByText('Moved to Secondary').count() === 1)), 'status change appears in the timeline');
 
   // Backup round trip
   await page.goto(base + '#/more');
@@ -59,8 +69,8 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   await page.goto(base + '#/');
   await page.waitForSelector('.shelf-item');
   await page.getByRole('button', { name: /^All/ }).click();
-  assert(await page.locator('a.shelf-item').count() === 5, 'restore brings back all 5 batches');
-  assert((await page.getByLabel('Sort').inputValue()) === 'rating', 'restore brings back settings (sort order)');
+  assert(await until(async () => (await page.locator('a.shelf-item').count() === 5)), 'restore brings back all 5 batches');
+  assert(await until(async () => ((await page.getByLabel('Sort').inputValue()) === 'rating')), 'restore brings back settings (sort order)');
 
   // A bad file is refused politely
   fs.writeFileSync(`${shots}/bad.json`, '{"hello": 1}');
@@ -74,7 +84,7 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   await page.goto(base + '#/recipes');
   await page.getByRole('link', { name: /First Traditional/ }).click();
   await page.waitForSelector('.hero');
-  assert((await page.locator('.hero-sub').textContent()).includes('3.8 L'), 'volume shows in liters after switching units');
+  assert(await until(async () => ((await page.locator('.hero-sub').textContent()).includes('3.8 L'))), 'volume shows in liters after switching units');
 
   // Data survives a reload, and the app works offline through the service worker
   await page.goto(base);

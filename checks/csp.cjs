@@ -2,6 +2,16 @@
 // Content-Security-Policy violation the browser reports.
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
   const b = await chromium.launch();
@@ -16,7 +26,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
     const errors = []; p.on('pageerror', (e) => errors.push(e.message));
     const violations = async () => [...(await p.evaluate(() => window.__csp)), ...console_];
     await p.goto(BASE + '/'); await p.waitForSelector('.empty');
-    ok((await p.locator('meta[http-equiv="Content-Security-Policy"]').count()) === 1, `${scheme}: the page carries the CSP`);
+    ok(await until(async () => ((await p.locator('meta[http-equiv="Content-Security-Policy"]').count()) === 1)), `${scheme}: the page carries the CSP`);
     await p.getByRole('button', { name: 'Load sample data' }).click(); await p.waitForSelector('.shelf-item');
     const count = Math.min(4, await p.locator('.shelf-item').count());
     for (let i = 0; i < count; i++) {
