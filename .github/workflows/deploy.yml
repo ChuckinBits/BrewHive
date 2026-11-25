@@ -20,8 +20,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       # npm ci installs exactly what package-lock.json lists, once it's committed (see lockfile.yml).
@@ -29,7 +29,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      # The built page must carry the Content-Security-Policy (added by vite.config.ts).
+      - run: grep -q 'http-equiv="Content-Security-Policy"' dist/index.html
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -41,4 +43,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

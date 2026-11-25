@@ -1,0 +1,18 @@
+# Dependabot opens a pull request when a package or a workflow action has an update,
+# so security fixes and runtime changes (like the move to Node 24) don't go unnoticed.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
