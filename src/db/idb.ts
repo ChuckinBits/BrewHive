@@ -11,6 +11,34 @@ export type StoreName = (typeof STORES)[number];
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/** How long storage gets to answer before BrewHive says so, instead of waiting on a blank screen. */
+export const STORAGE_WAIT_MS = 10_000;
+
+/** The promise, or an error once STORAGE_WAIT_MS pass without an answer. */
+export function withTimeout<T>(promise: Promise<T>, what: string, ms = STORAGE_WAIT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`This browser's storage didn't answer while ${what} (waited ${Math.round(ms / 1000)} seconds).`)), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
+/** Deletes BrewHive's whole database, for starting a preview over. Resolves once it's gone (or the browser gives up). */
+export function deleteDatabase(): Promise<void> {
+  return new Promise((resolve) => {
+    void dbPromise?.then((db) => db.close()).catch(() => {});
+    dbPromise = null;
+    // Don't wait on stuck storage for ever: reloading is worth trying either way.
+    setTimeout(resolve, 3000);
+    try {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = request.onerror = request.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
 function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
@@ -76,10 +104,10 @@ export async function putMany<T>(store: StoreName, records: T[]): Promise<void> 
 }
 
 export async function clearAll(): Promise<void> {
-  const db = await openDb();
+  const db = await withTimeout(openDb(), 'opening the database');
   const tx = db.transaction([...STORES], 'readwrite');
   for (const name of STORES) tx.objectStore(name).clear();
-  await done(tx);
+  await withTimeout(done(tx), 'erasing');
   notify();
 }
 
