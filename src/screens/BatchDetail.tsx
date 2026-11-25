@@ -34,7 +34,7 @@ import {
   projectedAbv,
   targetReached,
 } from '../lib/batch.ts';
-import { addedLines, currentIngredientStage, entryFromLine, ingredientStageAt, lineFromEntry, timelineSections } from '../lib/stages.ts';
+import { addedLines, currentIngredientStage, entryFromLine, ingredientStageAt, ingredientStageLabel, lineFromEntry, timelineSections } from '../lib/stages.ts';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, fmtRating, fmtSG, fmtTemp, fmtTempBoth, fmtVolumeBoth, newId, nowLocal, parseNum, tempFromInput, tempToInput, today } from '../lib/format.ts';
 import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, suggestCount, totalMl, type BottleLine, type BottleUnit } from '../lib/bottling.ts';
 import { Link, navigate } from '../lib/router.tsx';
@@ -62,16 +62,54 @@ const EVENT_ICONS: Record<EventType, IconName> = {
 };
 
 /**
- * When a tapped ingredient went in: primary ingredients went in when the batch was started,
- * except nutrients, which are usually staggered. Everything else goes in now.
+ * When a tapped ingredient went in, to start the Log sheet at: primary ingredients (nutrients too)
+ * at the batch start date, at the time of day it is now; everything else now.
  */
-async function logDateFor(line: IngredientLine, batch: Batch): Promise<string> {
+function logDateFor(line: IngredientLine, batch: Batch): string {
   const now = nowLocal();
-  if ((line.stage ?? 'primary') !== 'primary' || batch.startDate === today()) return now;
-  const library = await ingredients.list();
-  const item = line.ingredientId ? library.find((i) => i.id === line.ingredientId) : library.find((i) => i.name.trim().toLowerCase() === line.name.trim().toLowerCase());
-  if (item?.category === 'nutrient') return now;
-  return `${batch.startDate}T00:00`;
+  if ((line.stage ?? 'primary') !== 'primary' || !batch.startDate || batch.startDate >= today()) return now;
+  return `${batch.startDate}T${now.slice(11, 16)}`;
+}
+
+/** The batch stage an ingredient stage's "Move to" button moves to. */
+const STATUS_FOR_STAGE: Record<IngredientStage, BatchStatus> = { primary: 'primary', secondary: 'secondary', aging: 'aging', bottling: 'bottled' };
+
+/** Logs one of a batch's ingredients on the timeline, asking when it went in. */
+function LogIngredientSheet({ batch, line, onClose }: { batch: Batch; line: IngredientLine; onClose: () => void }) {
+  const [date, setDate] = useState(() => logDateFor(line, batch));
+  const [error, setError] = useState('');
+  const save = async () => {
+    if (!date) return setError('Enter when it went in.');
+    await events.save({ batchId: batch.id, type: 'ingredient', date, value: null, note: '', ...entryFromLine(line), ingredientLineId: line.id });
+    toast(`${line.name} logged on the timeline`);
+    onClose();
+  };
+  return (
+    <Sheet title={`Log ${line.name}`} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <p>
+          {line.amount ? `${line.amount} of ${line.name}` : line.name}, from {ingredientStageLabel(line.stage ?? 'primary')} ingredients.
+        </p>
+        <Field label="When" hint={(line.stage ?? 'primary') === 'primary' ? 'Starts at the batch start date.' : undefined}>
+          <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="btn btn-primary btn-block">
+          Add to timeline
+        </button>
+      </form>
+    </Sheet>
+  );
 }
 
 /** The short value shown after an entry's title, such as "1.045", "3.60" or "1 oz". */
@@ -127,6 +165,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [archiving, setArchiving] = useState(false);
   // Moving from fermenting to Aging asks for the final reading.
   const [finishing, setFinishing] = useState(false);
+  // An ingredient being logged from the Ingredients card.
+  const [logging, setLogging] = useState<IngredientLine | null>(null);
   // Backsweetening ticked to ferment after fermentation ended: offer to go back to Secondary.
   const [restarting, setRestarting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -312,18 +352,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
             lines={batch.ingredients}
             current={currentStage}
             added={added}
-            onLog={async (line) => {
-              await events.save({
-                batchId: batch.id,
-                type: 'ingredient',
-                date: await logDateFor(line, batch),
-                value: null,
-                note: '',
-                ...entryFromLine(line),
-                ingredientLineId: line.id,
-              });
-              toast(`${line.name} logged on the timeline`);
-            }}
+            onLog={(line) => setLogging(line)}
+            onMoveTo={batch.status === 'archived' ? undefined : (stage) => void setStatus(STATUS_FOR_STAGE[stage])}
           />
         </section>
       )}
@@ -449,6 +479,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
       {entry && (
         <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} />
       )}
+      {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} />}
       {finishing && <FinishSheet batch={batch} timeline={data.events} onClose={() => setFinishing(false)} />}
       {restarting && (
         <ConfirmSheet

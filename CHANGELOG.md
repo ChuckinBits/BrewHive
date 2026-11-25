@@ -5,6 +5,21 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.5)
+
+### Ingredients card
+
+- **Log any earlier stage.** Ingredients not yet logged can be tapped in
+  the batch's current stage or any earlier one, so a Bottled batch can
+  still log a Secondary ingredient. Later stages stay locked.
+- **Asks when.** Tapping an ingredient opens a small sheet with When:
+  primary ingredients (nutrients too) start at the batch start date,
+  everything else at now.
+- **Move to the next stage.** The next stage's ingredients show a
+  "Move to Secondary" (Aging, Bottled) button. It moves the batch and adds
+  the stage change to the timeline, as the stage buttons do, asking for the
+  final reading or bottles where they would.
+
 ## v0.2.4 – 2026-11-23
 
 ### Add entry
