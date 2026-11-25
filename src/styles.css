@@ -2519,3 +2519,11 @@ button.library-row {
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* A card head with more than one action, stacked on the right: Edit, then Hide Add. */
+.card-head-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}

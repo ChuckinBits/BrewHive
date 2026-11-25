@@ -19,6 +19,9 @@ a milestone.
   "Move to Secondary" (Aging, Bottled) button. It moves the batch and adds
   the stage change to the timeline, as the stage buttons do, asking for the
   final reading or bottles where they would.
+- **Hide Add.** Under Edit on the Ingredients card, "Hide Add" hides the
+  + Add buttons on every batch, for keeping the list without logging it on
+  the timeline. "Show Add" brings them back.
 
 ## v0.2.4 – 2026-11-23
 

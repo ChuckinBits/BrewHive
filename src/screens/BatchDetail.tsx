@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
 import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
-import { batches, categoriesOf, cellar, events, ingredients, recipes, useQuery, useSettings } from '../db/store.ts';
+import { batches, categoriesOf, cellar, events, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
 import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, eventTitle, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type LibraryIngredient, type Settings, type TempUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, useIngredientFields } from '../components/StagedIngredients.tsx';
@@ -341,11 +341,24 @@ export function BatchDetailScreen({ id }: { id: string }) {
         <section className="card">
           <div className="card-head">
             <h2>Ingredients</h2>
-            <Link to={`/batches/${batch.id}/edit?section=ingredients`} className="btn btn-quiet btn-small" aria-label="Edit ingredients">
-              Edit
-            </Link>
+            <div className="card-head-actions">
+              <Link to={`/batches/${batch.id}/edit?section=ingredients`} className="btn btn-quiet btn-small" aria-label="Edit ingredients">
+                Edit
+              </Link>
+              {/* For people who keep the list but don't log it: hides + Add on every batch. */}
+              {currentStage && (
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-small"
+                  aria-pressed={!!settings.hideIngredientAdd}
+                  onClick={() => void saveSettings({ hideIngredientAdd: !settings.hideIngredientAdd })}
+                >
+                  {settings.hideIngredientAdd ? 'Show Add' : 'Hide Add'}
+                </button>
+              )}
+            </div>
           </div>
-          {currentStage && added.size < batch.ingredients.length && (
+          {currentStage && !settings.hideIngredientAdd && added.size < batch.ingredients.length && (
             <p className="field-hint">Tap an ingredient when it goes in, to log it on the timeline.</p>
           )}
           <LoggableIngredients
@@ -353,6 +366,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
             current={currentStage}
             added={added}
             onLog={(line) => setLogging(line)}
+            canAdd={!settings.hideIngredientAdd}
             onMoveTo={batch.status === 'archived' ? undefined : (stage) => void setStatus(STATUS_FOR_STAGE[stage])}
           />
         </section>

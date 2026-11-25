@@ -55,6 +55,8 @@ interface LoggableProps {
   onLog: (line: IngredientLine) => void;
   /** Moves the batch on to a later stage, from the button on that stage's ingredients. Omitted where it can't move (archived). */
   onMoveTo?: (stage: IngredientStage) => void;
+  /** False hides the + Add buttons (the Hide Add setting); the list and its ✓ dates stay. */
+  canAdd?: boolean;
 }
 
 /** Read-only, as on a recipe: grouped by stage, nothing to tap. */
@@ -69,7 +71,7 @@ const MOVE_LABEL: Record<IngredientStage, string> = { primary: 'Primary', second
  * On the batch page: ingredients for the current stage, or any earlier one, can be tapped to log
  * them on the timeline. The next stage that has ingredients offers to move the batch on to it.
  */
-export function LoggableIngredients({ lines, current, added, onLog, onMoveTo }: LoggableProps) {
+export function LoggableIngredients({ lines, current, added, onLog, onMoveTo, canAdd = true }: LoggableProps) {
   const groups = groupByStage(lines);
   const reached = (stage: IngredientStage) => current != null && STAGE_INDEX[stage] <= STAGE_INDEX[current];
   const next = onMoveTo ? groups.find((g) => !reached(g.stage))?.stage : undefined;
@@ -77,7 +79,7 @@ export function LoggableIngredients({ lines, current, added, onLog, onMoveTo }: 
     <div className="staged-ingredients">
       {groups.map((group) => {
         const isCurrent = group.stage === current;
-        const canLog = reached(group.stage);
+        const canLog = canAdd && reached(group.stage);
         return (
           <section key={group.stage} aria-label={`${ingredientStageLabel(group.stage)} ingredients`}>
             <h3 className={isCurrent ? 'stage-divider stage-divider-current' : 'stage-divider'}>
