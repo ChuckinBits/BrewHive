@@ -101,7 +101,7 @@ export function App() {
     return (
       <ProblemScreen
         title="BrewHive couldn't open its data"
-        message="BrewHive keeps everything in this browser's storage, and the browser didn't let it in. Private browsing windows often block storage, so try a normal window, or reload."
+        message="BrewHive keeps everything in this browser's storage, and the browser didn't let it in. Another BrewHive tab or window can hold on to it, even one paused in the background: close the others and reload, or quit the browser completely and open BrewHive again. Private browsing windows often block storage too, so use a normal window."
         error={problem}
       />
     );

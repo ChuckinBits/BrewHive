@@ -22,6 +22,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await p.locator('#root').innerHTML()) === '', 2000), 'while storage is quiet, nothing is drawn yet');
   ok(await until(async () => (await p.getByRole('alert').getByText("BrewHive couldn't open its data").count() === 1), 15000), "after the wait it says BrewHive couldn't open its data");
   ok(await until(async () => (await p.getByText(/storage didn't answer while opening BrewHive \(waited 10 seconds\)/).count() === 1)), 'with the reason');
+  ok(await until(async () => (await p.getByText(/close the others and reload, or quit the browser completely/).count() === 1)), 'with what usually fixes it: close other BrewHive tabs, or restart the browser');
   ok(await until(async () => (await p.getByRole('button', { name: 'Reload' }).count() === 1)), 'and a Reload button');
   ok(await until(async () => (await p.getByRole('button', { name: 'Start the preview over' }).count() === 0)), 'starting over is only offered in a hosted preview');
   await b.close();
