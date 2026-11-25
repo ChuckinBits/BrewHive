@@ -145,8 +145,8 @@ const entry = (type: BatchEvent['type'], date: string, value: number | null = nu
   ...patch,
 });
 
-const near = (actual: number | null | undefined, expected: number) =>
-  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${actual} is not ${expected}`);
+const near = (actual: number | null | undefined, expected: number, message?: string) =>
+  assert.ok(actual != null && Math.abs(actual - expected) < 1e-6, `${message ? message + ": " : ""}${actual} is not ${expected}`);
 
 test('a step feeding raises the potential ABV (issue example: 13.1% to 15.75%)', () => {
   const b = batch({ og: 1.1 });

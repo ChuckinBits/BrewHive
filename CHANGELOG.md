@@ -5,6 +5,26 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.2.6)
+
+### Safety
+
+- **Backups are checked before restoring.** Each record is checked for the
+  fields BrewHive needs; one that can't be used is skipped and counted
+  ("Skipped 3 records that couldn't be read"), and loose ends such as a
+  number saved as text are tidied. Settings that don't make sense keep this
+  device's value. A damaged or hand-edited backup can no longer break a page.
+- **Content-Security-Policy.** The built app only allows its own files, so
+  nothing that slipped into a page could load a script or send data
+  anywhere.
+
+### Behind the scenes
+
+- Pull requests are checked (types, unit tests and a build) before merging,
+  and the deploy checks types too.
+- A "Update lockfile" workflow writes package-lock.json, so every build
+  installs exactly the package versions that were tested.
+
 ## v0.2.5 – 2026-11-24
 
 ### Ingredients card

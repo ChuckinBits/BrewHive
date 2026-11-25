@@ -40,8 +40,8 @@ export function MoreScreen() {
   const importBackup = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const written = await restoreBackup(JSON.parse(await file.text()));
-      toast(`Backup restored: ${plural(written, 'record')}`);
+      const { written, skipped } = await restoreBackup(JSON.parse(await file.text()));
+      toast(`Backup restored: ${plural(written, 'record')}${skipped ? `. Skipped ${plural(skipped, 'record')} that couldn't be read.` : ''}`);
     } catch (error) {
       toast(error instanceof SyntaxError ? 'That file is not a BrewHive backup.' : error instanceof Error ? error.message : 'The backup could not be read.');
     }

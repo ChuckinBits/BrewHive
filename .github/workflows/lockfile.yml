@@ -1,0 +1,29 @@
+# Writes package-lock.json, which pins every package to the exact version tested, and pushes it
+# to the add-lockfile branch to merge. Run it by hand: Actions > Update lockfile > Run workflow.
+# Run it again whenever package.json's dependencies change.
+name: Update lockfile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --package-lock-only --ignore-scripts
+      - name: Push to the add-lockfile branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b add-lockfile
+          git add package-lock.json
+          git commit -m "Add package-lock.json"
+          git push --force origin add-lockfile
+          echo "Pushed. Open a pull request from add-lockfile into main to merge it." >> "$GITHUB_STEP_SUMMARY"
