@@ -24,6 +24,9 @@ a milestone.
   and the deploy checks types too.
 - A "Update lockfile" workflow writes package-lock.json, so every build
   installs exactly the package versions that were tested.
+- The workflows use the Node 24 versions of GitHub's actions, CI fails if
+  the built page is missing its Content-Security-Policy, and Dependabot
+  proposes package and action updates weekly.
 
 ## v0.2.5 – 2026-11-24
 
