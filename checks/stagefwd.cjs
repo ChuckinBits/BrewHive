@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -22,24 +32,24 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   await p.locator('select:has(option[value=bottled])').first().selectOption('bottled');
   await p.getByRole('textbox', { name: 'Final gravity (optional)' }).fill('1.000');
   await p.getByRole('button', { name: /^(Start batch|Save batch|Add batch)$/ }).click(); await p.waitForSelector('.hero');
-  ok(await status() === 'Bottled', 'the batch is Bottled');
+  ok(await until(async () => (await status() === 'Bottled')), 'the batch is Bottled');
 
   await openStage();
-  ok(await moveTo().inputValue() === 'secondary', 'only Primary on the timeline: Stage change starts on Secondary');
+  ok(await until(async () => (await moveTo().inputValue() === 'secondary')), 'only Primary on the timeline: Stage change starts on Secondary');
   await d.getByLabel('When', { exact: true }).fill(day(-60) + 'T09:00');
-  ok(await d.getByText(/already in Bottled, so this only records/).count() === 1, 'it says the batch stays in Bottled');
+  ok(await until(async () => (await d.getByText(/already in Bottled, so this only records/).count() === 1)), 'it says the batch stays in Bottled');
   await p.screenshot({ path: out + '/stagefwd.png' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await status() === 'Bottled', 'saving Secondary leaves the batch in Bottled');
+  ok(await until(async () => (await status() === 'Bottled')), 'saving Secondary leaves the batch in Bottled');
 
   await openStage();
-  ok(await moveTo().inputValue() === 'aging', 'Secondary on the timeline: the next starts on Aging');
+  ok(await until(async () => (await moveTo().inputValue() === 'aging')), 'Secondary on the timeline: the next starts on Aging');
   await d.getByLabel('When', { exact: true }).fill(day(-30) + 'T09:00');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
-  ok(await status() === 'Bottled', 'and Aging leaves it in Bottled too');
+  ok(await until(async () => (await status() === 'Bottled')), 'and Aging leaves it in Bottled too');
 
   await openStage();
-  ok(await moveTo().inputValue() === 'bottled', 'then Bottled');
+  ok(await until(async () => (await moveTo().inputValue() === 'bottled')), 'then Bottled');
   await d.getByLabel('When', { exact: true }).fill(day(-5) + 'T09:00');
   await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
   await p.locator('.timeline-sections .stage-divider', { hasText: 'Bottled' }).waitFor({ timeout: 3000 }).catch(() => {});
@@ -49,7 +59,7 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   // The stage buttons still move it back.
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Aging' }).click();
   await p.waitForTimeout(300);
-  ok(await status() === 'Aging', 'the stage buttons move it back to Aging');
+  ok(await until(async () => (await status() === 'Aging')), 'the stage buttons move it back to Aging');
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
 })().catch((e) => { console.error(e.message); process.exit(1); });

@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
@@ -17,23 +27,23 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 4: rating from the slider logs one entry per day
   await slider().fill('7'); await p.waitForTimeout(400);
-  ok(await reviews() === 1 && await heroRating() === 'Rated 7 out of 10', '4: setting the batch rating adds a "Batch rating" entry');
+  ok(await until(async () => (await reviews() === 1 && await heroRating() === 'Rated 7 out of 10')), '4: setting the batch rating adds a "Batch rating" entry');
   await slider().fill('8'); await p.waitForTimeout(200); await slider().fill('8.5'); await p.waitForTimeout(400);
-  ok(await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1, '4: changing it again the same day updates that one entry (8.5)');
+  ok(await until(async () => (await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1)), '4: changing it again the same day updates that one entry (8.5)');
 
   // 1 + 2: tasting with checkbox (default on) and a taster
   await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
   const box = p.getByLabel('Set as the batch rating');
-  ok(await box.isDisabled(), '1: the checkbox waits until a rating is picked');
+  ok(await until(async () => (await box.isDisabled())), '1: the checkbox waits until a rating is picked');
   await p.getByRole('dialog').getByRole('slider', { name: 'Rating' }).fill('9');
-  ok(await box.isChecked(), '1: "Set as the batch rating" is checked by default');
-  ok(await p.getByText('Replaces the current batch rating of 8.5.').count() === 1, '1: it says which rating it replaces');
+  ok(await until(async () => (await box.isChecked())), '1: "Set as the batch rating" is checked by default');
+  ok(await until(async () => (await p.getByText('Replaces the current batch rating of 8.5.').count() === 1)), '1: it says which rating it replaces');
   await p.getByLabel(/^Taster/).fill('Sam');
   await p.screenshot({ path: `${out}/1-tasting-sheet.png` });
   await p.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
-  ok(await heroRating() === 'Rated 9 out of 10', '1: the batch rating is now 9');
-  ok((await titles()).includes('Tasting by Sam'), '2: the timeline shows "Tasting by Sam"');
-  ok(await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1, '4: the tasting did not overwrite today\'s Batch rating entry (still 8.5)');
+  ok(await until(async () => (await heroRating() === 'Rated 9 out of 10')), '1: the batch rating is now 9');
+  ok(await until(async () => ((await titles()).includes('Tasting by Sam'))), '2: the timeline shows "Tasting by Sam"');
+  ok(await until(async () => (await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1)), '4: the tasting did not overwrite today\'s Batch rating entry (still 8.5)');
 
   // 1: unticked tasting leaves the batch rating alone
   await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
@@ -41,7 +51,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByLabel('Set as the batch rating').uncheck();
   await p.getByLabel(/^Taster/).fill('Ana');
   await p.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
-  ok(await heroRating() === 'Rated 9 out of 10', '1: an unticked tasting of 5 leaves the batch at 9');
+  ok(await until(async () => (await heroRating() === 'Rated 9 out of 10')), '1: an unticked tasting of 5 leaves the batch at 9');
 
   // 2: known tasters are suggested
   await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
@@ -52,7 +62,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 4: the slider after a tasting updates today's entry, tastings untouched
   await slider().fill('6'); await p.waitForTimeout(400);
-  ok(await reviews() === 1 && (await titles()).filter(t => t.startsWith('Tasting')).length === 2, '4: rating again updates the Batch rating entry; both tastings stay');
+  ok(await until(async () => (await reviews() === 1 && (await titles()).filter(t => t.startsWith('Tasting')).length === 2)), '4: rating again updates the Batch rating entry; both tastings stay');
 
   // 4: Clear removes today's entry only
   await p.evaluate(async () => {
@@ -66,10 +76,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
     await new Promise(r => (tx.oncomplete = r));
   });
   await p.reload(); await p.waitForSelector('.hero');
-  ok(await reviews() === 2, '4: yesterday\'s Batch rating entry is there too');
+  ok(await until(async () => (await reviews() === 2)), '4: yesterday\'s Batch rating entry is there too');
   await p.locator('section.card .rating-input').getByRole('button', { name: 'Clear' }).click(); await p.waitForTimeout(400);
-  ok(await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 7 out of 10"]').count() === 1, '4: Clear removes today\'s entry and keeps yesterday\'s');
-  ok(await p.locator('.hero .rating-none').count() === 1, '4: and the batch is unrated');
+  ok(await until(async () => (await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 7 out of 10"]').count() === 1)), '4: Clear removes today\'s entry and keeps yesterday\'s');
+  ok(await until(async () => (await p.locator('.hero .rating-none').count() === 1)), '4: and the batch is unrated');
 
   // 3: date lines up with other entries
   const rights = await p.locator('.timeline-entry time').evaluateAll(ts => ts.map(t => Math.round(t.getBoundingClientRect().right)));

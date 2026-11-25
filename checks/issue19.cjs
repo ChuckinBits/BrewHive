@@ -1,5 +1,15 @@
 const { chromium } = require('playwright');
 const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
   const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
@@ -7,32 +17,32 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(BASE + '/'); await p.getByRole('button', { name: 'Load sample data' }).click(); await p.waitForSelector('.chips');
   await p.goto(BASE + '/#/cellar'); await p.waitForSelector('.chips');
   const chip = (n) => p.getByRole('group', { name: 'Filter cellar' }).getByRole('button', { name: new RegExp('^' + n) });
-  ok(await chip('In cellar').getAttribute('aria-pressed') === 'true', 'cellar opens on In cellar');
+  ok(await until(async () => (await chip('In cellar').getAttribute('aria-pressed') === 'true')), 'cellar opens on In cellar');
   const emptyBefore = Number(await chip('Empty').locator('.chip-count').textContent());
   await p.getByRole('link', { name: /First Traditional/ }).click(); await p.waitForSelector('.hero');
   const pour = async (n) => { await p.getByRole('button', { name: 'Log a pour' }).click(); await p.getByRole('textbox', { name: 'Bottles' }).fill(String(n)); await p.getByRole('button', { name: 'Save pour' }).click(); await p.waitForTimeout(400); };
   await pour(1);
-  ok(await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 0, 'no prompt while bottles are left');
+  ok(await until(async () => (await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 0)), 'no prompt while bottles are left');
   await pour(2);
-  ok(await p.getByText('That was the last bottle of First Traditional. Archive the batch?').count() === 1, 'pouring the last bottle asks to archive');
+  ok(await until(async () => (await p.getByText('That was the last bottle of First Traditional. Archive the batch?').count() === 1)), 'pouring the last bottle asks to archive');
   await p.screenshot({ path: process.argv[2] + '/19-prompt.png' });
   await p.getByRole('button', { name: 'Not now' }).click(); await p.waitForTimeout(300);
   await p.getByRole('button', { name: /^Edit Drank 2 bottles/ }).click();
   await p.getByRole('textbox', { name: 'Bottles' }).fill('2'); await p.getByRole('button', { name: 'Save changes' }).click(); await p.waitForTimeout(400);
-  ok(await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 0, 'after Not now, it does not ask again while still empty');
+  ok(await until(async () => (await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 0)), 'after Not now, it does not ask again while still empty');
   await p.getByRole('button', { name: /^Edit Drank 2 bottles/ }).click();
   await p.getByRole('textbox', { name: 'Bottles' }).fill('1'); await p.getByRole('button', { name: 'Save changes' }).click(); await p.waitForTimeout(400);
-  ok(await p.locator('.stat-value').first().textContent() === '1', 'editing the pour brings a bottle back');
+  ok(await until(async () => (await p.locator('.stat-value').first().textContent() === '1')), 'editing the pour brings a bottle back');
   await pour(1);
-  ok(await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 1, 'running out again asks again');
+  ok(await until(async () => (await p.getByRole('dialog', { name: 'Archive the batch?' }).count() === 1)), 'running out again asks again');
   await p.getByRole('dialog').getByRole('button', { name: 'Archive' }).click(); await p.waitForTimeout(400);
   await p.getByRole('link', { name: 'First Traditional' }).click(); await p.waitForSelector('.hero');
-  ok(await p.locator('.archived-note').count() === 1, 'Archive archives the batch');
+  ok(await until(async () => (await p.locator('.archived-note').count() === 1)), 'Archive archives the batch');
   await p.goto(BASE + '/#/cellar'); await p.waitForSelector('.chips');
-  ok(await p.getByRole('link', { name: /First Traditional/ }).count() === 0, 'the empty entry is hidden under In cellar');
-  ok(Number(await chip('Empty').locator('.chip-count').textContent()) === emptyBefore + 1, 'Empty count goes up by one');
+  ok(await until(async () => (await p.getByRole('link', { name: /First Traditional/ }).count() === 0)), 'the empty entry is hidden under In cellar');
+  ok(await until(async () => (Number(await chip('Empty').locator('.chip-count').textContent()) === emptyBefore + 1)), 'Empty count goes up by one');
   await chip('Empty').click();
-  ok(await p.getByRole('link', { name: /First Traditional/ }).count() === 1, 'and listed under Empty');
+  ok(await until(async () => (await p.getByRole('link', { name: /First Traditional/ }).count() === 1)), 'and listed under Empty');
   await p.screenshot({ path: process.argv[2] + '/19-empty.png' });
   // Pour everything that's left: In cellar then says so
   await chip('In cellar').click();
@@ -47,9 +57,9 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
     if (await p.getByRole('button', { name: 'Not now' }).count()) { await p.getByRole('button', { name: 'Not now' }).click(); await p.waitForTimeout(200); }
     await p.goto(BASE + '/#/cellar'); await p.waitForSelector('.chips');
   }
-  ok(await p.getByText('Every bottle has been enjoyed.').count() === 1, 'with nothing left, In cellar says every bottle has been enjoyed');
+  ok(await until(async () => (await p.getByText('Every bottle has been enjoyed.').count() === 1)), 'with nothing left, In cellar says every bottle has been enjoyed');
   await p.screenshot({ path: process.argv[2] + '/19-all-gone.png' });
   await p.getByRole('button', { name: 'See empty bottles' }).click();
-  ok(await chip('Empty').getAttribute('aria-pressed') === 'true', 'the link switches to Empty');
+  ok(await until(async () => (await chip('Empty').getAttribute('aria-pressed') === 'true')), 'the link switches to Empty');
   console.log(errors.length ? 'ERRORS ' + errors : 'no console errors'); await b.close();
 })().catch(e => { console.error(e.message); process.exit(1); });

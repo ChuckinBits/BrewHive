@@ -29,10 +29,6 @@ export function currentIngredientStage(status: BatchStatus): IngredientStage | n
   return status;
 }
 
-/** The stage new ingredients go in when added from the timeline: the current one, or Primary before the batch starts. */
-export function stageForNewIngredient(status: BatchStatus): IngredientStage {
-  return currentIngredientStage(status) ?? 'primary';
-}
 
 /**
  * The stage a batch was in at a date, from its stage change entries: the newest one at or before it.

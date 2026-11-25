@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BatchEvent, BatchStatus, IngredientLine } from '../db/types.ts';
-import { addedLines, currentIngredientStage, ingredientStageAt, statusAt, groupByStage, joinAmount, splitAmount, stageForNewIngredient, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
+import { addedLines, currentIngredientStage, ingredientStageAt, statusAt, groupByStage, joinAmount, splitAmount, timelineSections, entryFromLine, lineFromEntry } from './stages.ts';
 
 const base = { createdAt: '2026-11-01T00:00:00Z', updatedAt: '', deletedAt: null };
 const line = (id: string, stage?: IngredientLine['stage'], amount = ''): IngredientLine => ({ id, name: id, amount, stage });
@@ -25,7 +25,6 @@ test('the current ingredient stage: none while planned, Bottling once bottled', 
   assert.equal(currentIngredientStage('primary'), 'primary');
   assert.equal(currentIngredientStage('aging'), 'aging');
   assert.equal(currentIngredientStage('bottled'), 'bottling');
-  assert.equal(stageForNewIngredient('planned'), 'primary');
 });
 
 test('an ingredient counts as added while a timeline entry points at it', () => {
