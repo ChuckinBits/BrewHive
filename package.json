@@ -1,6 +1,6 @@
 {
   "name": "brewhive",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "BrewHive: an open source, private-by-default mead and brew log. From first pitch to final gravity.",
   "license": "MIT",
   "private": true,

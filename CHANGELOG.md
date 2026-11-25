@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.2.5)
+## v0.2.5 – 2026-11-24
 
 ### Ingredients card
 
@@ -30,6 +30,9 @@ a milestone.
   grouped by why: "No cost: Cinnamon sticks, Oak cubes." in place of
   "Not counted: Cinnamon sticks (no cost), Oak cubes (no cost)." Lines for
   "No amount" and "Cost in other units" follow when they apply.
+
+**Updating from v0.2.4:** existing data carries over. Ingredients already
+logged keep their dates; Hide Add starts off.
 
 ## v0.2.4 – 2026-11-23
 
