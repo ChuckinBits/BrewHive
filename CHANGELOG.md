@@ -14,6 +14,9 @@ a milestone.
   little smaller. The build targets Chrome and Edge 111, Firefox 114 and
   Safari 16.4 or newer, Vite's default. Nothing you'd see changes: the
   styles already needed iOS 16.2 or newer for their full look.
+- **TypeScript 7.** Type checks run on TypeScript 7, the native compiler,
+  and finish several times faster. It no longer picks up Node's types on its
+  own, so the config names them for the tests.
 
 ## v0.2.6 – 2026-11-24
 
