@@ -78,6 +78,9 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if (!('rating' in r)) r.rating = null;
     idOrNull(r, 'vesselId');
     fills(r, 'vessels');
+    idOrNull(r, 'parentId');
+    idOrNull(r, 'splitAt');
+    if ('statusBeforeSplit' in r && !oneOf(r.statusBeforeSplit, STATUS_IDS)) r.statusBeforeSplit = null;
     return true;
   },
   events: (r) => {

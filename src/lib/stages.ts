@@ -24,7 +24,7 @@ export function ingredientStageLabel(stage: IngredientStage): string {
  * or is archived. A bottled batch is at Bottling.
  */
 export function currentIngredientStage(status: BatchStatus): IngredientStage | null {
-  if (status === 'planned' || status === 'archived') return null;
+  if (status === 'planned' || status === 'archived' || status === 'split') return null;
   if (status === 'bottled') return 'bottling';
   return status;
 }

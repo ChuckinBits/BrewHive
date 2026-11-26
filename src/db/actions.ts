@@ -4,7 +4,8 @@ import { batches, events } from './store.ts';
 import type { Batch, BatchStatus, VesselFill } from './types.ts';
 import { fillsOf, normalizeFills, volumeAfterRack } from '../lib/equipment.ts';
 import { planReviewEntry, planStatusEntry } from '../lib/batch.ts';
-import { nowLocal } from '../lib/format.ts';
+import { newId, nowLocal } from '../lib/format.ts';
+import { planSplit, subBatchesOf, type SplitPart } from '../lib/split.ts';
 
 /**
  * Moves a batch to a new stage and records it on the timeline, keeping at
@@ -33,6 +34,30 @@ export async function rackInto(batchId: string, fills: VesselFill[], date = nowL
 export function withVessels(batch: Batch, vessels: VesselFill[]): Batch {
   const { vesselId: _older, ...rest } = batch;
   return { ...rest, vessels, volumeL: volumeAfterRack(vessels, batch) };
+}
+
+/**
+ * Splits a batch into sub-batches, one per part, from `date` on (the racking that put it in their
+ * vessels). The batch becomes Split; each sub-batch is a batch of its own in its vessel.
+ */
+export async function splitBatch(parentId: string, parts: SplitPart[], date: string): Promise<Batch[]> {
+  const parent = await batches.get(parentId);
+  if (!parent) return [];
+  const plan = planSplit(parent, parts, date, newId);
+  const saved: Batch[] = [];
+  for (const child of plan.children) saved.push(await batches.save(child));
+  await batches.save(plan.parent);
+  return saved;
+}
+
+/** Undoes a split nothing has happened in since: the sub-batches go, and the batch carries on in their vessels. */
+export async function undoSplit(parentId: string): Promise<void> {
+  const parent = await batches.get(parentId);
+  if (!parent || parent.status !== 'split') return;
+  const children = subBatchesOf(parent, await batches.list());
+  for (const child of children) await batches.remove(child.id);
+  const { splitAt: _s, statusBeforeSplit, ...rest } = parent;
+  await batches.save({ ...rest, status: statusBeforeSplit ?? 'secondary', vessels: children.flatMap((c) => fillsOf(c).map((f) => ({ vesselId: f.vesselId, volumeL: c.volumeL }))) });
 }
 
 /** Archives a batch, remembering its stage so it can be unarchived. */

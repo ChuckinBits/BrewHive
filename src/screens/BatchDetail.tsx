@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
-import { archiveBatch, changeStatus, rackInto, setBatchRating, unarchiveBatch } from '../db/actions.ts';
+import { archiveBatch, changeStatus, rackInto, setBatchRating, unarchiveBatch, undoSplit } from '../db/actions.ts';
+import { canUndoSplit, subBatchesOf, timelineOf } from '../lib/split.ts';
+import { SplitSheet } from './batch/SplitSheet.tsx';
 import { VesselField } from '../components/VesselField.tsx';
 import { getAll } from '../db/idb.ts';
 import { fillsOf, fmtHeadspace, headspace, listNames, rackedInto, vesselsOf, vesselTypeLabel } from '../lib/equipment.ts';
@@ -39,7 +41,7 @@ import {
   targetReached,
 } from '../lib/batch.ts';
 import { addedLines, currentIngredientStage, timelineSections } from '../lib/stages.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolume, fmtVolumeBoth } from '../lib/format.ts';
+import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolume, fmtVolumeBoth, nowLocal } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { BatchArt, batchSubtitle } from './Batches.tsx';
 import { EVENT_ICONS, entryCategory, eventValue, isBottledEntry, newestFirst } from './batch/entries.ts';
@@ -55,13 +57,19 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const settings = useSettings();
   const data = useQuery(async () => {
     const batch = await batches.get(id);
-    if (!batch) return { batch: null, events: [], recipe: null, equipment: [] };
+    if (!batch) return { batch: null, events: [], inherited: new Set<string>(), recipe: null, equipment: [], allBatches: [] as Batch[] };
     const all = await events.list();
+    const allBatches = await batches.list();
+    // A sub-batch's timeline starts with the history of the batch it was split from.
+    const timeline = timelineOf(batch, allBatches, all);
     return {
       batch,
-      events: all.filter((e) => e.batchId === id).sort(newestFirst),
+      events: timeline.events.sort(newestFirst),
+      inherited: timeline.inherited,
       recipe: batch.recipeId ? ((await recipes.get(batch.recipeId)) ?? null) : null,
       equipment: await equipment.list(),
+      allBatches,
+      allEvents: all,
     };
   }, [id]);
 
@@ -100,6 +108,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [restarting, setRestarting] = useState(false);
   // Offered after moving to Secondary, when you track vessels: which one it was racked into.
   const [racking, setRacking] = useState(false);
+  // After racking into several vessels: offered sub-batches.
+  const [splitting, setSplitting] = useState<{ fills: VesselFill[]; date: string } | null>(null);
+  const [undoingSplit, setUndoingSplit] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Batch" back="/" />;
@@ -138,6 +149,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const toLog = anyToLog(batch.ingredients, currentStage, added);
 
   const hasVessels = data.equipment.some((e) => e.kind === 'vessel');
+  const parentBatch = batch.parentId ? data.allBatches.find((b) => b.id === batch.parentId) : undefined;
+  const subBatches = batch.status === 'split' ? subBatchesOf(batch, data.allBatches) : [];
+  const undoable = batch.status === 'split' && canUndoSplit(batch, subBatches, data.allEvents ?? []);
   const inVessels = vesselsOf(batch, data.equipment);
   const vesselUnit = batch.volumeUnit ?? volumeUnitOf(settings);
   const setStatus = async (status: BatchStatus) => {
@@ -165,7 +179,34 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </p>
       </section>
 
-      {batch.status === 'archived' ? (
+      {parentBatch && (
+        <p className="split-from muted">
+          Split from <Link to={`/batches/${parentBatch.id}`}>{parentBatch.name}</Link> on {fmtDate(batch.splitAt)}. Its history up to then is part of this timeline.
+        </p>
+      )}
+
+      {batch.status === 'split' ? (
+        <div className="archived-note split-note">
+          <span>
+            <strong>Split on {fmtDate(batch.splitAt)}</strong>
+            <span className="muted">
+              Into{' '}
+              {subBatches.map((b, i) => (
+                <span key={b.id}>
+                  {i > 0 && (i === subBatches.length - 1 ? ' and ' : ', ')}
+                  <Link to={`/batches/${b.id}`}>{b.name}</Link>
+                </span>
+              ))}
+              . They carry on from here.
+            </span>
+          </span>
+          {undoable && (
+            <button type="button" className="btn btn-small" onClick={() => setUndoingSplit(true)}>
+              Undo split
+            </button>
+          )}
+        </div>
+      ) : batch.status === 'archived' ? (
         <div className="archived-note">
           <span>
             <strong>Archived</strong>
@@ -177,7 +218,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
         </div>
       ) : (
         <div className="steps" role="group" aria-label="Status">
-          {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((status) => (
+          {BATCH_STATUSES.filter((s) => s.id !== 'archived' && s.id !== 'split').map((status) => (
             <button
               key={status.id}
               type="button"
@@ -345,10 +386,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
       <section className="card">
         <div className="card-head">
           <h2>Timeline</h2>
-          <button type="button" className="btn btn-primary btn-small" onClick={() => setEntry('new')}>
-            <Icon name="plus" size={18} />
-            Add entry
-          </button>
+          {batch.status !== 'split' && (
+            <button type="button" className="btn btn-primary btn-small" onClick={() => setEntry('new')}>
+              <Icon name="plus" size={18} />
+              Add entry
+            </button>
+          )}
         </div>
         {data.events.length === 0 ? (
           <p className="muted">Nothing logged yet. Add a gravity reading or a note to start the timeline.</p>
@@ -367,8 +410,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
                     type="button"
                     className="timeline-entry"
                     // The Bottled entry opens bottling, to add bottles; its own date and removal are a tap further.
-                    onClick={() => (isBottledEntry(event) ? setBottling({ entry: event }) : setEntry(event))}
-                    aria-label={isBottledEntry(event) ? `Bottling, ${fmtDate(event.date)}` : `Edit ${titleOf(event)}, ${fmtDate(event.date)}`}
+                    // An entry from before a split belongs to the batch it was split from: open that batch.
+                    onClick={() => (data.inherited.has(event.id) ? navigate(`/batches/${event.batchId}`) : isBottledEntry(event) ? setBottling({ entry: event }) : setEntry(event))}
+                    aria-label={data.inherited.has(event.id) ? `${titleOf(event)}, ${fmtDate(event.date)}, from ${parentBatch?.name ?? 'the batch it was split from'}` : isBottledEntry(event) ? `Bottling, ${fmtDate(event.date)}` : `Edit ${titleOf(event)}, ${fmtDate(event.date)}`}
                   >
                     <span className="timeline-icon">
                       {iconFor(event)}
@@ -455,10 +499,24 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && (
-        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} onSecondary={() => hasVessels && setRacking(true)} />
+        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} onSecondary={() => hasVessels && setRacking(true)} onSeveral={(fills, date) => setSplitting({ fills, date })} />
       )}
       {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} />}
-      {racking && <RackSheet batch={batch} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setRacking(false)} />}
+      {racking && <RackSheet batch={batch} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setRacking(false)} onSeveral={(fills, date) => setSplitting({ fills, date })} />}
+      {splitting && <SplitSheet batch={batch} fills={splitting.fills} date={splitting.date} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setSplitting(null)} />}
+      {undoingSplit && (
+        <ConfirmSheet
+          title="Undo the split?"
+          message={`${listNames(subBatches.map((b) => b.name))} go, and ${batch.name} carries on in their vessels. Nothing was logged on them yet, so nothing is lost.`}
+          confirmLabel="Undo split"
+          onClose={() => setUndoingSplit(false)}
+          onConfirm={async () => {
+            await undoSplit(batch.id);
+            setUndoingSplit(false);
+            toast('Split undone');
+          }}
+        />
+      )}
       {finishing && <FinishSheet batch={batch} timeline={data.events} stabilized={finishing === 'stabilized'} onClose={() => setFinishing(false)} />}
       {restarting && (
         <ConfirmSheet
@@ -507,7 +565,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
 
 /** After moving to Secondary: which vessel it was racked into, logged as a Racked entry. */
-function RackSheet({ batch, unit, onClose }: { batch: Batch; unit: VolumeUnit; onClose: () => void }) {
+function RackSheet({ batch, unit, onClose, onSeveral }: { batch: Batch; unit: VolumeUnit; onClose: () => void; onSeveral: (fills: VesselFill[], date: string) => void }) {
   const [fills, setFills] = useState<VesselFill[]>([]);
   const [error, setError] = useState('');
   return (
@@ -540,9 +598,12 @@ function RackSheet({ batch, unit, onClose }: { batch: Batch; unit: VolumeUnit; o
           className="btn btn-primary btn-block"
           onClick={async () => {
             if (!fills.length) return setError('Choose the vessel it went into, or tap Not now.');
-            await rackInto(batch.id, fills);
+            const date = nowLocal();
+            await rackInto(batch.id, fills, date);
             toast('Racked');
             onClose();
+            // Into several vessels: offer sub-batches.
+            if (fills.length > 1) onSeveral(fills, date);
           }}
         >
           Log racking

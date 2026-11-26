@@ -1,6 +1,7 @@
 // Home screen: every batch, as carboys on a shelf or as a list.
 
 import { useState } from 'react';
+import { timelineOf } from '../lib/split.ts';
 import { batches, events, usePrefs, useQuery } from '../db/store.ts';
 import { loadSampleData } from '../db/sample.ts';
 import { BATCH_STATUSES, type Batch, type BatchEvent } from '../db/types.ts';
@@ -59,6 +60,8 @@ export function BatchesScreen() {
     list.push(event);
     eventsByBatch.set(event.batchId, list);
   }
+  // A sub-batch's readings start with those of the batch it was split from.
+  for (const b of data.batches) if (b.parentId) eventsByBatch.set(b.id, timelineOf(b, data.batches, data.events).events);
 
   const inFilter = (b: Batch, f: Filter) =>
     f === 'all' ? true : f === 'active' ? isActive(b.status) : f === 'bottled' ? b.status === 'bottled' : b.status === 'archived';

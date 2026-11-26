@@ -17,6 +17,23 @@ a milestone.
   each vessel with its own headspace, and the timeline says "Racked into Jug
   B and Jug C". Removing that entry puts the batch, and its volume, back.
 
+### Splitting batches
+
+- **Split a batch into sub-batches.** After racking into several vessels,
+  BrewHive asks whether to make sub-batches. Keep it one batch, or split it so
+  each vessel becomes a batch of its own, named "Bramble Melomel #2 A", "… B"
+  (rename them as you like).
+- **Each sub-batch keeps the history.** Its timeline starts with the batch's
+  entries up to the split (tap one to open the batch it belongs to), so its
+  OG, readings and ABV carry on. From there it has its own readings, stages,
+  tastings and rating. Ingredients, and so costs, are divided by volume.
+- **The batch is marked Split.** It shows which sub-batches it became, leaves
+  the Active list (find it under All), and keeps its history.
+- **Undo split** is offered until something is logged on a sub-batch: they
+  go, and the batch carries on in their vessels.
+- Racking into several vessels now says when one would get nothing ("Nothing
+  goes in 5 gal carboy"), as filling in order can leave the last empty.
+
 ## v0.3.0 – 2026-11-26
 
 ### Equipment

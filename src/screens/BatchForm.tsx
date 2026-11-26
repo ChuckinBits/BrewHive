@@ -281,7 +281,8 @@ function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded;
         <div className="form-pair">
           <Field label="Status">
             <select value={draft.status} onChange={(e) => set({ status: e.target.value as BatchStatus })}>
-              {BATCH_STATUSES.map((s) => (
+              {/* Split only comes from splitting: listed just for a batch that already is. */}
+              {BATCH_STATUSES.filter((s) => s.id !== 'split' || draft.status === 'split').map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>

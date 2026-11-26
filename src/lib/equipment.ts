@@ -7,7 +7,7 @@ import { fmtVolume } from './format.ts';
 
 /** A batch that still sits in its vessels: not bottled, archived or deleted. */
 export function inVessel(batch: Batch): boolean {
-  return !batch.deletedAt && batch.status !== 'bottled' && batch.status !== 'archived';
+  return !batch.deletedAt && batch.status !== 'bottled' && batch.status !== 'archived' && batch.status !== 'split';
 }
 
 const single = (id: string | null | undefined): VesselFill[] => (id ? [{ vesselId: id, volumeL: null }] : []);

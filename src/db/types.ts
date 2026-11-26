@@ -92,7 +92,7 @@ export function styleAbout(style: string, type: BeverageType = 'mead'): string |
   return (Array.isArray(styles) ? styles : MEAD_STYLES).find((s) => s.name.toLowerCase() === wanted)?.about;
 }
 
-export type BatchStatus = 'planned' | 'primary' | 'secondary' | 'aging' | 'bottled' | 'archived';
+export type BatchStatus = 'planned' | 'primary' | 'secondary' | 'aging' | 'bottled' | 'archived' | 'split';
 
 export const BATCH_STATUSES: { id: BatchStatus; label: string }[] = [
   { id: 'planned', label: 'Planned' },
@@ -101,6 +101,8 @@ export const BATCH_STATUSES: { id: BatchStatus; label: string }[] = [
   { id: 'aging', label: 'Aging' },
   { id: 'bottled', label: 'Bottled' },
   { id: 'archived', label: 'Archived' },
+  // Not a stage: a batch split into sub-batches stops here, and they carry on.
+  { id: 'split', label: 'Split' },
 ];
 
 export type EventType =
@@ -405,6 +407,14 @@ export interface Batch extends Base {
   vessels?: VesselFill[];
   /** Older data (v0.3.0): the one vessel it was in. `vessels` takes over when present. */
   vesselId?: string | null;
+  /**
+   * Splitting (v0.3): on a batch split into sub-batches, when it was split and the stage it was in.
+   * On a sub-batch, the batch it came from and when: its timeline starts with that batch's history
+   * up to then.
+   */
+  splitAt?: string | null;
+  statusBeforeSplit?: BatchStatus | null;
+  parentId?: string | null;
 }
 
 /** Part of a batch in a vessel. A null volume means all of it (the batch's volume). */

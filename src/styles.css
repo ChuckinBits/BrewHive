@@ -2709,3 +2709,10 @@ button.library-row {
 .vessel-line + .vessel-line {
   margin-top: 6px;
 }
+
+/* Splitting (v0.3): where a sub-batch came from, and a split batch's note. */
+.split-from {
+  margin: -4px 0 12px;
+  font-size: 14px;
+  text-align: center;
+}
