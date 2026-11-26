@@ -3,11 +3,11 @@
 import type { Batch, BatchEvent, IngredientLine, Recipe } from '../db/types.ts';
 import { BEVERAGE_TYPES } from '../db/types.ts';
 import { finalGravity, finalReading, isFermentationComplete, originalGravity, targetFinalGravity } from './batch.ts';
-import { fmtSG, newId } from './format.ts';
+import { fmtRating, fmtSG, newId } from './format.ts';
 import { ingredientStageLabel, stageOf } from './stages.ts';
 
-/** The recipe fields a batch provides. Name, notes, steps and rating are handled separately. */
-export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'volumeUnit' | 'targetOG' | 'targetFG' | 'targetMode' | 'targetAbv' | 'ingredients' | 'icon' | 'extraIcons' | 'color'>;
+/** The recipe fields a batch provides. Name, notes and steps are handled separately. */
+export type RecipeFields = Pick<Recipe, 'beverageType' | 'style' | 'batchSizeL' | 'volumeUnit' | 'targetOG' | 'targetFG' | 'targetMode' | 'targetAbv' | 'ingredients' | 'icon' | 'extraIcons' | 'color' | 'rating'>;
 
 /**
  * What a batch puts into its recipe. The target FG is the batch's final
@@ -30,7 +30,15 @@ export function recipeFieldsFromBatch(batch: Batch, events: BatchEvent[]): Recip
     icon: batch.icon,
     extraIcons: batch.extraIcons ?? [],
     color: batch.color,
+    // The batch's rating, which a new recipe starts with and an update brings over. An unrated batch
+    // (one just started from the recipe, say) leaves the recipe's rating alone: see ratingForUpdate.
+    rating: batch.rating,
   };
+}
+
+/** The recipe's rating after an update from a batch: the batch's, unless the batch isn't rated. */
+export function ratingForUpdate(recipe: Recipe, next: RecipeFields): number | null {
+  return next.rating ?? recipe.rating;
 }
 
 /** A recipe name from a batch name: "Bramble Melomel #2" becomes "Bramble Melomel". */
@@ -65,6 +73,9 @@ export function recipeChanges(recipe: Recipe, next: RecipeFields, formatVolume: 
   const mode = (m: string | undefined) => (m === 'abv' ? 'ABV' : 'FG');
   if (mode(recipe.targetMode) !== mode(next.targetMode)) fields.push(`Aims for ${mode(recipe.targetMode)} → ${mode(next.targetMode)}`);
   if (!sameNumber(recipe.targetAbv ?? null, next.targetAbv ?? null, 1)) fields.push(`Target ABV ${recipe.targetAbv != null ? `${recipe.targetAbv}%` : 'none'} → ${next.targetAbv != null ? `${next.targetAbv}%` : 'none'}`);
+  const rating = ratingForUpdate(recipe, next);
+  const rated = (r: number | null) => (r == null ? 'none' : fmtRating(r));
+  if (rating !== recipe.rating) fields.push(`Rating ${rated(recipe.rating)} → ${rated(rating)}`);
   if (recipe.icon !== next.icon) fields.push('Icon');
   if (recipe.color.toLowerCase() !== next.color.toLowerCase()) fields.push('Color');
 

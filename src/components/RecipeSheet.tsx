@@ -5,7 +5,7 @@ import { volumeUnitOf } from '../lib/units.ts';
 import { batches, recipes, useQuery } from '../db/store.ts';
 import type { Batch, BatchEvent, Recipe, Settings } from '../db/types.ts';
 import { fmtVolume, plural } from '../lib/format.ts';
-import { otherBatchesFrom, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from '../lib/recipeFromBatch.ts';
+import { otherBatchesFrom, ratingForUpdate, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from '../lib/recipeFromBatch.ts';
 import { navigate } from '../lib/router.tsx';
 import { Field, Sheet, toast } from './ui.tsx';
 
@@ -30,7 +30,8 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
 
   const saveNew = async () => {
     if (!name.trim()) return setError('Give the recipe a name.');
-    const saved = await recipes.save({ ...fields, ...stamp, name: name.trim(), steps: [], notes: batch.notes, rating: null, isPublished: false });
+    // The recipe starts with the batch's rating (fields.rating).
+    const saved = await recipes.save({ ...fields, ...stamp, name: name.trim(), steps: [], notes: batch.notes, isPublished: false });
     await batches.save({ ...batch, recipeId: saved.id });
     toast('Saved as a recipe');
     onClose();
@@ -42,8 +43,8 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
     const upToDate = changes.fields.length === 0 && changes.ingredients.length === 0;
     const others = otherBatchesFrom(recipe.id, allBatches, batch.id);
     const update = async () => {
-      // Name, notes, steps and rating stay as they are on the recipe.
-      await recipes.save({ ...recipe, ...fields, ...stamp });
+      // Name, notes and steps stay as they are on the recipe; an unrated batch keeps its rating too.
+      await recipes.save({ ...recipe, ...fields, ...stamp, rating: ratingForUpdate(recipe, fields) });
       toast('Recipe updated');
       onClose();
     };
@@ -63,7 +64,7 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-              <p className="field-hint">The recipe's name, notes, steps and rating stay as they are.</p>
+              <p className="field-hint">The recipe's name, notes and steps stay as they are{batch.rating == null ? ', and so does its rating, since this batch isn\'t rated' : ''}.</p>
             </div>
           )}
           {others.length > 0 && !upToDate && (
@@ -93,7 +94,7 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
           void saveNew();
         }}
       >
-        <p className="muted">Saves this batch's style, size, gravities, ingredients with their stages, icon and color as a recipe you can brew again.</p>
+        <p className="muted">Saves this batch's style, size, gravities, ingredients with their stages, icon, color and rating as a recipe you can brew again.</p>
         <Field label="Recipe name">
           <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
         </Field>
