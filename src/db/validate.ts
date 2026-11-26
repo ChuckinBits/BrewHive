@@ -3,7 +3,7 @@
 // skipped, and loose ends (a missing note, a number saved as text) are tidied up, rather than
 // letting one bad record break a page.
 
-import { BATCH_STATUSES, BEVERAGE_TYPES, EVENT_TYPES, INGREDIENT_STAGES, POUR_TYPES, type Settings } from './types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, EVENT_TYPES, INGREDIENT_STAGES, POUR_TYPES, VESSEL_TYPES, type Settings } from './types.ts';
 import type { StoreName } from './idb.ts';
 
 type Rec = Record<string, unknown>;
@@ -29,6 +29,11 @@ const EVENT_IDS: string[] = [...EVENT_TYPES.map((t) => t.id), 'status'];
 const BEVERAGE_IDS = BEVERAGE_TYPES.map((t) => t.id);
 const STAGE_IDS = INGREDIENT_STAGES.map((s) => s.id);
 const POUR_IDS = POUR_TYPES.map((t) => t.id);
+const VESSEL_IDS = VESSEL_TYPES.map((t) => t.id);
+/** Optional id: text, or null. */
+const idOrNull = (r: Rec, key: string) => {
+  if (key in r && !isText(r[key])) r[key] = null;
+};
 
 /** A recipe's or batch's ingredient lines: those with an id and a name. */
 function cleanLines(value: unknown): Rec[] {
@@ -61,6 +66,7 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if (!isText(r.recipeId)) r.recipeId = null;
     for (const key of ['volumeL', 'og', 'targetFG', 'targetAbv', 'rating']) numberOrNull(r, key);
     if (!('rating' in r)) r.rating = null;
+    idOrNull(r, 'vesselId');
     return true;
   },
   events: (r) => {
@@ -68,6 +74,8 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if (!isNumber(r.value)) r.value = null;
     text(r, 'note');
     for (const key of ['toStatus', 'fromStatus']) if (key in r && !oneOf(r[key], STATUS_IDS)) delete r[key];
+    idOrNull(r, 'vesselId');
+    idOrNull(r, 'fromVesselId');
     return true;
   },
   cellar: (r) => {
@@ -96,6 +104,17 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
       const c = r.cost;
       if (!isObject(c) || !isNumber(c.price) || !isNumber(c.quantity) || !isText(c.unit)) r.cost = null;
     }
+    return true;
+  },
+  equipment: (r) => {
+    if (!hasText(r, 'name')) return false;
+    if (r.kind !== 'vessel' && r.kind !== 'gear') r.kind = 'gear';
+    text(r, 'notes');
+    if (r.kind === 'vessel' && !oneOf(r.vesselType, VESSEL_IDS)) r.vesselType = 'other';
+    numberOrNull(r, 'capacityL');
+    if (isNumber(r.capacityL) && r.capacityL <= 0) r.capacityL = null;
+    if ('capacityUnit' in r && r.capacityUnit !== 'gal' && r.capacityUnit !== 'L') delete r.capacityUnit;
+    numberOrNull(r, 'price');
     return true;
   },
 };

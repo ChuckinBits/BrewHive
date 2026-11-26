@@ -19,6 +19,7 @@ import { DEFAULT_TARGET_FG, analyzeGravity, batchAbv, finalReading, isFermentati
 import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
 import { navigate } from '../lib/router.tsx';
+import { VesselField } from '../components/VesselField.tsx';
 
 interface Draft {
   name: string;
@@ -40,6 +41,7 @@ interface Draft {
   extraIcons: string[];
   color: string;
   notes: string;
+  vesselId: string | null;
 }
 
 interface Loaded {
@@ -81,6 +83,7 @@ export function BatchFormScreen({ id, recipeId, section }: { id?: string; recipe
           extraIcons: batch.extraIcons ?? [],
           color: batch.color,
           notes: batch.notes,
+          vesselId: batch.vesselId ?? null,
         },
       };
     }
@@ -109,6 +112,7 @@ export function BatchFormScreen({ id, recipeId, section }: { id?: string; recipe
         extraIcons: recipe?.extraIcons ?? [],
         color: recipe?.color ?? getFlavor(DEFAULT_FLAVOR).color,
         notes: '',
+        vesselId: null,
       },
     };
   }, [id, recipeId]);
@@ -221,6 +225,8 @@ function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded;
       extraIcons: draft.extraIcons,
       color: draft.color,
       notes: draft.notes.trim(),
+      // Set by hand here, it's a correction: racking is what logs a move on the timeline.
+      vesselId: draft.vesselId,
     });
 
     if (loaded.existing && loaded.existing.status !== saved.status) {
@@ -299,6 +305,14 @@ function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded;
             <input type="text" inputMode="decimal" value={draft.og} placeholder="1.100" onChange={(e) => set({ og: e.target.value })} />
           </Field>
         </div>
+        <VesselField
+          value={draft.vesselId}
+          onChange={(vesselId) => set({ vesselId })}
+          batch={{ id: loaded.existing?.id ?? '', volumeL: volumeFromInput(draft.volume, draft.volumeUnit) }}
+          unit={draft.volumeUnit}
+          current={loaded.existing?.vesselId}
+          hint={isNew ? 'What it ferments in. Racking it later asks where it goes next.' : 'Racking logs a move on the timeline; this just corrects it.'}
+        />
 
         <div className="gravity-group">
           <TargetField value={draft} onChange={set} og={effectiveOg} />

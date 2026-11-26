@@ -18,6 +18,7 @@ import { BatchFormScreen } from './screens/BatchForm.tsx';
 import { BatchesScreen } from './screens/Batches.tsx';
 import { CellarDetailScreen, CellarFormScreen, CellarScreen } from './screens/Cellar.tsx';
 import { MoreScreen } from './screens/More.tsx';
+import { EquipmentScreen } from './screens/Equipment.tsx';
 import { RecipeDetailScreen, RecipeFormScreen, RecipesScreen } from './screens/Recipes.tsx';
 
 const TABS: { to: string; label: string; icon: IconName }[] = [
@@ -30,7 +31,7 @@ const TABS: { to: string; label: string; icon: IconName }[] = [
 function activeTab(path: string): string {
   if (path.startsWith('/recipes')) return '/recipes';
   if (path.startsWith('/cellar')) return '/cellar';
-  if (path.startsWith('/more') || path.startsWith('/ingredients')) return '/more';
+  if (path.startsWith('/more') || path.startsWith('/ingredients') || path.startsWith('/equipment')) return '/more';
   return '/';
 }
 
@@ -49,6 +50,7 @@ function pickScreen(path: string, query: URLSearchParams): ReactNode {
   if ((m = matchPath('/cellar/:id/edit', path))) return <CellarFormScreen id={m.id} />;
   if ((m = matchPath('/cellar/:id', path))) return <CellarDetailScreen id={m.id} />;
   if (path === '/more') return <MoreScreen />;
+  if (path === '/equipment') return <EquipmentScreen />;
   if (path === '/ingredients') return <IngredientsScreen />;
   if (path === '/ingredients/new') return <IngredientFormScreen category={query.get('category') ?? undefined} />;
   if ((m = matchPath('/ingredients/:id', path))) return <IngredientFormScreen id={m.id} />;

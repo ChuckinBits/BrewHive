@@ -3,7 +3,7 @@
 
 import { putMany } from './idb.ts';
 import { ensureOgEntries, ensureStarterIngredients, ingredients } from './store.ts';
-import type { Batch, BatchEvent, BatchStatus, CellarEntry, EventType, IngredientCost, IngredientLine, IngredientStage, LibraryIngredient, Pour, Recipe } from './types.ts';
+import type { Batch, BatchEvent, BatchStatus, CellarEntry, Equipment, EventType, IngredientCost, IngredientLine, IngredientStage, LibraryIngredient, Pour, Recipe, VesselType } from './types.ts';
 import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 import { entryFromLine, joinAmount } from '../lib/stages.ts';
@@ -261,7 +261,7 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'feeding', at(17), 1.034, 'Added 8 oz honey to push it a little stronger'),
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
-    event(b2.id, 'rack', at(12), null, 'Racked off the yeast'),
+    { ...event(b2.id, 'rack', at(12), null, 'Racked off the yeast'), fromVesselId: 'sample-bucket', vesselId: 'sample-jug-a' },
     ...b2.ingredients
       .filter((l) => l.name === 'Cinnamon sticks')
       .map((l) => ({ ...event(b2.id, 'ingredient', at(12, 19)), ...entryFromLine(l), ingredientLineId: l.id })),
@@ -272,7 +272,7 @@ export async function loadSampleData(): Promise<void> {
     event(b3.id, 'gravity', at(92), 1.008),
     { ...event(b3.id, 'gravity', at(75), 1.002), final: true },
     stage(b3.id, at(74, 17), 'primary', 'secondary'),
-    event(b3.id, 'rack', at(74)),
+    { ...event(b3.id, 'rack', at(74)), fromVesselId: 'sample-jug-c', vesselId: 'sample-jug-b' },
     { ...event(b3.id, 'moved', at(73)), place: 'Basement' },
     { ...event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'), method: 'Chemical' },
     stage(b3.id, at(60), 'secondary', 'aging'),
@@ -325,6 +325,24 @@ export async function loadSampleData(): Promise<void> {
   ];
 
   await putMany('recipes', [traditional, blackberry, cyser]);
+  // Vessels, holding the batches still in one (bottled ones have left theirs), and a little gear.
+  const vessel = (id: string, name: string, vesselType: VesselType, gallons: number, price: number | null, notes = ''): Equipment => ({
+    id, name, kind: 'vessel', vesselType, capacityL: gallons * L_PER_GAL, capacityUnit: 'gal', price, notes, ...stamp(),
+  });
+  const gear = (id: string, name: string, price: number | null, notes = ''): Equipment => ({ id, name, kind: 'gear', price, notes, ...stamp() });
+  b1.vesselId = 'sample-bucket';
+  b2.vesselId = 'sample-jug-a';
+  b3.vesselId = 'sample-jug-b';
+  await putMany('equipment', [
+    vessel('sample-bucket', 'Small bucket', 'bucket', 2, 14.99, 'Food-grade, with a grommet lid. Room for fruit in primary.'),
+    vessel('sample-jug-a', 'Jug A', 'jug', 1, 7.99),
+    vessel('sample-jug-b', 'Jug B', 'jug', 1, 7.99),
+    vessel('sample-jug-c', 'Jug C', 'jug', 1, 7.99),
+    vessel('sample-carboy', '5 gal carboy', 'carboy', 5, 39.99, 'Glass. For the day a batch grows up.'),
+    gear('sample-hydrometer', 'Hydrometer', 12.99, 'Triple scale, with the test jar'),
+    gear('sample-siphon', 'Auto-siphon', 14.99),
+    gear('sample-ph', 'pH meter', 24.99, 'Calibrate with the 4.0 and 7.0 buffers'),
+  ]);
   await putMany('batches', [b1, b2, b3, b4, b5]);
   await putMany('events', sampleEvents);
   await putMany('cellar', [c1, c2]);

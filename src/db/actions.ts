@@ -15,6 +15,18 @@ export async function changeStatus(batch: Batch, to: BatchStatus, patch: Partial
   await recordStatusEntry(batch.id, batch.status, to);
 }
 
+/**
+ * Racks the batch into a vessel (or out of tracking, with null): a Racked entry that records where
+ * it went and where it came from, and the batch's vessel follows.
+ */
+export async function rackInto(batchId: string, vesselId: string | null, date = nowLocal(), note = ''): Promise<void> {
+  // Read fresh: racking is offered right after a stage change, which saved the batch.
+  const batch = await batches.get(batchId);
+  if (!batch) return;
+  await events.save({ batchId, type: 'rack', date, value: null, note, vesselId, fromVesselId: batch.vesselId ?? null });
+  if ((batch.vesselId ?? null) !== vesselId) await batches.save({ ...batch, vesselId });
+}
+
 /** Archives a batch, remembering its stage so it can be unarchived. */
 export async function archiveBatch(batch: Batch): Promise<void> {
   if (batch.status === 'archived') return;

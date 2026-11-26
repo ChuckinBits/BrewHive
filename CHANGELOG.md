@@ -5,6 +5,29 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.3.0)
+
+### Equipment
+
+- **An Equipment screen** under More, with two lists. **Vessels**:
+  carboys, buckets, jugs, kegs, barrels and tanks, each with a capacity,
+  what it cost and notes. Leave a vessel unnamed and it's called by its size
+  and type, such as "5 gal carboy". **Other gear**: hydrometers, siphons, pH
+  meters, whatever you'd like a list of, with notes and prices.
+- **See what's in each vessel.** The list shows which batch each vessel
+  holds, or that it's free, and how many are free. A batch leaves its vessel
+  when it's bottled or archived.
+- **Batches have a vessel.** Pick one when you start a batch, or change it
+  on the batch's form. Picking one that's too small, or that already holds
+  another batch, warns you. The batch page shows the vessel and the headspace
+  left in it, such as "0.5 gal headspace (10%)".
+- **Racking moves the batch.** Moving a batch to Secondary asks which vessel
+  it was racked into, and a Racked entry from Add entry asks the same. The
+  timeline says where it went ("Racked into Jug B"), the old vessel is free
+  again, and removing the entry puts the batch back where it was.
+- Without vessels, nothing changes: the vessel fields and questions only
+  appear once you've added one. Backups include your equipment.
+
 ## v0.2.9 – 2026-11-26
 
 ### Ratings

@@ -74,6 +74,8 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 2: ingredient timeline entry adds to the list in the current stage
   await p.getByRole('button', { name: 'Secondary', exact: true }).click(); await p.waitForTimeout(300);
+  // The sample data has vessels, so moving to Secondary offers racking into one (v0.3): not now.
+  await p.getByRole('dialog', { name: 'Racked into a new vessel?' }).getByRole('button', { name: 'Not now' }).click(); await p.waitForTimeout(200);
   ok(await until(async () => (await p.getByRole('button', { name: 'Log Raspberries as added' }).count() === 1 && await p.getByRole('button', { name: 'Log Clover honey as added' }).count() === 1)), '3: in Secondary, Raspberries become tappable and Primary ones still are');
   await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click();
   ok(await until(async () => (await p.getByLabel(/^Add to batch ingredients/).isChecked())), '2: "Add to batch ingredients" is checked by default');

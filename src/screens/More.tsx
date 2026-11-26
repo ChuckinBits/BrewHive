@@ -63,6 +63,17 @@ export function MoreScreen() {
         <Icon name="chevron" size={18} />
       </Link>
 
+      <Link to="/equipment" className="card more-link">
+        <span className="timeline-icon">
+          <Icon name="batches" size={20} />
+        </span>
+        <span className="more-link-text">
+          <strong>Equipment</strong>
+          <span className="muted">Your vessels, which batch is in each, and the rest of your gear.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </Link>
+
       <section className="card">
         <h2>Units</h2>
         <div className="settings-row">
@@ -174,7 +185,7 @@ export function MoreScreen() {
       {erasing && (
         <ConfirmSheet
           title="Erase everything?"
-          message="Every recipe, batch, bottle, ingredient and setting on this device will be deleted, and the starter ingredients put back. This cannot be undone, so save a backup first if you might want it back."
+          message="Every recipe, batch, bottle, ingredient, piece of equipment and setting on this device will be deleted, and the starter ingredients put back. This cannot be undone, so save a backup first if you might want it back."
           confirmLabel="Erase everything"
           onClose={() => setErasing(false)}
           onConfirm={async () => {

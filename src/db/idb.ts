@@ -3,10 +3,10 @@
 // library such as Dexie, only this file and store.ts need to change.
 
 const DB_NAME = 'brewhive';
-// 2: adds the ingredient library (v0.2). Opening creates any store that's missing.
-const DB_VERSION = 2;
+// 2: adds the ingredient library (v0.2). 3: adds equipment (v0.3). Opening creates any store that's missing.
+const DB_VERSION = 3;
 
-export const STORES = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients', 'settings'] as const;
+export const STORES = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients', 'equipment', 'settings'] as const;
 export type StoreName = (typeof STORES)[number];
 
 let dbPromise: Promise<IDBDatabase> | null = null;

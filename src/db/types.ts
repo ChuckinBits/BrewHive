@@ -303,6 +303,39 @@ export interface LibraryIngredient extends Base {
 }
 
 export type VolumeUnit = 'gal' | 'L';
+
+// --- Equipment (v0.3)
+
+/** What a vessel is. A batch ferments or ages in one. */
+export type VesselType = 'carboy' | 'bucket' | 'jug' | 'keg' | 'barrel' | 'tank' | 'other';
+
+export const VESSEL_TYPES: { id: VesselType; label: string }[] = [
+  { id: 'carboy', label: 'Carboy' },
+  { id: 'bucket', label: 'Bucket' },
+  { id: 'jug', label: 'Jug' },
+  { id: 'keg', label: 'Keg' },
+  { id: 'barrel', label: 'Barrel' },
+  { id: 'tank', label: 'Tank' },
+  { id: 'other', label: 'Other vessel' },
+];
+
+/**
+ * A piece of equipment. Vessels hold batches and have a capacity; other gear (a hydrometer, a
+ * siphon, a pH meter) is a list with notes. Which batch a vessel holds is the batch's vesselId.
+ */
+export interface Equipment extends Base {
+  name: string;
+  kind: 'vessel' | 'gear';
+  /** For vessels. */
+  vesselType?: VesselType;
+  /** For vessels: how much it holds, in liters. */
+  capacityL?: number | null;
+  /** The unit the capacity was entered in. Missing means the default from settings. */
+  capacityUnit?: VolumeUnit;
+  /** What it cost, in the settings' currency. Optional. */
+  price?: number | null;
+  notes: string;
+}
 /** What a batch or recipe aims for: a final gravity (the ABV follows), or an ABV (the final gravity follows). */
 export type TargetMode = 'fg' | 'abv';
 export type TempUnit = 'F' | 'C';
@@ -368,6 +401,8 @@ export interface Batch extends Base {
   color: string;
   rating: number | null;
   notes: string;
+  /** The vessel it's in now (an Equipment id), if you track vessels. Racking can change it. */
+  vesselId?: string | null;
 }
 
 export interface BatchEvent extends Base {
@@ -426,6 +461,9 @@ export interface BatchEvent extends Base {
   rating?: number | null;
   /** For "tasting" entries: who tasted it, if not the user. Optional. */
   taster?: string;
+  /** For "rack" entries: the vessel it was racked into, and the one it came out of. */
+  vesselId?: string | null;
+  fromVesselId?: string | null;
 }
 
 export interface CellarEntry extends Base {
