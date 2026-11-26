@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased
+## v0.2.9 – 2026-11-26
 
 ### Ratings
 
@@ -30,6 +30,9 @@ a milestone.
   the recipe has it, such as a rating or one ingredient, and the button says
   how many changes it will make. What you leave out is offered again next
   time.
+
+**Updating from v0.2.8:** nothing to do. Recipes you saved before keep their
+rating; the next Update recipe from a rated batch offers its rating.
 
 ## v0.2.8 – 2026-11-25
 
