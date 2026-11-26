@@ -401,8 +401,16 @@ export interface Batch extends Base {
   color: string;
   rating: number | null;
   notes: string;
-  /** The vessel it's in now (an Equipment id), if you track vessels. Racking can change it. */
+  /** The vessels it's in now and how much is in each, if you track vessels. Racking changes them. */
+  vessels?: VesselFill[];
+  /** Older data (v0.3.0): the one vessel it was in. `vessels` takes over when present. */
   vesselId?: string | null;
+}
+
+/** Part of a batch in a vessel. A null volume means all of it (the batch's volume). */
+export interface VesselFill {
+  vesselId: string;
+  volumeL: number | null;
 }
 
 export interface BatchEvent extends Base {
@@ -461,7 +469,12 @@ export interface BatchEvent extends Base {
   rating?: number | null;
   /** For "tasting" entries: who tasted it, if not the user. Optional. */
   taster?: string;
-  /** For "rack" entries: the vessel it was racked into, and the one it came out of. */
+  /** For "rack" entries: the vessels it was racked into, and the ones it came out of. Missing when vessels weren't tracked. */
+  vessels?: VesselFill[];
+  fromVessels?: VesselFill[];
+  /** For "rack" entries: the batch's volume before, so removing the entry restores it. */
+  fromVolumeL?: number | null;
+  /** Older data (v0.3.0): one vessel in and out. `vessels` / `fromVessels` take over when present. */
   vesselId?: string | null;
   fromVesselId?: string | null;
 }

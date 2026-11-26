@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { batches, events, ingredients, useQuery } from '../../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit } from '../../db/types.ts';
+import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit, type VesselFill } from '../../db/types.ts';
 import { useIngredientFields } from '../../components/StagedIngredients.tsx';
 import { currentCost } from '../../components/CostCard.tsx';
 import { Field, RatingInput, Sheet, TEMP_UNITS, UnitField, toast } from '../../components/ui.tsx';
@@ -13,7 +13,8 @@ import { fmtDateShort, fmtRating, fmtSG, fmtTemp, newId, nowLocal, parseNum, tem
 import { FinalReadingFields, NO_FINAL_READING, finalReadingError, saveFinalReading, type FinalReading } from '../../components/FinalReading.tsx';
 import { EVENT_ICONS } from './entries.ts';
 import { VesselField } from '../../components/VesselField.tsx';
-import { isLatestRack, vesselAfterRemovingRack } from '../../lib/equipment.ts';
+import { fillsAfterRemovingRack, fillsOf, isLatestRack, normalizeFills, rackedFrom, rackedInto, sameFills } from '../../lib/equipment.ts';
+import { withVessels } from '../../db/actions.ts';
 import { volumeUnitOf } from '../../lib/units.ts';
 
 /** The text a value input starts with when editing an entry. */
@@ -109,7 +110,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
   const [minutes, setMinutes] = useState(existing?.minutes != null ? String(existing.minutes) : '');
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   // Racking: the vessel it went into. Shown only once you have vessels (More → Equipment).
-  const [rackVessel, setRackVessel] = useState<string | null>(existing ? (existing.vesselId ?? null) : null);
+  const [rackFills, setRackFills] = useState<VesselFill[]>(existing ? (rackedInto(existing) ?? []) : []);
 
   const [taster, setTaster] = useState(existing?.taster ?? '');
   // New tastings set the batch rating by default. Editing an old tasting leaves the batch alone unless ticked.
@@ -207,8 +208,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
       // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
       final: type === 'gravity' && !isOg ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
       // Racking with vessels tracked: where it went, and (for a new entry) where it came from.
-      ...(type === 'rack' && (rackVessel != null || existing?.vesselId != null || (!existing && batch.vesselId != null))
-        ? { vesselId: rackVessel, fromVesselId: existing ? (existing.fromVesselId ?? null) : (batch.vesselId ?? null) }
+      ...(type === 'rack' && (rackFills.length > 0 || (existing && rackedInto(existing) !== undefined) || (!existing && fillsOf(batch).length > 0))
+        ? { vessels: normalizeFills(rackFills), fromVessels: existing ? rackedFrom(existing) : fillsOf(batch), fromVolumeL: existing ? existing.fromVolumeL : batch.volumeL }
         : {}),
     };
     if (newStage) {
@@ -259,9 +260,10 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
     // Racking moves the batch's vessel: a new entry always, an edited one if it's the latest racking.
-    if (type === 'rack' && 'vesselId' in fields) {
-      const moves = !existing || (isLatestRack(existing, batchEntries) && (batch.vesselId ?? null) === (existing.vesselId ?? null));
-      if (moves && (batch.vesselId ?? null) !== rackVessel) await batches.save({ ...batch, vesselId: rackVessel });
+    if (type === 'rack' && 'vessels' in fields) {
+      const into = normalizeFills(rackFills);
+      const moves = !existing || (isLatestRack(existing, batchEntries) && sameFills(rackedInto(existing) ?? [], fillsOf(batch)));
+      if (moves && !sameFills(into, fillsOf(batch))) await batches.save(withVessels(batch, into));
     }
     const reratedBatch = rateBatch || (drivesBatchRating && rating !== batch.rating);
     toast(reratedBatch ? (existing ? 'Entry updated, and the batch rating too' : 'Saved, and the batch rating updated') : existing ? 'Entry updated' : 'Added to the timeline');
@@ -549,12 +551,13 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
         {type === 'rack' && (
           <VesselField
             label="Racked into"
-            value={rackVessel}
-            onChange={setRackVessel}
+            value={rackFills}
+            onChange={setRackFills}
+            changesVolume
             batch={batch}
             unit={volumeUnitOf(settings)}
-            noneLabel={batch.vesselId || existing?.vesselId ? 'Somewhere not tracked' : 'Not tracked'}
-            current={existing ? (existing.fromVesselId ?? null) : batch.vesselId}
+            noneLabel={fillsOf(batch).length || (existing && rackedInto(existing)?.length) ? 'Somewhere not tracked' : 'Not tracked'}
+            current={(existing ? rackedFrom(existing) : fillsOf(batch)).map((f) => f.vesselId)}
           />
         )}
         {kind !== 'ingredient' && !newStage && whenField}
@@ -594,8 +597,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
                     if (isOg) await batches.save({ ...batch, og: null });
                     if (removalGoesBackTo) await batches.save({ ...batch, status: removalGoesBackTo, ...(batch.status === 'archived' ? { statusBeforeArchive: null } : {}) });
                     // Removing the racking that moved it puts it back in the vessel it came from.
-                    const vesselBack = vesselAfterRemovingRack(existing, batch, batchEntries);
-                    if ((vesselBack ?? null) !== (batch.vesselId ?? null)) await batches.save({ ...batch, vesselId: vesselBack ?? null });
+                    const back = fillsAfterRemovingRack(existing, batch, batchEntries);
+                    if (!sameFills(back, fillsOf(batch))) await batches.save({ ...withVessels(batch, back), volumeL: existing.fromVolumeL ?? batch.volumeL });
                     toast(isOg ? 'OG removed' : removalGoesBackTo ? `Entry removed; back to ${statusLabel(removalGoesBackTo)}` : 'Entry removed');
                     onClose();
                   }}
