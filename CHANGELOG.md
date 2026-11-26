@@ -15,6 +15,11 @@ a milestone.
   with the slider, and nothing is saved until **Save**. The tasting and pour
   forms keep their slider, since those save together with the rest of the
   form.
+- **Editing the Batch rating entry changes the batch rating.** If it's the
+  entry the batch's current rating came from (the latest one), changing it on
+  the timeline changes the batch rating too. An older entry, or one a tasting
+  has since replaced, only changes the timeline, and the form says which.
+  Removing a Batch rating entry never clears the batch rating.
 
 ## v0.2.8 – 2026-11-25
 
