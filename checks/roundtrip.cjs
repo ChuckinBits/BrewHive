@@ -57,7 +57,8 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const second = await backup('roundtrip-2');
 
   const strip = (r) => { const { createdAt, updatedAt, ...rest } = r; return JSON.stringify(rest, Object.keys(rest).sort()); };
-  for (const store of ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients']) {
+  ok((first.json.data.equipment || []).length > 0, 'the backup has the sample equipment (v0.3)');
+  for (const store of ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients', 'equipment']) {
     const a = new Map((first.json.data[store] || []).map((r) => [r.id, r]));
     const c = new Map((second.json.data[store] || []).map((r) => [r.id, r]));
     const lost = [...a.keys()].filter((id) => !c.has(id));

@@ -2602,3 +2602,66 @@ button.library-row {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* --- Equipment (v0.3) ------------------------------------------------------ */
+
+.equipment-add {
+  margin-top: 0;
+}
+
+.equipment-row {
+  min-height: 60px;
+  padding-block: 6px;
+}
+
+.equipment-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.equipment-text .library-name {
+  font-size: 15px;
+}
+
+.equipment-notes {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Free, or the batch in it. */
+.vessel-status {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vessel-busy {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* The batch page's Vessel: headspace on its own line. */
+.vessel-room {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vessel-over {
+  color: var(--danger, #b3261e);
+  font-weight: 600;
+}
+
+.vessel-warning {
+  display: block;
+  margin-top: 6px;
+}

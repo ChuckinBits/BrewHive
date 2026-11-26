@@ -101,3 +101,22 @@ test('only starter ingredients get that exception', () => {
   const freshBatch = rec('b1', '2026-11-25T05:00:00Z', '2026-11-25T05:00:00Z');
   assert.equal(backupWins(rec('b1', '2026-10-01', '2026-10-20'), freshBatch), false);
 });
+
+test('equipment: a name is needed; kind, vessel type, capacity and price are tidied', () => {
+  assert.equal(cleanRecord('equipment', { id: 'e1', kind: 'vessel' }), null, 'no name');
+  const v = cleanRecord('equipment', { id: 'e2', name: 'Jug', kind: 'vessel', vesselType: 'amphora', capacityL: -3, capacityUnit: 'quarts', price: 'free' })!;
+  assert.equal(v.vesselType, 'other');
+  assert.equal(v.capacityL, null);
+  assert.ok(!('capacityUnit' in v));
+  assert.equal(v.price, null);
+  assert.equal(v.notes, '');
+  assert.equal(cleanRecord('equipment', { id: 'e3', name: 'Siphon', kind: 'spaceship' })!.kind, 'gear');
+});
+
+test('a batch and a racking entry keep vessel ids only when they are text', () => {
+  const b = cleanRecord('batches', { id: 'b', name: 'B', startDate: '2026-11-01', status: 'primary', vesselId: 7 })!;
+  assert.equal(b.vesselId, null);
+  const r = cleanRecord('events', { id: 'r', batchId: 'b', date: '2026-11-02T10:00', type: 'rack', vesselId: 'v2', fromVesselId: {} })!;
+  assert.equal(r.vesselId, 'v2');
+  assert.equal(r.fromVesselId, null);
+});

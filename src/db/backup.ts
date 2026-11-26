@@ -7,7 +7,7 @@ import { today } from '../lib/format.ts';
 import { ensureOgEntries, loadSettings, rememberTheme } from './store.ts';
 import { backupWins, cleanRecord, cleanSettings } from './validate.ts';
 
-const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients'];
+const DATA_STORES: StoreName[] = ['recipes', 'batches', 'events', 'cellar', 'pours', 'ingredients', 'equipment'];
 
 export interface BackupFile {
   app: 'brewhive';

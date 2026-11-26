@@ -1,0 +1,100 @@
+const { chromium } = require('playwright');
+const BASE = process.env.BREWHIVE_URL || 'http://localhost:4173';
+// Waits for a condition that reads the page: the page can lag a moment behind a click or a save,
+// longer on a slow machine. Polls until it holds or CHECK_WAIT ms (default 5000) pass.
+const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value || Date.now() > end) return value;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+};
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
+const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
+// v0.3 Equipment: vessels and gear, a batch's vessel, racking into another, headspace, and removing.
+(async () => {
+  const b = await chromium.launch();
+  const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US' })).newPage();
+  const errors = []; p.on('pageerror', e => errors.push(e.message)); p.on('console', m => m.type() === 'error' && errors.push(m.text()));
+  const out = process.argv[2] || '/tmp';
+  const d = p.getByRole('dialog').last();
+  const fact = async (name) => ((await p.locator('dt', { hasText: new RegExp('^' + name + '$') }).locator('xpath=following-sibling::dd[1]').textContent().catch(() => null)) ?? '').trim();
+  const row = (name) => p.locator('.equipment-row', { has: p.locator('.library-name', { hasText: new RegExp('^' + name + '$') }) });
+  const addVessel = async ({ type, capacity, name }) => {
+    await p.getByRole('button', { name: 'Add vessel' }).first().click();
+    if (type) await d.getByLabel('Type').selectOption({ label: type });
+    if (capacity) await d.getByLabel('Capacity', { exact: true }).fill(capacity);
+    if (name) await d.getByLabel('Name').fill(name);
+    await d.getByRole('button', { name: 'Add vessel' }).click(); await d.waitFor({ state: 'detached' });
+  };
+
+  // 1. Equipment is under More, and starts empty
+  await p.goto(BASE + '/#/more'); await p.getByRole('link', { name: /Equipment/ }).click(); await p.waitForSelector('.topbar');
+  ok(await until(async () => (await p.getByText(/Carboys, buckets, jugs, kegs and barrels/).count() === 1)), 'More → Equipment, empty, says what vessels are for');
+
+  // 2. A vessel left unnamed is named from its capacity and type; gear has a price
+  await addVessel({ type: 'Carboy', capacity: '5' });
+  ok(await until(async () => (await row('5 gal carboy').count() === 1)), 'an unnamed 5 gal carboy is called "5 gal carboy"');
+  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug A' });
+  await p.getByRole('button', { name: 'Add gear' }).click();
+  await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel(/^Price/).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
+  await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => ((await row('Hydrometer').textContent()).includes('$12.99') && (await row('Hydrometer').textContent()).includes('Triple scale'))), 'gear shows its notes and price');
+  ok(await until(async () => ((await p.locator('.card-head .muted').textContent()) === 'All free')), 'both vessels are free');
+
+  // 3. A new batch picks a vessel; too small warns
+  await p.goto(BASE + '/#/batches/new');
+  await p.getByLabel('Name').fill('Vessel Test'); await p.getByLabel('Volume', { exact: true }).fill('5');
+  await p.getByLabel('Vessel').selectOption({ label: 'Jug A · 1 gal · free' });
+  ok(await until(async () => (await p.getByText("Jug A holds 1 gal, less than this batch's 5 gal.").count() === 1)), 'picking a 1 gal jug for 5 gal warns');
+  await p.getByLabel('Volume', { exact: true }).fill('1');
+  ok(await until(async () => (await p.locator('.vessel-warning').count() === 0)), '1 gal fits: no warning');
+  await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
+  const batchUrl = p.url();
+  ok(await until(async () => ((await fact('Vessel')) === 'Jug AFull')), 'the batch page shows the vessel and that it is full: ' + (await fact('Vessel')));
+
+  // 4. The Equipment screen shows what's in each vessel
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await row('Jug A').locator('.vessel-status').textContent()) === 'Vessel Test' && (await p.locator('.card-head .muted').textContent()) === '1 of 2 free')), 'Jug A holds Vessel Test; 1 of 2 free');
+
+  // 5. Moving to Secondary offers racking; the carboy gets it, the jug is free again
+  await p.goto(batchUrl); await p.waitForSelector('.hero');
+  await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Secondary' }).click();
+  ok(await until(async () => (await p.getByRole('dialog', { name: 'Racked into a new vessel?' }).count() === 1)), 'moving to Secondary asks which vessel it was racked into');
+  // The vessel list loads a moment after the sheet opens.
+  const opts = () => d.getByLabel('Racked into').locator('option').allTextContents();
+  ok(await until(async () => { const o = await opts(); return o.length === 3 && o[2] === 'Jug A · 1 gal · in it now'; }), 'its own vessel says "in it now", listed last: ' + (await opts()).join(' | '));
+  await d.getByRole('button', { name: 'Log racking' }).click();
+  ok(await until(async () => (await d.getByRole('alert').getByText('Choose the vessel it went into').count() === 1)), 'Log racking without a vessel asks for one');
+  await d.getByLabel('Racked into').selectOption({ label: '5 gal carboy · 5 gal · free' });
+  await p.screenshot({ path: `${out}/equipment-rack.png` });
+  await d.getByRole('button', { name: 'Log racking' }).click(); await p.waitForTimeout(400);
+  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into 5 gal carboy' }).count() === 1)), 'the timeline says "Racked into 5 gal carboy"');
+  ok(await until(async () => ((await fact('Vessel')) === '5 gal carboy4 gal headspace (80%)')), 'headspace in the carboy: 4 gal (80%): ' + (await fact('Vessel')));
+
+  // 6. Removing that racking puts it back in Jug A
+  await p.getByRole('button', { name: /^Edit Racked into 5 gal carboy/ }).click();
+  await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await p.waitForTimeout(400);
+  ok(await until(async () => ((await fact('Vessel')) === 'Jug AFull')), 'removing the racking puts it back in Jug A');
+
+  // 7. Racking from Add entry, into the carboy again
+  await p.getByRole('button', { name: 'Add entry' }).click();
+  await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('rack'), exact: true }).click();
+  await d.getByLabel('Racked into').selectOption({ label: '5 gal carboy · 5 gal · free' });
+  await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
+  ok(await until(async () => ((await fact('Vessel')).startsWith('5 gal carboy'))), 'a Racked entry from Add entry moves it to the carboy');
+
+  // 8. Deleting the carboy: the batch shows no vessel, and the timeline still names it
+  await p.goto(BASE + '/#/equipment'); await row('5 gal carboy').click();
+  await d.getByRole('button', { name: 'Delete' }).click();
+  ok(await until(async () => (await p.getByText("Vessel Test is in it. It keeps its history, but won't show a vessel.").count() === 1)), 'deleting a vessel in use says what happens to its batch');
+  await p.getByRole('dialog').last().getByRole('button', { name: 'Delete' }).click(); await p.waitForTimeout(400);
+  await p.goto(batchUrl); await p.waitForSelector('.hero');
+  ok(await until(async () => (await p.locator('dt', { hasText: /^Vessel$/ }).count() === 0)), 'the batch no longer shows a vessel');
+  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into 5 gal carboy' }).count() === 1)), 'but its Racked entry still says where it went');
+
+  ok(errors.length === 0, 'no console errors ' + errors.join(' | '));
+  await b.close();
+})().catch(e => { console.error(e.message); process.exit(1); });

@@ -12,6 +12,9 @@ import { ingredientStageAt, lineFromEntry, stageAfterRemoving } from '../../lib/
 import { fmtDateShort, fmtRating, fmtSG, fmtTemp, newId, nowLocal, parseNum, tempFromInput, tempToInput } from '../../lib/format.ts';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingError, saveFinalReading, type FinalReading } from '../../components/FinalReading.tsx';
 import { EVENT_ICONS } from './entries.ts';
+import { VesselField } from '../../components/VesselField.tsx';
+import { isLatestRack, vesselAfterRemovingRack } from '../../lib/equipment.ts';
+import { volumeUnitOf } from '../../lib/units.ts';
 
 /** The text a value input starts with when editing an entry. */
 function valueToInput(event: BatchEvent, settings: Settings): string {
@@ -36,6 +39,8 @@ interface EventSheetProps {
   onRestart: () => void;
   /** Called after a Stabilized entry is added to a batch that is still fermenting. */
   onStabilized: () => void;
+  /** Called after a new Stage change entry moves the batch to Secondary, to offer racking into a vessel. */
+  onSecondary?: () => void;
 }
 
 /** The stages in order, for working out the next one. */
@@ -66,7 +71,7 @@ const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravi
 const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized }: EventSheetProps) {
+export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized, onSecondary }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   // "Batch rating" entries come from the rating slider; they are edited, not added, here.
   const isReview = existing?.type === 'review';
@@ -103,6 +108,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
   const [pasteurTemp, setPasteurTemp] = useState(existing?.type === 'stabilize' && existing.value != null ? tempToInput(existing.value, existing.tempUnit ?? settings.tempUnit) : '');
   const [minutes, setMinutes] = useState(existing?.minutes != null ? String(existing.minutes) : '');
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
+  // Racking: the vessel it went into. Shown only once you have vessels (More → Equipment).
+  const [rackVessel, setRackVessel] = useState<string | null>(existing ? (existing.vesselId ?? null) : null);
 
   const [taster, setTaster] = useState(existing?.taster ?? '');
   // New tastings set the batch rating by default. Editing an old tasting leaves the batch alone unless ticked.
@@ -199,6 +206,10 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
       minutes: pasteurizing && minutes.trim() !== '' ? (parseNum(minutes) ?? undefined) : undefined,
       // Unticking a final reading keeps it marked as a former final (a measurement, never sugar).
       final: type === 'gravity' && !isOg ? (isFinal ? true : existing?.final != null ? false : undefined) : undefined,
+      // Racking with vessels tracked: where it went, and (for a new entry) where it came from.
+      ...(type === 'rack' && (rackVessel != null || existing?.vesselId != null || (!existing && batch.vesselId != null))
+        ? { vesselId: rackVessel, fromVesselId: existing ? (existing.fromVesselId ?? null) : (batch.vesselId ?? null) }
+        : {}),
     };
     if (newStage) {
       if (stageAsksFinal) {
@@ -212,7 +223,9 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
       await events.save({ ...fields, type: 'status', value: null, toStatus: stage, fromStatus, auto: false });
       if (stageMovesBatch) await batches.save({ ...batch, status: stage });
       toast(stageMovesBatch ? `Moved to ${statusLabel(stage)}` : 'Added to the timeline');
-      return onClose();
+      onClose();
+      if (stageMovesBatch && stage === 'secondary') onSecondary?.();
+      return;
     }
     if (existing && isStage) {
       // Editing a stage entry by hand makes it permanent: stage taps later the same day add a new entry instead of replacing it.
@@ -245,6 +258,11 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     if (fields.final) for (const other of markedFinals(batchEntries)) if (other.id !== existing?.id) await events.save({ ...other, final: false });
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
+    // Racking moves the batch's vessel: a new entry always, an edited one if it's the latest racking.
+    if (type === 'rack' && 'vesselId' in fields) {
+      const moves = !existing || (isLatestRack(existing, batchEntries) && (batch.vesselId ?? null) === (existing.vesselId ?? null));
+      if (moves && (batch.vesselId ?? null) !== rackVessel) await batches.save({ ...batch, vesselId: rackVessel });
+    }
     const reratedBatch = rateBatch || (drivesBatchRating && rating !== batch.rating);
     toast(reratedBatch ? (existing ? 'Entry updated, and the batch rating too' : 'Saved, and the batch rating updated') : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
@@ -528,6 +546,17 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
             <input type="text" value={place} placeholder="Basement" autoFocus={!existing} onChange={(e) => setPlace(e.target.value)} />
           </Field>
         )}
+        {type === 'rack' && (
+          <VesselField
+            label="Racked into"
+            value={rackVessel}
+            onChange={setRackVessel}
+            batch={batch}
+            unit={volumeUnitOf(settings)}
+            noneLabel={batch.vesselId || existing?.vesselId ? 'Somewhere not tracked' : 'Not tracked'}
+            current={existing ? (existing.fromVesselId ?? null) : batch.vesselId}
+          />
+        )}
         {kind !== 'ingredient' && !newStage && whenField}
         <Field label="Note (optional)">
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
@@ -564,6 +593,9 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
                     await events.remove(existing.id);
                     if (isOg) await batches.save({ ...batch, og: null });
                     if (removalGoesBackTo) await batches.save({ ...batch, status: removalGoesBackTo, ...(batch.status === 'archived' ? { statusBeforeArchive: null } : {}) });
+                    // Removing the racking that moved it puts it back in the vessel it came from.
+                    const vesselBack = vesselAfterRemovingRack(existing, batch, batchEntries);
+                    if ((vesselBack ?? null) !== (batch.vesselId ?? null)) await batches.save({ ...batch, vesselId: vesselBack ?? null });
                     toast(isOg ? 'OG removed' : removalGoesBackTo ? `Entry removed; back to ${statusLabel(removalGoesBackTo)}` : 'Entry removed');
                     onClose();
                   }}

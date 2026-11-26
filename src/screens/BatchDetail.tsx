@@ -2,14 +2,17 @@
 
 import { useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
-import { archiveBatch, changeStatus, setBatchRating, unarchiveBatch } from '../db/actions.ts';
-import { batches, categoriesOf, events, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, eventTitle, statusLabel, type BatchEvent, type BatchStatus, type IngredientLine, type IngredientStage } from '../db/types.ts';
+import { archiveBatch, changeStatus, rackInto, setBatchRating, unarchiveBatch } from '../db/actions.ts';
+import { VesselField } from '../components/VesselField.tsx';
+import { getAll } from '../db/idb.ts';
+import { fmtHeadspace, headspace, vesselOf, vesselTypeLabel } from '../lib/equipment.ts';
+import { batches, categoriesOf, equipment, events, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
+import { BATCH_STATUSES, eventTitle, statusLabel, type Batch, type BatchEvent, type Equipment, type BatchStatus, type IngredientLine, type IngredientStage, type VolumeUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, anyToLog } from '../components/StagedIngredients.tsx';
 import { CostFacts } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
-import { ConfirmSheet, RatingBadge, RatingCard, Stat, TopBar, toast } from '../components/ui.tsx';
+import { ConfirmSheet, RatingBadge, RatingCard, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { CategoryIcon } from '../icons/CategoryIcon.tsx';
 import { categoryIcon } from '../lib/library.ts';
@@ -52,12 +55,13 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const settings = useSettings();
   const data = useQuery(async () => {
     const batch = await batches.get(id);
-    if (!batch) return { batch: null, events: [], recipe: null };
+    if (!batch) return { batch: null, events: [], recipe: null, equipment: [] };
     const all = await events.list();
     return {
       batch,
       events: all.filter((e) => e.batchId === id).sort(newestFirst),
       recipe: batch.recipeId ? ((await recipes.get(batch.recipeId)) ?? null) : null,
+      equipment: await equipment.list(),
     };
   }, [id]);
 
@@ -70,7 +74,15 @@ export function BatchDetailScreen({ id }: { id: string }) {
     const id = found ? categoryIcon(found) : null;
     return id ? <CategoryIcon id={id} size={20} strokeWidth={1.75} /> : <Icon name={EVENT_ICONS[event.type]} size={20} />;
   };
-  const titleOf = (event: BatchEvent) => eventTitle(event, entryCategory(event, library));
+  // Every vessel, deleted ones too, so an old Racked entry still says where it went.
+  const vesselNames = useQuery(async () => new Map((await getAll<Equipment>('equipment')).map((e) => [e.id, e.name]))) ?? new Map<string, string>();
+  const titleOf = (event: BatchEvent) => {
+    if (event.type === 'rack' && event.vesselId !== undefined) {
+      const into = event.vesselId ? vesselNames.get(event.vesselId) : null;
+      return into ? `Racked into ${into}` : 'Racked';
+    }
+    return eventTitle(event, entryCategory(event, library));
+  };
 
   // null: closed. 'new': adding an entry. An event: editing that entry.
   const [entry, setEntry] = useState<BatchEvent | 'new' | null>(null);
@@ -85,6 +97,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [logging, setLogging] = useState<IngredientLine | null>(null);
   // Backsweetening ticked to ferment after fermentation ended: offer to go back to Secondary.
   const [restarting, setRestarting] = useState(false);
+  // Offered after moving to Secondary, when you track vessels: which one it was racked into.
+  const [racking, setRacking] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (!data) return <TopBar title="Batch" back="/" />;
@@ -122,12 +136,16 @@ export function BatchDetailScreen({ id }: { id: string }) {
   // Hide Add and the "Tap an ingredient" hint only show while something is left to log.
   const toLog = anyToLog(batch.ingredients, currentStage, added);
 
+  const hasVessels = data.equipment.some((e) => e.kind === 'vessel');
+  const vessel = vesselOf(batch, data.equipment);
+  const room = vessel ? headspace(vessel.capacityL, batch.volumeL) : null;
   const setStatus = async (status: BatchStatus) => {
     // Bottling asks how many bottles first, then fills the cellar. Tapping Bottled again adds more.
     if (status === 'bottled') return setBottling({ entry: null });
     if (status === batch.status) return;
     if (status === 'aging' && !complete && !finalReading(data.events)) return setFinishing(true);
     await changeStatus(batch, status);
+    if (status === 'secondary' && batch.status === 'primary' && hasVessels) setRacking(true);
   };
 
   return (
@@ -229,6 +247,16 @@ export function BatchDetailScreen({ id }: { id: string }) {
             <>
               <dt>Volume</dt>
               <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, volumeUnitOf(settings))}</dd>
+            </>
+          )}
+          {vessel && (
+            <>
+              <dt>Vessel</dt>
+              <dd>
+                <Link to="/equipment">{vessel.name}</Link>
+                {vessel.name.toLowerCase().includes(vesselTypeLabel(vessel).toLowerCase()) ? '' : ` (${vesselTypeLabel(vessel).toLowerCase()})`}
+                {room && <span className={room.liters < -0.005 ? 'vessel-room vessel-over' : 'vessel-room'}>{fmtHeadspace(room, batch.volumeUnit ?? volumeUnitOf(settings))}</span>}
+              </dd>
             </>
           )}
           <dt>Started</dt>
@@ -418,9 +446,10 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && (
-        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} />
+        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} onSecondary={() => hasVessels && setRacking(true)} />
       )}
       {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} />}
+      {racking && <RackSheet batch={batch} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setRacking(false)} />}
       {finishing && <FinishSheet batch={batch} timeline={data.events} stabilized={finishing === 'stabilized'} onClose={() => setFinishing(false)} />}
       {restarting && (
         <ConfirmSheet
@@ -467,3 +496,48 @@ export function BatchDetailScreen({ id }: { id: string }) {
   );
 }
 
+
+/** After moving to Secondary: which vessel it was racked into, logged as a Racked entry. */
+function RackSheet({ batch, unit, onClose }: { batch: Batch; unit: VolumeUnit; onClose: () => void }) {
+  const [vesselId, setVesselId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  return (
+    <Sheet title="Racked into a new vessel?" onClose={onClose}>
+      <div className="form">
+        <p>Moving to Secondary usually means racking off the lees. Pick the vessel it went into and a Racked entry goes on the timeline{batch.vesselId ? ', and the old vessel is free again' : ''}.</p>
+        <VesselField
+          label="Racked into"
+          value={vesselId}
+          onChange={(v) => {
+            setVesselId(v);
+            setError('');
+          }}
+          batch={batch}
+          unit={unit}
+          noneLabel="Choose a vessel"
+          current={batch.vesselId}
+        />
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          onClick={async () => {
+            if (!vesselId) return setError('Choose the vessel it went into, or tap Not now.');
+            await rackInto(batch.id, vesselId);
+            toast('Racked');
+            onClose();
+          }}
+        >
+          Log racking
+        </button>
+        <button type="button" className="btn btn-block" onClick={onClose}>
+          Not now
+        </button>
+      </div>
+    </Sheet>
+  );
+}

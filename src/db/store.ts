@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAll, getOne, putMany, subscribe, type StoreName } from './idb.ts';
-import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
+import { DEFAULT_CATEGORIES, type Base, type Batch, type BatchEvent, type CellarEntry, type Equipment, type IngredientCategory, type LibraryIngredient, type Pour, type Recipe, type Settings, type ViewMode } from './types.ts';
 import { starterIngredients } from './starterIngredients.ts';
 import { upgradeSettings } from '../lib/units.ts';
 import { localeCurrency } from '../lib/cost.ts';
@@ -48,6 +48,7 @@ export const events = collection<BatchEvent>('events');
 export const cellar = collection<CellarEntry>('cellar');
 export const pours = collection<Pour>('pours');
 export const ingredients = collection<LibraryIngredient>('ingredients');
+export const equipment = collection<Equipment>('equipment');
 
 /** The currency for costs: the chosen one, or the locale's. */
 export function currencyOf(settings: Settings): string {
