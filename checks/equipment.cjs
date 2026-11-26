@@ -86,6 +86,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await fact('Vessel')).startsWith('5 gal carboy'))), 'a Racked entry from Add entry moves it to the carboy');
 
+  // 7b. What it cost: no prices given yet, so nothing counted and it says so
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await p.locator('.equipment-cost').textContent()) === 'Vessels$0.00Other gear$12.99Total$12.99' && await p.getByText("2 items have no price, so they aren't counted.").count() === 1)), 'What it cost: vessels $0, gear $12.99, total $12.99, and 2 without a price');
+
   // 8. Deleting the carboy: the batch shows no vessel, and the timeline still names it
   await p.goto(BASE + '/#/equipment'); await row('5 gal carboy').click();
   await d.getByRole('button', { name: 'Delete' }).click();
@@ -122,6 +126,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => ((await fact('Vessels')) === 'Jug B · 1 galFullJug C · 0.8 gal0.2 gal headspace (20%)')), 'Vessels: Jug B full, Jug C 0.8 gal with 0.2 gal headspace: ' + (await fact('Vessels')));
   ok(await until(async () => ((await fact('Volume')).startsWith('1.8 gal'))), 'the batch is now 1.8 gal');
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  // Three 1 gal jugs are one line, closed, with how many are free; it opens to show each.
+  const jugs = p.locator('.vessel-group-head', { hasText: '1 gal jug' });
+  ok(await until(async () => ((await jugs.textContent()) === '1 gal jug3 vessels1 of 3 free' && (await jugs.getAttribute('aria-expanded')) === 'false')), 'the three 1 gal jugs are one closed line: 1 of 3 free');
+  await jugs.click();
   ok(await until(async () => ((await row('Jug B').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Jug C').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Big carboy').locator('.vessel-status').textContent()) === 'Free')), 'both jugs hold Two Jugs, and the big carboy is free');
   await p.goBack(); await p.waitForSelector('.hero');
   await p.getByRole('button', { name: /^Edit Racked into Jug B and Jug C/ }).click();

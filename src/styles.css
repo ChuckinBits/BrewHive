@@ -2716,3 +2716,40 @@ button.library-row {
   font-size: 14px;
   text-align: center;
 }
+
+/* Alike vessels on one line that opens to show each. */
+.vessel-chevron {
+  flex: none;
+  color: var(--muted);
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+
+.vessel-chevron-open {
+  transform: rotate(-90deg);
+}
+
+.vessel-group-list {
+  margin: 0 0 4px 46px;
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+}
+
+.vessel-group-list .equipment-row {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vessel-chevron {
+    transition: none;
+  }
+}
+
+.equipment-cost dd {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.equipment-cost-total {
+  font-weight: 700;
+}

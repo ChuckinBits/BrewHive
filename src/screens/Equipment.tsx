@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ConfirmSheet, Field, Sheet, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { batches, currencyOf, equipment, useQuery, useSettings } from '../db/store.ts';
 import { VESSEL_TYPES, type Batch, type Equipment, type VesselType, type VolumeUnit } from '../db/types.ts';
-import { batchesIn, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
+import { batchesIn, groupVessels, priceTotal, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
 import { fmtMoney } from '../lib/cost.ts';
 import { fmtVolume, parseNum, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { volumeUnitOf } from '../lib/units.ts';
@@ -22,11 +22,41 @@ export function EquipmentScreen() {
   const currency = currencyOf(settings);
   const data = useQuery(async () => ({ items: await equipment.list(), batches: await batches.list() }));
   const [editing, setEditing] = useState<Editing>(null);
+  // Which groups of alike vessels are open.
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   if (!data) return <TopBar title="Equipment" back="/more" />;
 
   const vessels = data.items.filter((e) => e.kind === 'vessel').sort(byName);
   const gear = data.items.filter((e) => e.kind === 'gear').sort(byName);
   const free = vessels.filter((v) => batchesIn(v.id, data.batches).length === 0).length;
+  const toggle = (key: string) =>
+    setOpen((o) => {
+      const n = new Set(o);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  /** A vessel's line: its name, and its type and size when it isn't under a group that says so. */
+  const vesselRow = (v: Equipment, withSize: boolean) => {
+    const holding = batchesIn(v.id, data.batches);
+    return (
+      <button type="button" className="library-row equipment-row" onClick={() => setEditing({ item: v, kind: 'vessel' })}>
+        {withSize && (
+          <span className="timeline-icon">
+            <Icon name="batches" size={20} />
+          </span>
+        )}
+        <span className="equipment-text">
+          <span className="library-name">{v.name}</span>
+          {withSize && <span className="muted">{[vesselTypeLabel(v), v.capacityL ? fmtVolume(v.capacityL, v.capacityUnit ?? unit) : null].filter(Boolean).join(' · ')}</span>}
+        </span>
+        <span className={holding.length ? 'vessel-status vessel-busy' : 'vessel-status'}>{holding.length ? holding.map((b) => b.name).join(', ') : 'Free'}</span>
+      </button>
+    );
+  };
+  const vesselCost = priceTotal(vessels);
+  const gearCost = priceTotal(gear);
+  const unpriced = vesselCost.unpriced + gearCost.unpriced;
 
   return (
     <>
@@ -51,20 +81,33 @@ export function EquipmentScreen() {
           <p className="muted">Carboys, buckets, jugs, kegs and barrels. Give each its capacity, and pick one when you start or rack a batch to see which are free and how much headspace a batch has.</p>
         ) : (
           <ul className="library-list">
-            {vessels.map((v) => {
-              const holding = batchesIn(v.id, data.batches);
+            {groupVessels(vessels, unit).map((group) => {
+              // One of a kind: just the vessel. Several alike: one line that opens to show each.
+              if (group.vessels.length === 1) return <li key={group.key}>{vesselRow(group.vessels[0], true)}</li>;
+              const groupFree = group.vessels.filter((v) => batchesIn(v.id, data.batches).length === 0).length;
+              const isOpen = open.has(group.key);
               return (
-                <li key={v.id}>
-                  <button type="button" className="library-row equipment-row" onClick={() => setEditing({ item: v, kind: 'vessel' })}>
+                <li key={group.key} className="vessel-group">
+                  <button type="button" className="library-row equipment-row vessel-group-head" aria-expanded={isOpen} onClick={() => toggle(group.key)}>
                     <span className="timeline-icon">
                       <Icon name="batches" size={20} />
                     </span>
                     <span className="equipment-text">
-                      <span className="library-name">{v.name}</span>
-                      <span className="muted">{[vesselTypeLabel(v), v.capacityL ? fmtVolume(v.capacityL, v.capacityUnit ?? unit) : null].filter(Boolean).join(' · ')}</span>
+                      <span className="library-name">{group.label}</span>
+                      <span className="muted">{group.vessels.length} vessels</span>
                     </span>
-                    <span className={holding.length ? 'vessel-status vessel-busy' : 'vessel-status'}>{holding.length ? holding.map((b) => b.name).join(', ') : 'Free'}</span>
+                    <span className={groupFree === 0 ? 'vessel-status vessel-busy' : 'vessel-status'}>{groupFree === group.vessels.length ? 'All free' : `${groupFree} of ${group.vessels.length} free`}</span>
+                    <span className={isOpen ? 'vessel-chevron vessel-chevron-open' : 'vessel-chevron'}>
+                      <Icon name="chevron" size={18} />
+                    </span>
                   </button>
+                  {isOpen && (
+                    <ul className="library-list vessel-group-list">
+                      {group.vessels.map((v) => (
+                        <li key={v.id}>{vesselRow(v, false)}</li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}
@@ -95,6 +138,21 @@ export function EquipmentScreen() {
           </ul>
         )}
       </section>
+
+      {vessels.length + gear.length > 0 && (
+        <section className="card">
+          <h2>What it cost</h2>
+          <dl className="facts equipment-cost">
+            <dt>Vessels</dt>
+            <dd>{fmtMoney(vesselCost.total, currency)}</dd>
+            <dt>Other gear</dt>
+            <dd>{fmtMoney(gearCost.total, currency)}</dd>
+            <dt>Total</dt>
+            <dd className="equipment-cost-total">{fmtMoney(vesselCost.total + gearCost.total, currency)}</dd>
+          </dl>
+          {unpriced > 0 && <p className="field-hint">{unpriced === 1 ? '1 item has no price, so it isn\'t counted.' : `${unpriced} items have no price, so they aren't counted.`}</p>}
+        </section>
+      )}
 
       {editing && <EquipmentSheet item={editing.item} kind={editing.kind} unit={unit} currency={currency} batches={data.batches} onClose={() => setEditing(null)} />}
     </>

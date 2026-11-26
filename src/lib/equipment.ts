@@ -148,3 +148,39 @@ export function fillsAfterRemovingRack(entry: BatchEvent, batch: Batch, timeline
 export function listNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
+
+export interface VesselGroup {
+  /** Type and capacity, such as "carboy|3.785". */
+  key: string;
+  /** "1 gal carboy", or "Carboy" for ones without a capacity. */
+  label: string;
+  vessels: Equipment[];
+}
+
+/**
+ * Vessels grouped by type and size, so eight 1 gal carboys are one line: groups by type in the
+ * order of VESSEL_TYPES, smallest first, and the vessels in each by name.
+ */
+export function groupVessels(vessels: Equipment[], unit: VolumeUnit): VesselGroup[] {
+  const groups = new Map<string, VesselGroup>();
+  for (const v of vessels) {
+    // Sizes typed in different units still match: compare to the milliliter.
+    const size = v.capacityL ? Math.round(v.capacityL * 1000) : 0;
+    const key = `${v.vesselType ?? 'other'}|${size}`;
+    const group = groups.get(key) ?? { key, label: suggestVesselName(v.vesselType, v.capacityL, v.capacityUnit ?? unit), vessels: [] };
+    group.vessels.push(v);
+    groups.set(key, group);
+  }
+  const typeOrder = (g: VesselGroup) => VESSEL_TYPES.findIndex((t) => t.id === g.key.split('|')[0]);
+  const sizeOf = (g: VesselGroup) => Number(g.key.split('|')[1]) || Infinity;
+  for (const g of groups.values()) g.vessels.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return [...groups.values()].sort((a, b) => typeOrder(a) - typeOrder(b) || sizeOf(a) - sizeOf(b));
+}
+
+/** What a set of equipment cost: the total of the prices given, and how many have none. */
+export function priceTotal(items: Equipment[]): { total: number; unpriced: number } {
+  return {
+    total: Math.round(items.reduce((sum, e) => sum + (e.price ?? 0), 0) * 100) / 100,
+    unpriced: items.filter((e) => e.price == null).length,
+  };
+}

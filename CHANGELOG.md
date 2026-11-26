@@ -5,6 +5,17 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Equipment
+
+- **Alike vessels on one line.** Vessels of the same type and size are
+  grouped, such as "1 gal carboy · 8 vessels · 4 of 8 free". Tap the line to
+  see each one and the batch in it. A vessel with no twin stays on its own
+  line.
+- **What it cost.** The Equipment screen totals what your vessels and other
+  gear cost, and both together, and says how many have no price.
+
 ## v0.3.1 – 2026-11-26
 
 ### Equipment

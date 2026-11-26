@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Equipment } from '../db/types.ts';
-import { batchesIn, fillInOrder, fillsAfterRemovingRack, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
+import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, priceTotal, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const GAL = 3.785411784;
@@ -85,4 +85,26 @@ test('removing the racking that moved the batch puts it back where it was', () =
   assert.deepEqual(fillsAfterRemovingRack(r1, b, [r1, r2]), into, 'a later racking: nothing changes');
   assert.deepEqual(fillsAfterRemovingRack(rack({ id: 'r3' }), b, []), into, 'a racking without vessels changes nothing');
   assert.deepEqual(fillsAfterRemovingRack(rack({ id: 'r4', vessels: into }), b, []), [], 'from nowhere: back to no vessel');
+});
+
+test('vessels group by type and size, smallest first; sizes in different units still match', () => {
+  const all = [
+    vessel({ id: 'c2', name: 'Carboy 2', capacityL: GAL, capacityUnit: 'gal' }),
+    vessel({ id: 'c1', name: 'Carboy 1', capacityL: 3.7854, capacityUnit: 'L' }),
+    vessel({ id: 'h', name: 'Half', capacityL: GAL / 2 }),
+    vessel({ id: 'b', name: 'Bucket', vesselType: 'bucket', capacityL: 2 * GAL }),
+    vessel({ id: 'x', name: 'Mystery', capacityL: null }),
+  ];
+  const groups = groupVessels(all, 'gal');
+  assert.deepEqual(groups.map((g) => [g.label, g.vessels.map((v) => v.id)]), [
+    ['0.5 gal carboy', ['h']],
+    ['1 gal carboy', ['c1', 'c2']],
+    ['Carboy', ['x']],
+    ['2 gal bucket', ['b']],
+  ]);
+});
+
+test('price totals: what was paid, and how many have no price', () => {
+  assert.deepEqual(priceTotal([vessel({ price: 7.99 }), vessel({ price: 7.99 }), vessel({ price: null })]), { total: 15.98, unpriced: 1 });
+  assert.deepEqual(priceTotal([]), { total: 0, unpriced: 0 });
 });
