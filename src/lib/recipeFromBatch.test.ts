@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Recipe } from '../db/types.ts';
-import { otherBatchesFrom, ratingForUpdate, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from './recipeFromBatch.ts';
+import { applyRecipeChanges, otherBatchesFrom, ratingForUpdate, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from './recipeFromBatch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const batch = (patch: Partial<Batch> = {}): Batch => ({
@@ -47,6 +47,7 @@ const recipe = (patch: Partial<Recipe> = {}): Recipe => ({
   isPublished: false,
   ...patch,
 });
+const labels = (c: { fields: { label: string }[]; ingredients: { label: string }[] }) => ({ fields: c.fields.map((x) => x.label), ingredients: c.ingredients.map((x) => x.label) });
 const vol = (l: number | null) => (l == null ? '–' : `${(l / 3.785411784).toFixed(2)} gal`);
 
 test('a batch provides its type, style, size, gravities, staged ingredients, icon and color', () => {
@@ -76,7 +77,7 @@ test('the suggested recipe name drops a trailing batch number', () => {
 });
 
 test('an identical batch means the recipe is already up to date', () => {
-  assert.deepEqual(recipeChanges(recipe(), recipeFieldsFromBatch(batch(), []), vol), { fields: [], ingredients: [] });
+  assert.deepEqual(labels(recipeChanges(recipe(), recipeFieldsFromBatch(batch(), []), vol)), { fields: [], ingredients: [] });
 });
 
 test('changes are listed field by field, and ingredients by name', () => {
@@ -90,14 +91,14 @@ test('changes are listed field by field, and ingredients by name', () => {
     }),
     [],
   );
-  const c = recipeChanges(recipe(), next, vol);
+  const c = labels(recipeChanges(recipe(), next, vol));
   assert.deepEqual(c.fields, ['Target OG 1.114 → 1.120']);
   assert.deepEqual(c.ingredients, ['Changed Clover honey: 3 lb, Primary → 3.5 lb, Primary', 'Added Vanilla bean (1, Secondary)', 'Removed Oak cubes']);
 });
 
 test('a stage change counts as an ingredient change', () => {
   const next = recipeFieldsFromBatch(batch({ ingredients: [{ id: 'l1', name: 'Clover honey', amount: '3 lb', stage: 'primary' }, { id: 'l2', name: 'oak cubes', amount: '1 oz', stage: 'secondary' }] }), []);
-  assert.deepEqual(recipeChanges(recipe(), next, vol).ingredients, ['Changed oak cubes: 1 oz, Aging → 1 oz, Secondary']);
+  assert.deepEqual(labels(recipeChanges(recipe(), next, vol)).ingredients, ['Changed oak cubes: 1 oz, Aging → 1 oz, Secondary']);
 });
 
 test('other batches from the same recipe are found, not counting this one or deleted ones', () => {
@@ -110,7 +111,7 @@ test('a recipe keeps the batch\'s target ABV, and the update lists a change of t
   assert.equal(fields.targetMode, 'abv');
   assert.equal(fields.targetAbv, 14);
   const recipe = { ...fields, id: 'r', name: 'R', steps: [], notes: '', rating: null, isPublished: false, createdAt: '', updatedAt: '', deletedAt: null, targetMode: 'fg' as const, targetAbv: null };
-  const changes = recipeChanges(recipe, fields, () => '');
+  const changes = labels(recipeChanges(recipe, fields, () => ''));
   assert.ok(changes.fields.includes('Aims for FG → ABV'));
   assert.ok(changes.fields.includes('Target ABV none → 14%'));
 });
@@ -123,12 +124,58 @@ test('a new recipe starts with the batch\'s rating', () => {
 test('an update brings the batch\'s new rating, and lists it', () => {
   const next = recipeFieldsFromBatch(batch({ rating: 8.5 }), []);
   assert.equal(ratingForUpdate(recipe({ rating: 7 }), next), 8.5);
-  assert.deepEqual(recipeChanges(recipe({ rating: 7 }), next, vol).fields, ['Rating 7 → 8.5']);
-  assert.deepEqual(recipeChanges(recipe({ rating: null }), next, vol).fields, ['Rating none → 8.5']);
+  assert.deepEqual(labels(recipeChanges(recipe({ rating: 7 }), next, vol)).fields, ['Rating 7 → 8.5']);
+  assert.deepEqual(labels(recipeChanges(recipe({ rating: null }), next, vol)).fields, ['Rating none → 8.5']);
 });
 
 test('an unrated batch leaves the recipe\'s rating alone', () => {
   const next = recipeFieldsFromBatch(batch({ rating: null }), []);
   assert.equal(ratingForUpdate(recipe({ rating: 7 }), next), 7);
-  assert.deepEqual(recipeChanges(recipe({ rating: 7 }), next, vol), { fields: [], ingredients: [] });
+  assert.deepEqual(labels(recipeChanges(recipe({ rating: 7 }), next, vol)), { fields: [], ingredients: [] });
+});
+
+// --- Picking which changes to apply
+
+const changed = () =>
+  recipeFieldsFromBatch(
+    batch({
+      og: 1.12,
+      rating: 6,
+      ingredients: [
+        { id: 'l1', name: 'Clover honey', amount: '3.5 lb', stage: 'primary' },
+        { id: 'l3', name: 'Vanilla bean', amount: '1', stage: 'secondary' },
+      ],
+    }),
+    [],
+  );
+
+test('every change has a key to pick it by', () => {
+  const c = recipeChanges(recipe(), changed(), vol);
+  assert.deepEqual(c.fields.map((x) => x.key), ['og', 'rating']);
+  assert.deepEqual(c.ingredients.map((x) => x.key), ['ingredient:clover honey', 'ingredient:vanilla bean', 'ingredient:oak cubes']);
+});
+
+test('applying every change matches the batch', () => {
+  const next = changed();
+  const all = new Set([...recipeChanges(recipe(), next, vol).fields, ...recipeChanges(recipe(), next, vol).ingredients].map((x) => x.key));
+  const r = applyRecipeChanges(recipe(), next, all);
+  assert.equal(r.targetOG, 1.12);
+  assert.equal(r.rating, 6);
+  assert.deepEqual(r.ingredients.map((l) => [l.name, l.amount]), [['Clover honey', '3.5 lb'], ['Vanilla bean', '1']]);
+  assert.equal(r.name, 'Bramble Melomel', 'the name stays');
+  assert.deepEqual(r.steps, ['Mix.'], 'and the steps');
+});
+
+test('unticked changes leave the recipe as it was', () => {
+  // Only the OG and the vanilla bean: the rating, the honey amount and the oak cubes stay.
+  const r = applyRecipeChanges(recipe(), changed(), new Set(['og', 'ingredient:vanilla bean']));
+  assert.equal(r.targetOG, 1.12);
+  assert.equal(r.rating, 9, 'rating unticked: still 9');
+  assert.deepEqual(r.ingredients.map((l) => [l.name, l.amount]), [['Clover honey', '3 lb'], ['Oak cubes', '1 oz'], ['Vanilla bean', '1']]);
+  assert.equal(r.ingredients[0].id, 'x1', 'kept lines keep their ids');
+});
+
+test('nothing picked changes nothing', () => {
+  const before = recipe();
+  assert.deepEqual(applyRecipeChanges(before, changed(), new Set()), before);
 });

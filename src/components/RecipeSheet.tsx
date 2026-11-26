@@ -5,7 +5,7 @@ import { volumeUnitOf } from '../lib/units.ts';
 import { batches, recipes, useQuery } from '../db/store.ts';
 import type { Batch, BatchEvent, Recipe, Settings } from '../db/types.ts';
 import { fmtVolume, plural } from '../lib/format.ts';
-import { otherBatchesFrom, ratingForUpdate, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from '../lib/recipeFromBatch.ts';
+import { applyRecipeChanges, otherBatchesFrom, recipeChanges, recipeFieldsFromBatch, suggestRecipeName, type RecipeChange } from '../lib/recipeFromBatch.ts';
 import { navigate } from '../lib/router.tsx';
 import { Field, Sheet, toast } from './ui.tsx';
 
@@ -23,6 +23,8 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
   const [mode, setMode] = useState<'new' | 'update'>(recipe ? 'update' : 'new');
   const [name, setName] = useState(suggestRecipeName(batch.name));
   const [error, setError] = useState('');
+  // Changes you unticked in Update recipe; everything else is applied.
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
   const allBatches = useQuery(() => batches.list()) ?? [];
 
   const fields = recipeFieldsFromBatch(batch, events);
@@ -42,12 +44,36 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
     const changes = recipeChanges(recipe, fields, (l) => fmtVolume(l, volumeUnitOf(settings)));
     const upToDate = changes.fields.length === 0 && changes.ingredients.length === 0;
     const others = otherBatchesFrom(recipe.id, allBatches, batch.id);
+    const all = [...changes.fields, ...changes.ingredients];
+    const picked = new Set(all.map((c) => c.key).filter((k) => !skipped.has(k)));
     const update = async () => {
-      // Name, notes and steps stay as they are on the recipe; an unrated batch keeps its rating too.
-      await recipes.save({ ...recipe, ...fields, ...stamp, rating: ratingForUpdate(recipe, fields) });
-      toast('Recipe updated');
+      if (picked.size === 0) return setError('Tick at least one change, or close this to leave the recipe as it is.');
+      // Name, notes and steps stay as they are on the recipe, and so does anything unticked.
+      await recipes.save({ ...applyRecipeChanges(recipe, fields, picked), ...stamp });
+      toast(picked.size === all.length ? 'Recipe updated' : `Recipe updated with ${plural(picked.size, 'change', 'changes')}`);
       onClose();
     };
+    const toggle = (key: string, on: boolean) => {
+      setError('');
+      setSkipped((s) => {
+        const n = new Set(s);
+        if (on) n.delete(key);
+        else n.add(key);
+        return n;
+      });
+    };
+    const pickList = (items: RecipeChange[]) => (
+      <ul className="change-picks">
+        {items.map((c) => (
+          <li key={c.key}>
+            <label className="check-field">
+              <input type="checkbox" checked={!skipped.has(c.key)} onChange={(e) => toggle(c.key, e.target.checked)} />
+              {c.label}
+            </label>
+          </li>
+        ))}
+      </ul>
+    );
     return (
       <Sheet title="Update recipe" onClose={onClose}>
         <div className="form">
@@ -59,11 +85,10 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
           ) : (
             <div className="change-list">
               <h3 className="stage-divider">What will change</h3>
-              <ul>
-                {[...changes.fields, ...changes.ingredients].map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
+              <p className="field-hint">Untick anything you want to leave as it is on the recipe.</p>
+              {changes.fields.length > 0 && pickList(changes.fields)}
+              {changes.fields.length > 0 && changes.ingredients.length > 0 && <h4 className="change-group">Ingredients</h4>}
+              {changes.ingredients.length > 0 && pickList(changes.ingredients)}
               <p className="field-hint">The recipe's name, notes and steps stay as they are{batch.rating == null ? ', and so does its rating, since this batch isn\'t rated' : ''}.</p>
             </div>
           )}
@@ -74,8 +99,13 @@ export function RecipeSheet({ batch, events, recipe, settings, onClose }: Props)
               ingredients; only the recipe changes.
             </p>
           )}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <button type="button" className="btn btn-primary btn-block" disabled={upToDate} onClick={() => void update()}>
-            Update recipe
+            {upToDate || picked.size === all.length ? 'Update recipe' : `Update recipe with ${plural(picked.size, 'change', 'changes')}`}
           </button>
           <button type="button" className="btn btn-block" onClick={() => setMode('new')}>
             Save as a new recipe instead
