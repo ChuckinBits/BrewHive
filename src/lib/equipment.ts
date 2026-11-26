@@ -184,3 +184,18 @@ export function priceTotal(items: Equipment[]): { total: number; unpriced: numbe
     unpriced: items.filter((e) => e.price == null).length,
   };
 }
+
+/** Most vessels added in one go. */
+export const MAX_AT_ONCE = 50;
+
+/**
+ * Names for vessels added together: "1 gal carboy 1", "… 2", carrying on after any already named
+ * that way ("… 9" when 1 to 8 exist). One vessel keeps the plain name.
+ */
+export function numberedNames(base: string, count: number, existing: string[]): string[] {
+  if (count <= 1) return [base];
+  const pattern = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (\\d+)$`, 'i');
+  const taken = existing.map((n) => Number(n.match(pattern)?.[1] ?? 0));
+  const start = Math.max(0, ...taken) + 1;
+  return Array.from({ length: count }, (_, i) => `${base} ${start + i}`);
+}

@@ -15,6 +15,9 @@ a milestone.
   line.
 - **What it cost.** The Equipment screen totals what your vessels and other
   gear cost, and both together, and says how many have no price.
+- **Add several alike at once.** Add vessel has a **How many** box: eight
+  1 gal carboys in one go, each its own vessel, numbered "1 gal carboy 1" to
+  "8" (or after your own name). Adding more later carries on the numbers.
 
 ## v0.3.1 – 2026-11-26
 

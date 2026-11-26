@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Equipment } from '../db/types.ts';
-import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, priceTotal, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
+import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, numberedNames, priceTotal, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const GAL = 3.785411784;
@@ -107,4 +107,11 @@ test('vessels group by type and size, smallest first; sizes in different units s
 test('price totals: what was paid, and how many have no price', () => {
   assert.deepEqual(priceTotal([vessel({ price: 7.99 }), vessel({ price: 7.99 }), vessel({ price: null })]), { total: 15.98, unpriced: 1 });
   assert.deepEqual(priceTotal([]), { total: 0, unpriced: 0 });
+});
+
+test('vessels added together are numbered, carrying on from ones already named that way', () => {
+  assert.deepEqual(numberedNames('1 gal carboy', 3, []), ['1 gal carboy 1', '1 gal carboy 2', '1 gal carboy 3']);
+  assert.deepEqual(numberedNames('1 gal carboy', 2, ['1 gal carboy 8', '1 gal carboy 3', '0.5 gal carboy 9']), ['1 gal carboy 9', '1 gal carboy 10']);
+  assert.deepEqual(numberedNames('Jug (small)', 2, ['Jug (small) 1']), ['Jug (small) 2', 'Jug (small) 3'], 'names with brackets still match');
+  assert.deepEqual(numberedNames('Big bucket', 1, ['Big bucket 1']), ['Big bucket'], 'one vessel keeps the plain name');
 });

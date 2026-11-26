@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ConfirmSheet, Field, Sheet, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { batches, currencyOf, equipment, useQuery, useSettings } from '../db/store.ts';
 import { VESSEL_TYPES, type Batch, type Equipment, type VesselType, type VolumeUnit } from '../db/types.ts';
-import { batchesIn, groupVessels, priceTotal, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
+import { MAX_AT_ONCE, batchesIn, groupVessels, numberedNames, priceTotal, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
 import { fmtMoney } from '../lib/cost.ts';
 import { fmtVolume, parseNum, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { volumeUnitOf } from '../lib/units.ts';
@@ -154,7 +154,7 @@ export function EquipmentScreen() {
         </section>
       )}
 
-      {editing && <EquipmentSheet item={editing.item} kind={editing.kind} unit={unit} currency={currency} batches={data.batches} onClose={() => setEditing(null)} />}
+      {editing && <EquipmentSheet item={editing.item} kind={editing.kind} unit={unit} currency={currency} batches={data.batches} items={data.items} onClose={() => setEditing(null)} />}
     </>
   );
 }
@@ -165,10 +165,12 @@ interface SheetProps {
   unit: VolumeUnit;
   currency: string;
   batches: Batch[];
+  /** Everything on the list, for numbering vessels added together. */
+  items: Equipment[];
   onClose: () => void;
 }
 
-function EquipmentSheet({ item, kind, unit, currency, batches: all, onClose }: SheetProps) {
+function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClose }: SheetProps) {
   const isVessel = kind === 'vessel';
   const [name, setName] = useState(item?.name ?? '');
   const [vesselType, setVesselType] = useState<VesselType>(item?.vesselType ?? 'carboy');
@@ -176,6 +178,8 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, onClose }: S
   const [capacity, setCapacity] = useState(volumeToInput(item?.capacityL ?? null, item?.capacityUnit ?? unit));
   const [price, setPrice] = useState(item?.price != null ? String(item.price) : '');
   const [notes, setNotes] = useState(item?.notes ?? '');
+  // Adding several alike at once (new vessels only).
+  const [count, setCount] = useState('1');
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const holding = item ? batchesIn(item.id, all) : [];
@@ -189,15 +193,20 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, onClose }: S
     if (price.trim() && (priceValue == null || priceValue < 0)) return setError('Enter what it cost, such as 34.99, or leave it empty.');
     const finalName = name.trim() || (isVessel ? suggested : '');
     if (!finalName) return setError('Enter what it is, such as Hydrometer.');
-    await equipment.save({
-      ...(item ?? {}),
-      name: finalName,
-      kind,
-      notes: notes.trim(),
-      price: priceValue,
-      ...(isVessel ? { vesselType, capacityL: capacity.trim() ? capacityL : null, capacityUnit } : {}),
-    });
-    toast(item ? 'Saved' : isVessel ? 'Vessel added' : 'Gear added');
+    const howMany = item || !isVessel ? 1 : Number(count.trim() || '1');
+    if (!Number.isInteger(howMany) || howMany < 1 || howMany > MAX_AT_ONCE) return setError(`How many should be a whole number from 1 to ${MAX_AT_ONCE}.`);
+    const names = item ? [finalName] : numberedNames(finalName, howMany, items.filter((e) => !e.deletedAt).map((e) => e.name));
+    for (const vesselName of names) {
+      await equipment.save({
+        ...(item ?? {}),
+        name: vesselName,
+        kind,
+        notes: notes.trim(),
+        price: priceValue,
+        ...(isVessel ? { vesselType, capacityL: capacity.trim() ? capacityL : null, capacityUnit } : {}),
+      });
+    }
+    toast(item ? 'Saved' : isVessel ? (names.length > 1 ? `${names.length} vessels added` : 'Vessel added') : 'Gear added');
     onClose();
   };
 
@@ -224,10 +233,15 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, onClose }: S
             <UnitField label="Capacity" value={capacity} onChange={setCapacity} unit={capacityUnit} units={VOLUME_UNITS} onUnit={setCapacityUnit} placeholder={capacityUnit === 'gal' ? '5' : '19'} />
           </div>
         )}
-        <Field label="Name" hint={isVessel ? (name.trim() ? 'Tell them apart, such as Carboy A or Big bucket.' : `Left empty, it's called ${suggested}.`) : undefined}>
+        {isVessel && !item && (
+          <Field label="How many" hint={Number(count) > 1 ? `Each is added on its own, numbered: ${numberedNames(name.trim() || suggested, Math.min(Number(count) || 1, MAX_AT_ONCE), items.map((e) => e.name)).slice(0, 2).join(', ')}…` : 'Got several alike? Add them all at once.'}>
+            <input type="text" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/[^0-9]/g, ''))} />
+          </Field>
+        )}
+        <Field label="Name" hint={isVessel ? (Number(count) > 1 && !item ? 'The name they share: each gets its number after it.' : name.trim() ? 'Tell them apart, such as Carboy A or Big bucket.' : `Left empty, it's called ${suggested}.`) : undefined}>
           <input type="text" value={name} placeholder={isVessel ? suggested : 'Hydrometer'} autoFocus={!item && !isVessel} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label={`Price (${currency}, optional)`}>
+        <Field label={Number(count) > 1 && isVessel && !item ? `Price each (${currency}, optional)` : `Price (${currency}, optional)`}>
           <input type="text" inputMode="decimal" value={price} placeholder={isVessel ? '39.99' : '12.99'} onChange={(e) => setPrice(e.target.value)} />
         </Field>
         <Field label="Notes">
@@ -253,7 +267,7 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, onClose }: S
           </p>
         )}
         <button type="submit" className="btn btn-primary btn-block">
-          {item ? 'Save' : isVessel ? 'Add vessel' : 'Add gear'}
+          {item ? 'Save' : isVessel ? (Number(count) > 1 ? `Add ${Number(count)} vessels` : 'Add vessel') : 'Add gear'}
         </button>
         {item && (
           <button type="button" className="btn btn-danger-quiet btn-block" onClick={() => setDeleting(true)}>

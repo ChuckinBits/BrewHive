@@ -136,6 +136,27 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await fact('Vessel')) === 'Big carboy1 gal headspace (33%)' && (await fact('Volume')).startsWith('2 gal'))), 'removing it puts the 2 gal back in the big carboy');
 
+  // 10. Several alike at once: eight 1 gal carboys, then two more, numbered on
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  const addMany = async (n) => {
+    await p.getByRole('button', { name: 'Add vessel' }).first().click();
+    await d.getByLabel('Type').selectOption({ label: 'Carboy' }); await d.getByLabel('Capacity', { exact: true }).fill('1');
+    await d.getByLabel('How many').fill(String(n)); await d.getByLabel(/^Price each/).fill('14.99');
+  };
+  await addMany(8);
+  ok(await until(async () => (await d.getByText('Each is added on its own, numbered: 1 gal carboy 1, 1 gal carboy 2…').count() === 1)), 'How many 8 says how they will be numbered');
+  await d.getByRole('button', { name: 'Add 8 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => (await p.getByText('8 vessels added').count() === 1)), 'it says 8 vessels were added');
+  const carboys = p.locator('.vessel-group-head', { hasText: '1 gal carboy' });
+  ok(await until(async () => ((await carboys.textContent()) === '1 gal carboy8 vesselsAll free')), 'they are one line: 1 gal carboy, 8 vessels, all free');
+  await addMany(2); await d.getByRole('button', { name: 'Add 2 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  await carboys.click();
+  ok(await until(async () => (JSON.stringify(await p.locator('.vessel-group-list .library-name').allTextContents()).includes('"1 gal carboy 9","1 gal carboy 10"'))), 'two more carry on as 1 gal carboy 9 and 10');
+  ok(await until(async () => ((await carboys.textContent()) === '1 gal carboy10 vesselsAll free')), 'and the line counts 10');
+  await p.getByRole('button', { name: 'Add vessel' }).first().click();
+  await d.getByLabel('How many').fill('51'); await d.getByRole('button', { name: 'Add 51 vessels' }).click();
+  ok(await until(async () => (await d.getByRole('alert').getByText('How many should be a whole number from 1 to 50.').count() === 1)), 'more than 50 at once asks for fewer');
+
   ok(errors.length === 0, 'no console errors ' + errors.join(' | '));
   await b.close();
 })().catch(e => { console.error(e.message); process.exit(1); });
