@@ -1852,6 +1852,22 @@ button.staged-row:hover {
   padding-left: 20px;
 }
 
+/* Update recipe: each change has its own checkbox. */
+.change-list .change-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.change-group {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .notice-inline {
   padding: 12px 14px;
   border-radius: 12px;

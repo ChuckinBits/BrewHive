@@ -25,6 +25,11 @@ a milestone.
   lists the change ("Rating 7 → 8.5") and applies it. A batch started from a
   recipe starts unrated, and updating the recipe from an unrated batch keeps
   the recipe's rating.
+- **Pick what Update recipe changes.** Every change in the Update recipe
+  sheet has a checkbox, all ticked to start. Untick any you want to leave as
+  the recipe has it, such as a rating or one ingredient, and the button says
+  how many changes it will make. What you leave out is offered again next
+  time.
 
 ## v0.2.8 – 2026-11-25
 
