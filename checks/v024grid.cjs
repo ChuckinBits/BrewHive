@@ -46,12 +46,12 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await add('Fermaid O', '2');
   await add('Lalvin 71B', '1');
   await add('Wildflower honey', '3');
-  const titles = await p.locator('.timeline-title').allTextContents();
-  const has = (re) => titles.some((t) => re.test(t));
-  ok(has(/^Fining: Gelatin finings/), 'Fining: Gelatin finings');
-  ok(has(/^Nutrients: Fermaid O/), 'Nutrients: Fermaid O');
-  ok(has(/^Yeast pitched: Lalvin 71B/), 'Yeast pitched: Lalvin 71B');
-  ok(has(/^Added Wildflower honey/), 'other categories keep "Added": Added Wildflower honey');
+  // The last entry can take a moment to appear: wait for each title rather than reading once.
+  const has = async (re) => until(async () => (await p.locator('.timeline-title').allTextContents()).some((t) => re.test(t)));
+  ok(await has(/^Fining: Gelatin finings/), 'Fining: Gelatin finings');
+  ok(await has(/^Nutrients: Fermaid O/), 'Nutrients: Fermaid O');
+  ok(await has(/^Yeast pitched: Lalvin 71B/), 'Yeast pitched: Lalvin 71B');
+  ok(await has(/^Added Wildflower honey/), 'other categories keep "Added": Added Wildflower honey');
   const fining = p.locator('.timeline-entry', { hasText: 'Fining: Gelatin finings' });
   ok(await until(async () => (await fining.locator('.timeline-icon svg').count() === 1)), 'the fining entry has an icon');
   await p.screenshot({ path: out + '/v024-timeline.png', fullPage: true });
