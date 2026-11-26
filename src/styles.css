@@ -518,6 +518,19 @@ textarea {
   accent-color: var(--accent);
 }
 
+/* The rating on a detail page: shown, not edited in place. */
+.rating-card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.rating-card-label {
+  font-weight: 600;
+  margin-right: auto;
+}
+
 .range-unset {
   opacity: 0.45;
 }

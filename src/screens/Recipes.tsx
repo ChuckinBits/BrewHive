@@ -12,7 +12,7 @@ import { CostCard } from '../components/CostCard.tsx';
 import { cleanIngredients } from '../lib/stages.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Book } from '../components/Vessels.tsx';
-import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
+import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingCard, Stat, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { L_PER_GAL, abv } from '../lib/calc.ts';
@@ -145,9 +145,7 @@ export function RecipeDetailScreen({ id }: { id: string }) {
         )
       )}
 
-      <section className="card">
-        <RatingInput value={recipe.rating} onChange={(rating) => recipes.save({ ...recipe, rating })} />
-      </section>
+      <RatingCard value={recipe.rating} name={recipe.name} onChange={(rating) => recipes.save({ ...recipe, rating })} />
 
       {recipe.ingredients.length > 0 && (
         <section className="card">

@@ -126,6 +126,11 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
   // A stage change on the timeline only moves the batch forward; the stage buttons move it back.
   const stageMovesBatch = stageIsNewest && isLaterStage(stage, batch.status);
   // Removing the latest stage change takes the batch back to the stage before it.
+  // A Batch rating entry that the batch's current rating came from: the latest one, with the same rating.
+  // Editing it changes the batch rating too; an older one, or one a tasting has since replaced, doesn't.
+  const drivesBatchRating =
+    isReview && existing != null && existing.rating === batch.rating &&
+    !batchEntries.some((e) => e.type === 'review' && e.id !== existing.id && e.date > existing.date);
   const removalGoesBackTo = existing ? stageAfterRemoving(existing, batch.status, batchEntries) : null;
   // An ingredient added to the batch's list goes in the stage the batch was in on the entry's date,
   // unless one is picked.
@@ -220,6 +225,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     } else if (existing && isReview) {
       // Editing a rating entry by hand keeps it, even if the batch rating changes again today.
       await events.save({ ...existing, ...fields, auto: false });
+      if (drivesBatchRating && rating !== batch.rating) await batches.save({ ...batch, rating });
     } else if (existing && kind === 'ingredient' && linkedLine) {
       await events.save({ ...existing, ...fields, type });
       if (updateList) await batches.save({ ...batch, ingredients: batch.ingredients.map((l) => (l.id === linkedLine.id ? lineFromEntry(l, fields) : l)) });
@@ -239,7 +245,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     if (fields.final) for (const other of markedFinals(batchEntries)) if (other.id !== existing?.id) await events.save({ ...other, final: false });
     const rateBatch = type === 'tasting' && setAsBatch && rating != null && rating !== batch.rating;
     if (rateBatch) await batches.save({ ...batch, rating });
-    toast(rateBatch ? 'Saved, and the batch rating updated' : existing ? 'Entry updated' : 'Added to the timeline');
+    const reratedBatch = rateBatch || (drivesBatchRating && rating !== batch.rating);
+    toast(reratedBatch ? (existing ? 'Entry updated, and the batch rating too' : 'Saved, and the batch rating updated') : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
     if (type === 'backsweeten' && fields.ferments && !(existing?.ferments) && isFermentationComplete(batch)) onRestart();
     // Stabilizing stops fermentation, so offer to finish it: the final reading and the move to Aging.
@@ -262,7 +269,11 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
         }}
       >
         {isReview ? (
-          <p className="field-hint">Logged when the batch rating was set. Changing it here doesn't change the batch's current rating.</p>
+          <p className="field-hint">
+            {drivesBatchRating
+              ? 'Logged when the batch rating was set. Changing it here changes the batch rating too. Removing this entry keeps the batch rating.'
+              : "Logged when the batch rating was set. The batch's rating has changed since, so changing this entry only changes the timeline."}
+          </p>
         ) : isStage ? (
           <Field label="Stage">
             <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
