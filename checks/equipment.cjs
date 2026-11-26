@@ -48,7 +48,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(BASE + '/#/batches/new');
   await p.getByLabel('Name').fill('Vessel Test'); await p.getByLabel('Volume', { exact: true }).fill('5');
   await p.getByLabel('Vessel').selectOption({ label: 'Jug A · 1 gal · free' });
-  ok(await until(async () => (await p.getByText("Jug A holds 1 gal, less than this batch's 5 gal.").count() === 1)), 'picking a 1 gal jug for 5 gal warns');
+  ok(await until(async () => (await p.getByText("Jug A holds 1 gal, less than the 5 gal of this batch.").count() === 1)), 'picking a 1 gal jug for 5 gal warns');
   await p.getByLabel('Volume', { exact: true }).fill('1');
   ok(await until(async () => (await p.locator('.vessel-warning').count() === 0)), '1 gal fits: no warning');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
@@ -94,6 +94,37 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(batchUrl); await p.waitForSelector('.hero');
   ok(await until(async () => (await p.locator('dt', { hasText: /^Vessel$/ }).count() === 0)), 'the batch no longer shows a vessel');
   ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into 5 gal carboy' }).count() === 1)), 'but its Racked entry still says where it went');
+
+  // 9. Several vessels: 2 gal in a 3 gal carboy, racked into two 1 gal jugs
+  await p.goto(BASE + '/#/equipment');
+  await addVessel({ type: 'Carboy', capacity: '3', name: 'Big carboy' });
+  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug B' });
+  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug C' });
+  await p.goto(BASE + '/#/batches/new');
+  await p.getByLabel('Name').fill('Two Jugs'); await p.getByLabel('Volume', { exact: true }).fill('2');
+  await p.getByLabel('Vessel').selectOption({ label: 'Big carboy · 3 gal · free' });
+  await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
+  ok(await until(async () => ((await fact('Vessel')) === 'Big carboy1 gal headspace (33%)')), '2 gal in the 3 gal carboy: 1 gal headspace (33%)');
+  await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Secondary' }).click();
+  const rackSheet = p.getByRole('dialog', { name: 'Racked into a new vessel?' });
+  await rackSheet.getByLabel('Racked into').selectOption({ label: 'Jug B · 1 gal · free' });
+  await rackSheet.getByRole('button', { name: 'Add another vessel' }).click();
+  await rackSheet.getByLabel('Racked into 2').selectOption({ label: 'Jug C · 1 gal · free' });
+  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jug B').inputValue()) === '1' && (await rackSheet.getByLabel('Amount in Jug C').inputValue()) === '1')), 'two 1 gal jugs fill in order: 1 + 1');
+  ok(await until(async () => (await rackSheet.getByText('2 gal across 2 vessels: all of it.').count() === 1)), 'and it says all 2 gal went in');
+  await rackSheet.getByLabel('Amount in Jug C').fill('0.8');
+  ok(await until(async () => (await rackSheet.getByText('1.8 gal across 2 vessels: 0.2 gal left behind. The batch becomes 1.8 gal.').count() === 1)), 'leaving 0.2 gal of lees behind: the batch becomes 1.8 gal');
+  await p.screenshot({ path: `${out}/equipment-rack-two.png` });
+  await rackSheet.getByRole('button', { name: 'Log racking' }).click(); await p.waitForTimeout(400);
+  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into Jug B and Jug C' }).count() === 1)), 'the timeline says "Racked into Jug B and Jug C"');
+  ok(await until(async () => ((await fact('Vessels')) === 'Jug B · 1 galFullJug C · 0.8 gal0.2 gal headspace (20%)')), 'Vessels: Jug B full, Jug C 0.8 gal with 0.2 gal headspace: ' + (await fact('Vessels')));
+  ok(await until(async () => ((await fact('Volume')).startsWith('1.8 gal'))), 'the batch is now 1.8 gal');
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await row('Jug B').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Jug C').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Big carboy').locator('.vessel-status').textContent()) === 'Free')), 'both jugs hold Two Jugs, and the big carboy is free');
+  await p.goBack(); await p.waitForSelector('.hero');
+  await p.getByRole('button', { name: /^Edit Racked into Jug B and Jug C/ }).click();
+  await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await p.waitForTimeout(400);
+  ok(await until(async () => ((await fact('Vessel')) === 'Big carboy1 gal headspace (33%)' && (await fact('Volume')).startsWith('2 gal'))), 'removing it puts the 2 gal back in the big carboy');
 
   ok(errors.length === 0, 'no console errors ' + errors.join(' | '));
   await b.close();

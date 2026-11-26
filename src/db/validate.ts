@@ -30,6 +30,16 @@ const BEVERAGE_IDS = BEVERAGE_TYPES.map((t) => t.id);
 const STAGE_IDS = INGREDIENT_STAGES.map((s) => s.id);
 const POUR_IDS = POUR_TYPES.map((t) => t.id);
 const VESSEL_IDS = VESSEL_TYPES.map((t) => t.id);
+/** Optional list of vessels with amounts: entries without a text id are dropped, amounts are numbers or null. */
+const fills = (r: Rec, key: string) => {
+  if (!(key in r)) return;
+  if (!Array.isArray(r[key])) return void delete r[key];
+  r[key] = (r[key] as unknown[]).flatMap((f) => {
+    if (!f || typeof f !== 'object' || !isText((f as Rec).vesselId)) return [];
+    const v = (f as Rec).volumeL;
+    return [{ vesselId: (f as Rec).vesselId, volumeL: isNumber(v) && v > 0 ? v : null }];
+  });
+};
 /** Optional id: text, or null. */
 const idOrNull = (r: Rec, key: string) => {
   if (key in r && !isText(r[key])) r[key] = null;
@@ -67,6 +77,7 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     for (const key of ['volumeL', 'og', 'targetFG', 'targetAbv', 'rating']) numberOrNull(r, key);
     if (!('rating' in r)) r.rating = null;
     idOrNull(r, 'vesselId');
+    fills(r, 'vessels');
     return true;
   },
   events: (r) => {
@@ -76,6 +87,9 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     for (const key of ['toStatus', 'fromStatus']) if (key in r && !oneOf(r[key], STATUS_IDS)) delete r[key];
     idOrNull(r, 'vesselId');
     idOrNull(r, 'fromVesselId');
+    fills(r, 'vessels');
+    fills(r, 'fromVessels');
+    numberOrNull(r, 'fromVolumeL');
     return true;
   },
   cellar: (r) => {

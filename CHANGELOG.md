@@ -5,6 +5,18 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased (v0.3.1)
+
+### Equipment
+
+- **A batch in several vessels.** Racking can go into more than one vessel:
+  pick the first, then **Add another vessel**. Each gets an amount, filled
+  in the order you picked them (2 gal into two 1 gal jugs is 1 + 1), and you
+  can change the amounts. If they add up to less than the batch, say lees
+  left behind, the batch's volume becomes what went in. The batch page lists
+  each vessel with its own headspace, and the timeline says "Racked into Jug
+  B and Jug C". Removing that entry puts the batch, and its volume, back.
+
 ## v0.3.0 – 2026-11-26
 
 ### Equipment

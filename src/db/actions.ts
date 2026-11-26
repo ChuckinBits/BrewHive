@@ -1,7 +1,8 @@
 // Writes that touch more than one record.
 
 import { batches, events } from './store.ts';
-import type { Batch, BatchStatus } from './types.ts';
+import type { Batch, BatchStatus, VesselFill } from './types.ts';
+import { fillsOf, normalizeFills, volumeAfterRack } from '../lib/equipment.ts';
 import { planReviewEntry, planStatusEntry } from '../lib/batch.ts';
 import { nowLocal } from '../lib/format.ts';
 
@@ -19,12 +20,19 @@ export async function changeStatus(batch: Batch, to: BatchStatus, patch: Partial
  * Racks the batch into a vessel (or out of tracking, with null): a Racked entry that records where
  * it went and where it came from, and the batch's vessel follows.
  */
-export async function rackInto(batchId: string, vesselId: string | null, date = nowLocal(), note = ''): Promise<void> {
+export async function rackInto(batchId: string, fills: VesselFill[], date = nowLocal(), note = ''): Promise<void> {
   // Read fresh: racking is offered right after a stage change, which saved the batch.
   const batch = await batches.get(batchId);
   if (!batch) return;
-  await events.save({ batchId, type: 'rack', date, value: null, note, vesselId, fromVesselId: batch.vesselId ?? null });
-  if ((batch.vesselId ?? null) !== vesselId) await batches.save({ ...batch, vesselId });
+  const vessels = normalizeFills(fills);
+  await events.save({ batchId, type: 'rack', date, value: null, note, vessels, fromVessels: fillsOf(batch), fromVolumeL: batch.volumeL });
+  await batches.save(withVessels(batch, vessels));
+}
+
+/** The batch in these vessels: several with amounts that add up differently change its volume (racking losses). */
+export function withVessels(batch: Batch, vessels: VesselFill[]): Batch {
+  const { vesselId: _older, ...rest } = batch;
+  return { ...rest, vessels, volumeL: volumeAfterRack(vessels, batch) };
 }
 
 /** Archives a batch, remembering its stage so it can be unarchived. */

@@ -261,7 +261,7 @@ export async function loadSampleData(): Promise<void> {
     event(b2.id, 'feeding', at(17), 1.034, 'Added 8 oz honey to push it a little stronger'),
     event(b2.id, 'gravity', at(13), 1.006),
     stage(b2.id, at(12), 'primary', 'secondary'),
-    { ...event(b2.id, 'rack', at(12), null, 'Racked off the yeast'), fromVesselId: 'sample-bucket', vesselId: 'sample-jug-a' },
+    { ...event(b2.id, 'rack', at(12), null, 'Racked off the yeast'), fromVessels: [{ vesselId: 'sample-bucket', volumeL: null }], vessels: [{ vesselId: 'sample-jug-a', volumeL: null }] },
     ...b2.ingredients
       .filter((l) => l.name === 'Cinnamon sticks')
       .map((l) => ({ ...event(b2.id, 'ingredient', at(12, 19)), ...entryFromLine(l), ingredientLineId: l.id })),
@@ -272,7 +272,7 @@ export async function loadSampleData(): Promise<void> {
     event(b3.id, 'gravity', at(92), 1.008),
     { ...event(b3.id, 'gravity', at(75), 1.002), final: true },
     stage(b3.id, at(74, 17), 'primary', 'secondary'),
-    { ...event(b3.id, 'rack', at(74)), fromVesselId: 'sample-jug-c', vesselId: 'sample-jug-b' },
+    { ...event(b3.id, 'rack', at(74)), fromVessels: [{ vesselId: 'sample-jug-c', volumeL: null }], vessels: [{ vesselId: 'sample-jug-b', volumeL: null }] },
     { ...event(b3.id, 'moved', at(73)), place: 'Basement' },
     { ...event(b3.id, 'stabilize', at(60), null, 'Sorbate and sulfite'), method: 'Chemical' },
     stage(b3.id, at(60), 'secondary', 'aging'),
@@ -330,9 +330,9 @@ export async function loadSampleData(): Promise<void> {
     id, name, kind: 'vessel', vesselType, capacityL: gallons * L_PER_GAL, capacityUnit: 'gal', price, notes, ...stamp(),
   });
   const gear = (id: string, name: string, price: number | null, notes = ''): Equipment => ({ id, name, kind: 'gear', price, notes, ...stamp() });
-  b1.vesselId = 'sample-bucket';
-  b2.vesselId = 'sample-jug-a';
-  b3.vesselId = 'sample-jug-b';
+  b1.vessels = [{ vesselId: 'sample-bucket', volumeL: null }];
+  b2.vessels = [{ vesselId: 'sample-jug-a', volumeL: null }];
+  b3.vessels = [{ vesselId: 'sample-jug-b', volumeL: null }];
   await putMany('equipment', [
     vessel('sample-bucket', 'Small bucket', 'bucket', 2, 14.99, 'Food-grade, with a grommet lid. Room for fruit in primary.'),
     vessel('sample-jug-a', 'Jug A', 'jug', 1, 7.99),

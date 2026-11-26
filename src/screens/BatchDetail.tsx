@@ -5,9 +5,9 @@ import { volumeUnitOf } from '../lib/units.ts';
 import { archiveBatch, changeStatus, rackInto, setBatchRating, unarchiveBatch } from '../db/actions.ts';
 import { VesselField } from '../components/VesselField.tsx';
 import { getAll } from '../db/idb.ts';
-import { fmtHeadspace, headspace, vesselOf, vesselTypeLabel } from '../lib/equipment.ts';
+import { fillsOf, fmtHeadspace, headspace, listNames, rackedInto, vesselsOf, vesselTypeLabel } from '../lib/equipment.ts';
 import { batches, categoriesOf, equipment, events, ingredients, recipes, saveSettings, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, eventTitle, statusLabel, type Batch, type BatchEvent, type Equipment, type BatchStatus, type IngredientLine, type IngredientStage, type VolumeUnit } from '../db/types.ts';
+import { BATCH_STATUSES, eventTitle, statusLabel, type Batch, type BatchEvent, type Equipment, type BatchStatus, type IngredientLine, type IngredientStage, type VesselFill, type VolumeUnit } from '../db/types.ts';
 import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, anyToLog } from '../components/StagedIngredients.tsx';
 import { CostFacts } from '../components/CostCard.tsx';
@@ -39,7 +39,7 @@ import {
   targetReached,
 } from '../lib/batch.ts';
 import { addedLines, currentIngredientStage, timelineSections } from '../lib/stages.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolumeBoth } from '../lib/format.ts';
+import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolume, fmtVolumeBoth } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { BatchArt, batchSubtitle } from './Batches.tsx';
 import { EVENT_ICONS, entryCategory, eventValue, isBottledEntry, newestFirst } from './batch/entries.ts';
@@ -77,9 +77,10 @@ export function BatchDetailScreen({ id }: { id: string }) {
   // Every vessel, deleted ones too, so an old Racked entry still says where it went.
   const vesselNames = useQuery(async () => new Map((await getAll<Equipment>('equipment')).map((e) => [e.id, e.name]))) ?? new Map<string, string>();
   const titleOf = (event: BatchEvent) => {
-    if (event.type === 'rack' && event.vesselId !== undefined) {
-      const into = event.vesselId ? vesselNames.get(event.vesselId) : null;
-      return into ? `Racked into ${into}` : 'Racked';
+    const into = event.type === 'rack' ? rackedInto(event) : undefined;
+    if (into) {
+      const names = into.map((f) => vesselNames.get(f.vesselId)).filter((n): n is string => !!n);
+      return names.length ? `Racked into ${listNames(names)}` : 'Racked';
     }
     return eventTitle(event, entryCategory(event, library));
   };
@@ -137,8 +138,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const toLog = anyToLog(batch.ingredients, currentStage, added);
 
   const hasVessels = data.equipment.some((e) => e.kind === 'vessel');
-  const vessel = vesselOf(batch, data.equipment);
-  const room = vessel ? headspace(vessel.capacityL, batch.volumeL) : null;
+  const inVessels = vesselsOf(batch, data.equipment);
+  const vesselUnit = batch.volumeUnit ?? volumeUnitOf(settings);
   const setStatus = async (status: BatchStatus) => {
     // Bottling asks how many bottles first, then fills the cellar. Tapping Bottled again adds more.
     if (status === 'bottled') return setBottling({ entry: null });
@@ -249,13 +250,21 @@ export function BatchDetailScreen({ id }: { id: string }) {
               <dd>{fmtVolumeBoth(batch.volumeL, batch.volumeUnit, volumeUnitOf(settings))}</dd>
             </>
           )}
-          {vessel && (
+          {inVessels.length > 0 && (
             <>
-              <dt>Vessel</dt>
+              <dt>{inVessels.length > 1 ? 'Vessels' : 'Vessel'}</dt>
               <dd>
-                <Link to="/equipment">{vessel.name}</Link>
-                {vessel.name.toLowerCase().includes(vesselTypeLabel(vessel).toLowerCase()) ? '' : ` (${vesselTypeLabel(vessel).toLowerCase()})`}
-                {room && <span className={room.liters < -0.005 ? 'vessel-room vessel-over' : 'vessel-room'}>{fmtHeadspace(room, batch.volumeUnit ?? volumeUnitOf(settings))}</span>}
+                {inVessels.map(({ vessel, volumeL }) => {
+                  const room = headspace(vessel.capacityL, volumeL);
+                  return (
+                    <span key={vessel.id} className="vessel-line">
+                      <Link to="/equipment">{vessel.name}</Link>
+                      {vessel.name.toLowerCase().includes(vesselTypeLabel(vessel).toLowerCase()) ? '' : ` (${vesselTypeLabel(vessel).toLowerCase()})`}
+                      {inVessels.length > 1 && volumeL != null && ` · ${fmtVolume(volumeL, vesselUnit)}`}
+                      {room && <span className={room.liters < -0.005 ? 'vessel-room vessel-over' : 'vessel-room'}>{fmtHeadspace(room, vesselUnit)}</span>}
+                    </span>
+                  );
+                })}
               </dd>
             </>
           )}
@@ -499,23 +508,27 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
 /** After moving to Secondary: which vessel it was racked into, logged as a Racked entry. */
 function RackSheet({ batch, unit, onClose }: { batch: Batch; unit: VolumeUnit; onClose: () => void }) {
-  const [vesselId, setVesselId] = useState<string | null>(null);
+  const [fills, setFills] = useState<VesselFill[]>([]);
   const [error, setError] = useState('');
   return (
     <Sheet title="Racked into a new vessel?" onClose={onClose}>
       <div className="form">
-        <p>Moving to Secondary usually means racking off the lees. Pick the vessel it went into and a Racked entry goes on the timeline{batch.vesselId ? ', and the old vessel is free again' : ''}.</p>
+        <p>
+          Moving to Secondary usually means racking off the lees. Pick the vessel it went into, or several with how much went in each, and a Racked entry goes on the timeline
+          {fillsOf(batch).length ? `. ${fillsOf(batch).length > 1 ? 'The old vessels are' : 'The old vessel is'} free again.` : '.'}
+        </p>
         <VesselField
           label="Racked into"
-          value={vesselId}
+          value={fills}
           onChange={(v) => {
-            setVesselId(v);
+            setFills(v);
             setError('');
           }}
+          changesVolume
           batch={batch}
           unit={unit}
           noneLabel="Choose a vessel"
-          current={batch.vesselId}
+          current={fillsOf(batch).map((f) => f.vesselId)}
         />
         {error && (
           <p className="form-error" role="alert">
@@ -526,8 +539,8 @@ function RackSheet({ batch, unit, onClose }: { batch: Batch; unit: VolumeUnit; o
           type="button"
           className="btn btn-primary btn-block"
           onClick={async () => {
-            if (!vesselId) return setError('Choose the vessel it went into, or tap Not now.');
-            await rackInto(batch.id, vesselId);
+            if (!fills.length) return setError('Choose the vessel it went into, or tap Not now.');
+            await rackInto(batch.id, fills);
             toast('Racked');
             onClose();
           }}

@@ -2665,3 +2665,47 @@ button.library-row {
   display: block;
   margin-top: 6px;
 }
+
+/* Several vessels: a row each, with the amount in it. */
+.vessel-picks {
+  display: grid;
+  gap: 8px;
+}
+
+.vessel-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vessel-pick-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.vessel-pick-row input.vessel-amount {
+  width: 4.5em;
+  min-width: 0;
+  flex: 0 0 4.5em;
+  padding-inline: 8px;
+  text-align: right;
+}
+
+.vessel-unit {
+  flex: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.vessel-add {
+  justify-self: start;
+}
+
+/* The batch page lists each vessel on its own line. */
+.vessel-line {
+  display: block;
+}
+
+.vessel-line + .vessel-line {
+  margin-top: 6px;
+}

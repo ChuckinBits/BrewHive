@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { volumeUnitOf } from '../lib/units.ts';
 import { recordStatusEntry } from '../db/actions.ts';
 import { batches, events, ingredients, loadSettings, recipes, syncOgEntry, useQuery, useSettings } from '../db/store.ts';
-import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VolumeUnit } from '../db/types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, type Batch, type BatchEvent, type BatchStatus, type BeverageType, type IngredientLine, type Settings, type TargetMode, type VesselFill, type VolumeUnit } from '../db/types.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
 import { EditableIngredients, IngredientSheet } from '../components/StagedIngredients.tsx';
 import { Icon } from '../icons/Icon.tsx';
@@ -20,6 +20,7 @@ import { fmtPercent, fmtSG, newId, nowLocal, parseNum, today, volumeFromInput, v
 import { FinalReadingFields, NO_FINAL_READING, finalReadingEntry, finalReadingError, saveFinalReading, type FinalReading } from '../components/FinalReading.tsx';
 import { navigate } from '../lib/router.tsx';
 import { VesselField } from '../components/VesselField.tsx';
+import { fillsOf, normalizeFills } from '../lib/equipment.ts';
 
 interface Draft {
   name: string;
@@ -41,7 +42,7 @@ interface Draft {
   extraIcons: string[];
   color: string;
   notes: string;
-  vesselId: string | null;
+  vessels: VesselFill[];
 }
 
 interface Loaded {
@@ -83,7 +84,7 @@ export function BatchFormScreen({ id, recipeId, section }: { id?: string; recipe
           extraIcons: batch.extraIcons ?? [],
           color: batch.color,
           notes: batch.notes,
-          vesselId: batch.vesselId ?? null,
+          vessels: fillsOf(batch),
         },
       };
     }
@@ -112,7 +113,7 @@ export function BatchFormScreen({ id, recipeId, section }: { id?: string; recipe
         extraIcons: recipe?.extraIcons ?? [],
         color: recipe?.color ?? getFlavor(DEFAULT_FLAVOR).color,
         notes: '',
-        vesselId: null,
+        vessels: [],
       },
     };
   }, [id, recipeId]);
@@ -226,7 +227,8 @@ function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded;
       color: draft.color,
       notes: draft.notes.trim(),
       // Set by hand here, it's a correction: racking is what logs a move on the timeline.
-      vesselId: draft.vesselId,
+      vessels: normalizeFills(draft.vessels),
+      vesselId: undefined,
     });
 
     if (loaded.existing && loaded.existing.status !== saved.status) {
@@ -306,11 +308,11 @@ function BatchForm({ loaded, settings, back, title, section }: { loaded: Loaded;
           </Field>
         </div>
         <VesselField
-          value={draft.vesselId}
-          onChange={(vesselId) => set({ vesselId })}
+          value={draft.vessels}
+          onChange={(vessels) => set({ vessels })}
           batch={{ id: loaded.existing?.id ?? '', volumeL: volumeFromInput(draft.volume, draft.volumeUnit) }}
           unit={draft.volumeUnit}
-          current={loaded.existing?.vesselId}
+          current={loaded.existing ? fillsOf(loaded.existing).map((f) => f.vesselId) : []}
           hint={isNew ? 'What it ferments in. Racking it later asks where it goes next.' : 'Racking logs a move on the timeline; this just corrects it.'}
         />
 
