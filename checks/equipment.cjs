@@ -112,7 +112,9 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await rackSheet.getByLabel('Racked into 2').selectOption({ label: 'Jug C · 1 gal · free' });
   ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jug B').inputValue()) === '1' && (await rackSheet.getByLabel('Amount in Jug C').inputValue()) === '1')), 'two 1 gal jugs fill in order: 1 + 1');
   ok(await until(async () => (await rackSheet.getByText('2 gal across 2 vessels: all of it.').count() === 1)), 'and it says all 2 gal went in');
-  await rackSheet.getByLabel('Amount in Jug C').fill('0.8');
+  // Typed a key at a time, as on a phone: the decimal point has to survive "0.".
+  await rackSheet.getByLabel('Amount in Jug C').fill(''); await rackSheet.getByLabel('Amount in Jug C').pressSequentially('0.8', { delay: 60 });
+  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jug C').inputValue()) === '0.8')), 'typing 0.8 a key at a time keeps the decimal point');
   ok(await until(async () => (await rackSheet.getByText('1.8 gal across 2 vessels: 0.2 gal left behind. The batch becomes 1.8 gal.').count() === 1)), 'leaving 0.2 gal of lees behind: the batch becomes 1.8 gal');
   await p.screenshot({ path: `${out}/equipment-rack-two.png` });
   await rackSheet.getByRole('button', { name: 'Log racking' }).click(); await p.waitForTimeout(400);

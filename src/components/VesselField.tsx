@@ -32,6 +32,8 @@ export function VesselField({ label = 'Vessel', value, onChange, batch, unit, no
   const data = useQuery(async () => ({ items: await equipment.list(), batches: await batches.list() }));
   // Amounts typed by hand stop the automatic fill-in-order.
   const [typed, setTyped] = useState(false);
+  // What's in each amount box as typed ("0.", "1/2"), so a half-typed number isn't redrawn mid-keystroke.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   if (!data) return null;
   const choices = vesselChoices(data.items, data.batches, batch.id).sort((a, b) => Number(current.includes(a.vessel.id)) - Number(current.includes(b.vessel.id)));
   if (choices.length === 0) return null;
@@ -90,9 +92,14 @@ export function VesselField({ label = 'Vessel', value, onChange, batch, unit, no
                       inputMode="decimal"
                       className="vessel-amount"
                       aria-label={`Amount in ${c?.vessel.name}`}
-                      value={volumeToInput(fill!.volumeL, unit)}
+                      value={drafts[fill!.vesselId] ?? volumeToInput(fill!.volumeL, unit)}
+                      onBlur={() => setDrafts((d) => {
+                        const { [fill!.vesselId]: _done, ...rest } = d;
+                        return rest;
+                      })}
                       onChange={(e) => {
                         setTyped(true);
+                        setDrafts((d) => ({ ...d, [fill!.vesselId]: e.target.value }));
                         onChange(fills.map((f) => (f.vesselId === fill!.vesselId ? { ...f, volumeL: volumeFromInput(e.target.value, unit) } : f)));
                       }}
                     />
