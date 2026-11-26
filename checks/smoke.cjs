@@ -36,12 +36,14 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   const order = await page.locator('.shelf-label strong').allTextContents();
   assert(order[0] === 'Winter Spice' && order[1] === 'First Traditional' && order[2] === 'Orchard Cyser', 'sort by rating puts 8.5, 8, 7 first: ' + order.join(' | '));
 
-  // Rate a batch with the slider
+  // Rate a batch: Change opens the rating sheet, Save sets it
   await page.getByRole('link', { name: /Bramble Melomel #2/ }).click();
   await page.waitForSelector('.hero');
-  await page.getByLabel('Rating').fill('9.5');
+  await page.locator('.rating-card').getByRole('button', { name: /^(Rate|Change)$/ }).click();
+  await page.getByRole('dialog').getByLabel('Rating').fill('9.5');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
   await page.waitForTimeout(300);
-  assert(await until(async () => ((await page.locator('.hero .rating').textContent()) === '9.5')), 'rating slider sets the badge to 9.5');
+  assert(await until(async () => ((await page.locator('.hero .rating').textContent()) === '9.5')), 'the rating sheet sets the badge to 9.5');
   const abvText = await page.locator('.stat-value').nth(2).textContent();
   assert(abvText === '10.9%', 'live ABV from OG 1.114 and latest reading 1.031 is 10.9%: ' + abvText);
 

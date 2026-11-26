@@ -53,6 +53,54 @@ export function RatingInput({ value, onChange }: { value: number | null; onChang
   );
 }
 
+/**
+ * The rating on a batch, recipe or bottle page. It only shows the rating: a scroll on a phone that
+ * lands on a slider used to change it. Rate / Change opens a sheet with the slider, and nothing is
+ * saved until Save.
+ */
+export function RatingCard({ value, name, onChange }: { value: number | null; name: string; onChange: (value: number | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <section className="card rating-card">
+      <div className="rating-card-row">
+        <span className="rating-card-label">Rating</span>
+        {value == null ? <span className="muted">Not rated</span> : <RatingBadge rating={value} />}
+        <button type="button" className="btn btn-small" onClick={() => setEditing(true)}>
+          {value == null ? 'Rate' : 'Change'}
+        </button>
+      </div>
+      {editing && (
+        <RatingSheet
+          name={name}
+          value={value}
+          onClose={() => setEditing(false)}
+          onSave={(rating) => {
+            setEditing(false);
+            if (rating !== value) onChange(rating);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function RatingSheet({ name, value, onSave, onClose }: { name: string; value: number | null; onSave: (value: number | null) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState(value);
+  return (
+    <Sheet title={`Rate ${name}`} onClose={onClose}>
+      <RatingInput value={draft} onChange={setDraft} />
+      <div className="button-row">
+        <button type="button" className="btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => onSave(draft)}>
+          Save
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 // --- Layout -----------------------------------------------------------------
 
 interface TopBarProps {

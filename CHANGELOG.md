@@ -5,6 +5,17 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Ratings
+
+- **No more accidental ratings.** On batch, recipe and bottle pages the
+  rating is shown, not edited in place: a finger landing on the old slider
+  while scrolling changed it. Tap **Rate** (or **Change**) to open a sheet
+  with the slider, and nothing is saved until **Save**. The tasting and pour
+  forms keep their slider, since those save together with the rest of the
+  form.
+
 ## v0.2.8 – 2026-11-25
 
 ### Batch page

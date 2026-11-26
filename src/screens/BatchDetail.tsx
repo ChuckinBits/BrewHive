@@ -9,7 +9,7 @@ import { GravityChart } from '../components/GravityChart.tsx';
 import { LoggableIngredients, anyToLog } from '../components/StagedIngredients.tsx';
 import { CostFacts } from '../components/CostCard.tsx';
 import { RecipeSheet } from '../components/RecipeSheet.tsx';
-import { ConfirmSheet, RatingBadge, RatingInput, Stat, TopBar, toast } from '../components/ui.tsx';
+import { ConfirmSheet, RatingBadge, RatingCard, Stat, TopBar, toast } from '../components/ui.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { CategoryIcon } from '../icons/CategoryIcon.tsx';
 import { categoryIcon } from '../lib/library.ts';
@@ -220,9 +220,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <GravityChart line={chartLine(batch, data.events)} />
 
-      <section className="card">
-        <RatingInput value={batch.rating} onChange={(rating) => setBatchRating(batch, rating)} />
-      </section>
+      <RatingCard value={batch.rating} name={batch.name} onChange={(rating) => setBatchRating(batch, rating)} />
 
       <section className="card">
         <h2>Details</h2>

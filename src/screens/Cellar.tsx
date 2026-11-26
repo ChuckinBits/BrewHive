@@ -9,7 +9,7 @@ import { IconPicker } from '../components/IconPicker.tsx';
 import { StyleField } from '../components/StyleField.tsx';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { Bottle } from '../components/Vessels.tsx';
-import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingInput, Segmented, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
+import { ConfirmSheet, EmptyState, Fab, Field, RatingBadge, RatingCard, RatingInput, Segmented, Sheet, Stat, TopBar, toast } from '../components/ui.tsx';
 import { DEFAULT_FLAVOR, getFlavor, iconsOf } from '../icons/FlavorIcon.tsx';
 import { Icon } from '../icons/Icon.tsx';
 import { fmtBottle, fmtDate, fmtDateShort, fmtPercent, parseNum, plural, today } from '../lib/format.ts';
@@ -167,9 +167,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
         <Stat label="Bottled" value={fmtDateShort(entry.bottledDate)} />
       </div>
 
-      <section className="card">
-        <RatingInput value={entry.rating} onChange={(rating) => cellar.save({ ...entry, rating })} />
-      </section>
+      <RatingCard value={entry.rating} name={entry.name} onChange={(rating) => cellar.save({ ...entry, rating })} />
 
       <section className="card">
         <h2>Details</h2>
