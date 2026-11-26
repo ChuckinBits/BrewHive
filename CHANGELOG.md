@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.3.0)
+## v0.3.0 – 2026-11-26
 
 ### Equipment
 
@@ -27,6 +27,9 @@ a milestone.
   again, and removing the entry puts the batch back where it was.
 - Without vessels, nothing changes: the vessel fields and questions only
   appear once you've added one. Backups include your equipment.
+
+**Updating from v0.2.9:** nothing to do. Add your vessels under More →
+Equipment, then pick one on each batch that's still fermenting or aging.
 
 ## v0.2.9 – 2026-11-26
 
