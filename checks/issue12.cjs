@@ -75,7 +75,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByLabel('Recipe name').fill('Winter Spice Strong');
   await p.getByRole('button', { name: 'Save recipe' }).click(); await p.waitForURL(/#\/recipes\//); await p.waitForSelector('.hero');
   ok(await until(async () => ((await p.locator('.topbar-title').textContent()) === 'Winter Spice Strong' && (await p.locator('.stat-value').first().textContent()) === '1.112')), 'saving as new creates "Winter Spice Strong" with OG 1.112');
-  await p.goto(BASE + '/#/recipes'); await p.getByRole('link', { name: /^Winter Spice\b(?! Strong)/ }).first().click(); await p.waitForSelector('.hero');
+  await p.goto(BASE + '/#/recipes'); await p.getByRole('link', { name: /(^|\s)Winter Spice\b(?! Strong)/ }).first().click(); await p.waitForSelector('.hero');
   ok(await until(async () => ((await p.locator('.stat-value').first().textContent()) === '1.110')), 'the original Winter Spice recipe is unchanged (1.110)');
   console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.join('\n') : 'no console errors');
   await b.close();

@@ -20,6 +20,11 @@ a milestone.
   the timeline changes the batch rating too. An older entry, or one a tasting
   has since replaced, only changes the timeline, and the form says which.
   Removing a Batch rating entry never clears the batch rating.
+- **Recipes carry the batch rating.** Saving a batch as a recipe gives the
+  recipe the batch's rating. Rate the batch again later and **Update recipe**
+  lists the change ("Rating 7 → 8.5") and applies it. A batch started from a
+  recipe starts unrated, and updating the recipe from an unrated batch keeps
+  the recipe's rating.
 
 ## v0.2.8 – 2026-11-25
 

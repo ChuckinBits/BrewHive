@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Recipe } from '../db/types.ts';
-import { otherBatchesFrom, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from './recipeFromBatch.ts';
+import { otherBatchesFrom, ratingForUpdate, recipeChanges, recipeFieldsFromBatch, suggestRecipeName } from './recipeFromBatch.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const batch = (patch: Partial<Batch> = {}): Batch => ({
@@ -42,7 +42,7 @@ const recipe = (patch: Partial<Recipe> = {}): Recipe => ({
   steps: ['Mix.'],
   icon: 'blackberry',
   color: '#4A2A5E',
-  rating: 7,
+  rating: 9,
   notes: 'Recipe notes',
   isPublished: false,
   ...patch,
@@ -113,4 +113,22 @@ test('a recipe keeps the batch\'s target ABV, and the update lists a change of t
   const changes = recipeChanges(recipe, fields, () => '');
   assert.ok(changes.fields.includes('Aims for FG → ABV'));
   assert.ok(changes.fields.includes('Target ABV none → 14%'));
+});
+
+test('a new recipe starts with the batch\'s rating', () => {
+  assert.equal(recipeFieldsFromBatch(batch({ rating: 7 }), []).rating, 7);
+  assert.equal(recipeFieldsFromBatch(batch({ rating: null }), []).rating, null);
+});
+
+test('an update brings the batch\'s new rating, and lists it', () => {
+  const next = recipeFieldsFromBatch(batch({ rating: 8.5 }), []);
+  assert.equal(ratingForUpdate(recipe({ rating: 7 }), next), 8.5);
+  assert.deepEqual(recipeChanges(recipe({ rating: 7 }), next, vol).fields, ['Rating 7 → 8.5']);
+  assert.deepEqual(recipeChanges(recipe({ rating: null }), next, vol).fields, ['Rating none → 8.5']);
+});
+
+test('an unrated batch leaves the recipe\'s rating alone', () => {
+  const next = recipeFieldsFromBatch(batch({ rating: null }), []);
+  assert.equal(ratingForUpdate(recipe({ rating: 7 }), next), 7);
+  assert.deepEqual(recipeChanges(recipe({ rating: 7 }), next, vol), { fields: [], ingredients: [] });
 });
