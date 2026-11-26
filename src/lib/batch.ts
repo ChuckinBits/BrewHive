@@ -50,7 +50,7 @@ export function isFermenting(status: BatchStatus): boolean {
  * an archived batch counts by the stage it was archived from (Bottled if unknown).
  */
 export function isFermentationComplete(batch: Batch): boolean {
-  const status = batch.status === 'archived' ? (batch.statusBeforeArchive ?? 'bottled') : batch.status;
+  const status = batch.status === 'archived' ? (batch.statusBeforeArchive ?? 'bottled') : batch.status === 'split' ? (batch.statusBeforeSplit ?? 'secondary') : batch.status;
   return status === 'aging' || status === 'bottled';
 }
 
@@ -362,7 +362,7 @@ export function fillLevel(status: BatchStatus): number {
 }
 
 export function isActive(status: BatchStatus): boolean {
-  return status !== 'bottled' && status !== 'archived';
+  return status !== 'bottled' && status !== 'archived' && status !== 'split';
 }
 
 export type ReviewEntryPlan =

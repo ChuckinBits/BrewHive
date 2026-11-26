@@ -62,7 +62,8 @@ export function VesselField({ label = 'Vessel', value, onChange, batch, unit, no
       <div className="vessel-picks">
         {(fills.length ? fills : [null]).map((fill, i) => {
           const c = fill ? byId.get(fill.vesselId) : null;
-          const warning = c && fill ? vesselWarning(c.vessel, several ? fill.volumeL : batch.volumeL, batch.id, data.batches, unit, several) : null;
+          const empty = several && fill?.volumeL != null && fill.volumeL <= 0;
+          const warning = empty ? `Nothing goes in ${c?.vessel.name}: change the amounts, or remove it.` : c && fill ? vesselWarning(c.vessel, several ? fill.volumeL : batch.volumeL, batch.id, data.batches, unit, several) : null;
           return (
             <div key={fill?.vesselId ?? 'none'} className="vessel-pick">
               <div className="vessel-pick-row">

@@ -88,7 +88,8 @@ export async function syncOgEntry(batch: Batch, previousStartDate?: string): Pro
 export async function ensureOgEntries(): Promise<void> {
   const all = await getAll<BatchEvent>('events');
   const has = new Set(all.filter((e) => e.og && !e.deletedAt).map((e) => e.batchId));
-  const missing = (await getAll<Batch>('batches')).filter((b) => !b.deletedAt && b.og != null && !has.has(b.id));
+  // A sub-batch reads its OG from the batch it was split from, so it never gets its own.
+  const missing = (await getAll<Batch>('batches')).filter((b) => !b.deletedAt && b.og != null && !has.has(b.id) && !b.parentId);
   await putMany(
     'events',
     missing.map((b) => fresh({ id: newId(), batchId: b.id, type: 'gravity' as const, date: ogDate(b.startDate), value: b.og, note: '', og: true })),

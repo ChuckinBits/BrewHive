@@ -42,6 +42,8 @@ interface EventSheetProps {
   onStabilized: () => void;
   /** Called after a new Stage change entry moves the batch to Secondary, to offer racking into a vessel. */
   onSecondary?: () => void;
+  /** Called after a new Racked entry puts the batch in several vessels, to offer sub-batches. */
+  onSeveral?: (fills: VesselFill[], date: string) => void;
 }
 
 /** The stages in order, for working out the next one. */
@@ -72,7 +74,7 @@ const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravi
 const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized, onSecondary }: EventSheetProps) {
+export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized, onSecondary, onSeveral }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   // "Batch rating" entries come from the rating slider; they are edited, not added, here.
   const isReview = existing?.type === 'review';
@@ -271,6 +273,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     if (type === 'backsweeten' && fields.ferments && !(existing?.ferments) && isFermentationComplete(batch)) onRestart();
     // Stabilizing stops fermentation, so offer to finish it: the final reading and the move to Aging.
     if (type === 'stabilize' && !existing && (batch.status === 'primary' || batch.status === 'secondary')) onStabilized();
+    // Racked into several vessels: offer sub-batches.
+    if (type === 'rack' && !existing && rackFills.length > 1) onSeveral?.(normalizeFills(rackFills), fields.date);
   };
 
   const whenField = (
@@ -297,7 +301,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
         ) : isStage ? (
           <Field label="Stage">
             <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
-              {BATCH_STATUSES.map((s) => (
+              {BATCH_STATUSES.filter((s) => s.id !== 'split').map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.id === 'bottled' ? 'Bottled' : `Moved to ${statusLabel(s.id)}`}
                 </option>
@@ -343,7 +347,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
                       : `The batch is already in ${statusLabel(batch.status)}, so this only records when it happened. Use the stage buttons at the top to move it back.`
               }>
               <select value={stage} onChange={(e) => setStage(e.target.value as BatchStatus)}>
-                {BATCH_STATUSES.filter((s) => s.id !== 'archived').map((s) => (
+                {BATCH_STATUSES.filter((s) => s.id !== 'archived' && s.id !== 'split').map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
