@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased (v0.3.1)
+## v0.3.1 – 2026-11-26
 
 ### Equipment
 
@@ -33,6 +33,9 @@ a milestone.
   go, and the batch carries on in their vessels.
 - Racking into several vessels now says when one would get nothing ("Nothing
   goes in 5 gal carboy"), as filling in order can leave the last empty.
+
+**Updating from v0.3.0:** nothing to do. Batches keep the vessel you gave
+them, and you can add more when you next rack.
 
 ## v0.3.0 – 2026-11-26
 
