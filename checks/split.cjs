@@ -26,17 +26,17 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const parentUrl = p.url();
   const parentCost = money(await fact('Ingredient cost'));
 
-  // 1. Rack into Jug C and the 5 gal carboy, half a gallon each
+  // 1. Rack into Jar C and the 5 gal carboy, half a gallon each
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Secondary' }).click();
   const rack = p.getByRole('dialog', { name: 'Racked into a new vessel?' });
-  await rack.getByLabel('Racked into').selectOption({ label: 'Jug C · 1 gal · free' });
+  await rack.getByLabel('Racked into').selectOption({ label: 'Jar C · 1 gal · free' });
   await rack.getByRole('button', { name: 'Add another vessel' }).click();
   await rack.getByLabel('Racked into 2').selectOption({ label: '5 gal carboy · 5 gal · free' });
-  await rack.getByLabel('Amount in Jug C').fill('0.5'); await rack.getByLabel('Amount in 5 gal carboy').fill('0.5');
+  await rack.getByLabel('Amount in Jar C').fill('0.5'); await rack.getByLabel('Amount in 5 gal carboy').fill('0.5');
   await rack.getByRole('button', { name: 'Log racking' }).click();
   const split = p.getByRole('dialog', { name: 'Make sub-batches?' });
   ok(await until(async () => (await split.count() === 1)), 'racking into two vessels offers sub-batches');
-  ok(await until(async () => ((await split.getByLabel('Jug C · 0.5 gal').inputValue()) === 'Bramble Melomel #2 A' && (await split.getByLabel('5 gal carboy · 0.5 gal').inputValue()) === 'Bramble Melomel #2 B')), 'named A and B, one per vessel');
+  ok(await until(async () => ((await split.getByLabel('Jar C · 0.5 gal').inputValue()) === 'Bramble Melomel #2 A' && (await split.getByLabel('5 gal carboy · 0.5 gal').inputValue()) === 'Bramble Melomel #2 B')), 'named A and B, one per vessel');
   await p.screenshot({ path: `${out}/split-1-offer.png` });
 
   // 2. Split: the first sub-batch opens, with the history up to the split
@@ -45,16 +45,16 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const aUrl = p.url();
   ok(await until(async () => ((await p.locator('.topbar').textContent()).includes('Bramble Melomel #2 A'))), 'it opens Bramble Melomel #2 A');
   ok(await until(async () => ((await p.locator('.split-from').textContent()).startsWith('Split from Bramble Melomel #2 on'))), 'which says where it came from');
-  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into Jug C and 5 gal carboy' }).count() === 1 && await p.locator('.timeline-title', { hasText: 'Original gravity' }).count() === 1)), 'its timeline has the racking and the OG from before the split');
+  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into Jar C and 5 gal carboy' }).count() === 1 && await p.locator('.timeline-title', { hasText: 'Original gravity' }).count() === 1)), 'its timeline has the racking and the OG from before the split');
   ok(await until(async () => ((await p.locator('.stat-value').first().textContent()) === '1.114')), 'and its OG is 1.114, from that history');
-  ok(await until(async () => ((await fact('Volume')).startsWith('0.5 gal') && (await fact('Vessel')) === 'Jug C0.5 gal headspace (50%)')), 'it is 0.5 gal in Jug C, with 0.5 gal headspace');
+  ok(await until(async () => ((await fact('Volume')).startsWith('0.5 gal') && (await fact('Vessel')) === 'Jar C0.5 gal headspace (50%)')), 'it is 0.5 gal in Jar C, with 0.5 gal headspace');
   const aCost = money(await fact('Ingredient cost'));
   ok(Math.abs(aCost - parentCost / 2) < 0.02, `its ingredient cost is half: $${aCost} of $${parentCost}`);
   ok(await until(async () => ((await p.locator('.step-on').textContent()) === 'Secondary')), 'it is in Secondary, where the batch was');
   await p.screenshot({ path: `${out}/split-2-child.png`, fullPage: true });
 
   // 3. An entry from before the split opens the batch it came from, which is Split
-  await p.getByRole('button', { name: /^Racked into Jug C and 5 gal carboy, .*, from Bramble Melomel #2$/ }).click();
+  await p.getByRole('button', { name: /^Racked into Jar C and 5 gal carboy, .*, from Bramble Melomel #2$/ }).click();
   await p.waitForURL(parentUrl); await p.waitForSelector('.hero');
   ok(await until(async () => ((await p.locator('.split-note').textContent()).includes('Into Bramble Melomel #2 A and Bramble Melomel #2 B'))), 'the batch says it was split into A and B');
   ok(await until(async () => (await p.getByRole('group', { name: 'Status' }).count() === 0 && await p.getByRole('button', { name: 'Add entry' }).count() === 0)), 'with no stage buttons and no Add entry');
@@ -72,17 +72,17 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(parentUrl); await p.waitForSelector('.hero');
   await p.getByRole('button', { name: 'Undo split' }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Undo split' }).click(); await p.waitForTimeout(400);
-  ok(await until(async () => ((await p.locator('.step-on').textContent()) === 'Secondary' && (await fact('Vessels')).startsWith('Jug C · 0.5 gal'))), 'undone: back in Secondary, in Jug C and the carboy');
+  ok(await until(async () => ((await p.locator('.step-on').textContent()) === 'Secondary' && (await fact('Vessels')).startsWith('Jar C · 0.5 gal'))), 'undone: back in Secondary, in Jar C and the carboy');
 
   // 6. Split again from a Racked entry; once A has an entry, the split stays
   await p.getByRole('button', { name: 'Add entry' }).click();
   await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: 'Racked', exact: true }).click();
   const d = p.getByRole('dialog').last();
-  await d.getByLabel('Racked into').selectOption({ label: 'Jug C · 1 gal · in it now' });
+  await d.getByLabel('Racked into').selectOption({ label: 'Jar C · 1 gal · in it now' });
   await d.getByRole('button', { name: 'Add another vessel' }).click();
   await d.getByLabel('Racked into 2').selectOption({ label: '5 gal carboy · 5 gal · in it now' });
-  ok(await until(async () => (await d.getByText('Nothing goes in 5 gal carboy: change the amounts, or remove it.').count() === 1)), 'filled in order, 1 gal fits in Jug C and nothing is left for the carboy: it says so');
-  await d.getByLabel('Amount in Jug C').fill('0.5'); await d.getByLabel('Amount in 5 gal carboy').fill('0.5');
+  ok(await until(async () => (await d.getByText('Nothing goes in 5 gal carboy: change the amounts, or remove it.').count() === 1)), 'filled in order, 1 gal fits in Jar C and nothing is left for the carboy: it says so');
+  await d.getByLabel('Amount in Jar C').fill('0.5'); await d.getByLabel('Amount in 5 gal carboy').fill('0.5');
   await d.getByRole('button', { name: 'Save entry' }).click();
   await split.getByRole('button', { name: 'Split into 2 batches' }).click(); await p.waitForURL((u) => u.toString() !== parentUrl); await p.waitForSelector('.hero');
   await p.getByRole('button', { name: 'Add entry' }).click();

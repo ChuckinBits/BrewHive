@@ -127,6 +127,8 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if (!hasText(r, 'name')) return false;
     if (r.kind !== 'vessel' && r.kind !== 'gear') r.kind = 'gear';
     text(r, 'notes');
+    // v0.3.2 renamed Jug to Jar.
+    if (r.vesselType === 'jug') r.vesselType = 'jar';
     if (r.kind === 'vessel' && !oneOf(r.vesselType, VESSEL_IDS)) r.vesselType = 'other';
     numberOrNull(r, 'capacityL');
     if (isNumber(r.capacityL) && r.capacityL <= 0) r.capacityL = null;
@@ -171,6 +173,7 @@ export function cleanSettings(incoming: unknown, current: Settings): Settings {
   }
   if (isText(incoming.currency) && /^[A-Z]{3}$/.test(incoming.currency)) out.currency = incoming.currency;
   if (typeof incoming.hideIngredientAdd === 'boolean') out.hideIngredientAdd = incoming.hideIngredientAdd;
+  if (oneOf(incoming.vesselSort, ['type', 'size', 'name', 'free'])) out.vesselSort = incoming.vesselSort as Settings['vesselSort'];
   return out;
 }
 

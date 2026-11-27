@@ -2,10 +2,10 @@
 // and the rest of your gear. Batches pick a vessel when they start or when they're racked.
 
 import { useState } from 'react';
-import { ConfirmSheet, Field, Sheet, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
-import { batches, currencyOf, equipment, useQuery, useSettings } from '../db/store.ts';
-import { VESSEL_TYPES, type Batch, type Equipment, type VesselType, type VolumeUnit } from '../db/types.ts';
-import { MAX_AT_ONCE, batchesIn, groupVessels, numberedNames, priceTotal, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
+import { ConfirmSheet, Field, Segmented, Sheet, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
+import { batches, currencyOf, equipment, saveSettings, useQuery, useSettings } from '../db/store.ts';
+import { VESSEL_TYPES, type Batch, type Equipment, type VesselSort, type VesselType, type VolumeUnit } from '../db/types.ts';
+import { MAX_AT_ONCE, batchesIn, groupVessels, numberedNames, priceTotal, sortGroups, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
 import { fmtMoney } from '../lib/cost.ts';
 import { fmtVolume, parseNum, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { volumeUnitOf } from '../lib/units.ts';
@@ -20,6 +20,7 @@ export function EquipmentScreen() {
   const settings = useSettings();
   const unit = volumeUnitOf(settings);
   const currency = currencyOf(settings);
+  const sort = settings.vesselSort ?? 'type';
   const data = useQuery(async () => ({ items: await equipment.list(), batches: await batches.list() }));
   const [editing, setEditing] = useState<Editing>(null);
   // Which groups of alike vessels are open.
@@ -77,11 +78,24 @@ export function EquipmentScreen() {
           <h2>Vessels</h2>
           {vessels.length > 0 && <span className="muted">{free === vessels.length ? 'All free' : `${free} of ${vessels.length} free`}</span>}
         </div>
+        {groupVessels(vessels, unit).length > 1 && (
+          <Segmented<VesselSort>
+            label="Sort vessels"
+            value={sort}
+            options={[
+              { id: 'type', label: 'Type' },
+              { id: 'size', label: 'Size' },
+              { id: 'name', label: 'Name' },
+              { id: 'free', label: 'Free first' },
+            ]}
+            onChange={(vesselSort) => void saveSettings({ vesselSort })}
+          />
+        )}
         {vessels.length === 0 ? (
-          <p className="muted">Carboys, buckets, jugs, kegs and barrels. Give each its capacity, and pick one when you start or rack a batch to see which are free and how much headspace a batch has.</p>
+          <p className="muted">Carboys, buckets, jars, kegs and barrels. Give each its capacity, and pick one when you start or rack a batch to see which are free and how much headspace a batch has.</p>
         ) : (
           <ul className="library-list">
-            {groupVessels(vessels, unit).map((group) => {
+            {sortGroups(groupVessels(vessels, unit), sort, data.batches).map((group) => {
               // One of a kind: just the vessel. Several alike: one line that opens to show each.
               if (group.vessels.length === 1) return <li key={group.key}>{vesselRow(group.vessels[0], true)}</li>;
               const groupFree = group.vessels.filter((v) => batchesIn(v.id, data.batches).length === 0).length;

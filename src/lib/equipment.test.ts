@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Equipment } from '../db/types.ts';
-import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, numberedNames, priceTotal, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
+import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, numberedNames, priceTotal, sortGroups, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const GAL = 3.785411784;
@@ -114,4 +114,22 @@ test('vessels added together are numbered, carrying on from ones already named t
   assert.deepEqual(numberedNames('1 gal carboy', 2, ['1 gal carboy 8', '1 gal carboy 3', '0.5 gal carboy 9']), ['1 gal carboy 9', '1 gal carboy 10']);
   assert.deepEqual(numberedNames('Jug (small)', 2, ['Jug (small) 1']), ['Jug (small) 2', 'Jug (small) 3'], 'names with brackets still match');
   assert.deepEqual(numberedNames('Big bucket', 1, ['Big bucket 1']), ['Big bucket'], 'one vessel keeps the plain name');
+});
+
+test('vessel lines sort by type, size, name or free first', () => {
+  const all = [
+    vessel({ id: 'c1', name: 'Carboy 1', capacityL: GAL }),
+    vessel({ id: 'c2', name: 'Carboy 2', capacityL: GAL }),
+    vessel({ id: 'big', name: 'Big carboy', capacityL: 5 * GAL }),
+    vessel({ id: 'j1', name: 'Jar 1', vesselType: 'jar', capacityL: GAL / 2 }),
+    vessel({ id: 'j2', name: 'Jar 2', vesselType: 'jar', capacityL: GAL / 2 }),
+    vessel({ id: 'bk', name: 'Ale pail', vesselType: 'bucket', capacityL: 2 * GAL }),
+  ];
+  const groups = groupVessels(all, 'gal');
+  const names = (sort: Parameters<typeof sortGroups>[1], batches: Batch[] = []) => sortGroups(groups, sort, batches).map((g) => (g.vessels.length === 1 ? g.vessels[0].name : g.label));
+  assert.deepEqual(names('type'), ['1 gal carboy', 'Big carboy', 'Ale pail', '0.5 gal jar']);
+  assert.deepEqual(names('size'), ['0.5 gal jar', '1 gal carboy', 'Ale pail', 'Big carboy']);
+  assert.deepEqual(names('name'), ['0.5 gal jar', '1 gal carboy', 'Ale pail', 'Big carboy'], 'a lone vessel goes by its own name');
+  const busy = [batch({ id: 'x', vessels: [fill('c1')] }), batch({ id: 'y', vessels: [fill('c2')] }), batch({ id: 'z', vessels: [fill('big')] })];
+  assert.deepEqual(names('free', busy), ['0.5 gal jar', 'Ale pail', '1 gal carboy', 'Big carboy'], 'two free jars, then one free pail; the busy ones last, by type');
 });

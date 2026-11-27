@@ -1,7 +1,7 @@
 // Equipment: which batches each vessel holds, how much room is left in it, and how racking moves a
 // batch from one set of vessels to another. A batch can be in several vessels at once.
 
-import type { Batch, BatchEvent, Equipment, VesselFill, VolumeUnit } from '../db/types.ts';
+import type { Batch, BatchEvent, Equipment, VesselFill, VesselSort, VolumeUnit } from '../db/types.ts';
 import { VESSEL_TYPES } from '../db/types.ts';
 import { fmtVolume } from './format.ts';
 
@@ -144,7 +144,7 @@ export function fillsAfterRemovingRack(entry: BatchEvent, batch: Batch, timeline
   return rackedFrom(entry);
 }
 
-/** "Jug A", "Jug A and Jug B", "Jug A, Jug B and Jug C". */
+/** "Jar A", "Jar A and Jar B", "Jar A, Jar B and Jar C". */
 export function listNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
@@ -198,4 +198,23 @@ export function numberedNames(base: string, count: number, existing: string[]): 
   const taken = existing.map((n) => Number(n.match(pattern)?.[1] ?? 0));
   const start = Math.max(0, ...taken) + 1;
   return Array.from({ length: count }, (_, i) => `${base} ${start + i}`);
+}
+
+/**
+ * The vessel lines in the order picked: by type (carboys, buckets, jars…, smallest first), by size
+ * (smallest first whatever the type), by name, or with the most free vessels first.
+ */
+export function sortGroups(groups: VesselGroup[], sort: VesselSort, batches: Batch[]): VesselGroup[] {
+  const typeOrder = (g: VesselGroup) => VESSEL_TYPES.findIndex((t) => t.id === g.key.split('|')[0]);
+  const sizeOf = (g: VesselGroup) => Number(g.key.split('|')[1]) || Infinity;
+  const byType = (a: VesselGroup, b: VesselGroup) => typeOrder(a) - typeOrder(b) || sizeOf(a) - sizeOf(b);
+  const label = (g: VesselGroup) => (g.vessels.length === 1 ? g.vessels[0].name : g.label);
+  const free = (g: VesselGroup) => g.vessels.filter((v) => batchesIn(v.id, batches).length === 0).length;
+  const order: Record<VesselSort, (a: VesselGroup, b: VesselGroup) => number> = {
+    type: byType,
+    size: (a, b) => sizeOf(a) - sizeOf(b) || typeOrder(a) - typeOrder(b),
+    name: (a, b) => label(a).localeCompare(label(b), undefined, { numeric: true }),
+    free: (a, b) => free(b) - free(a) || byType(a, b),
+  };
+  return [...groups].sort(order[sort]);
 }

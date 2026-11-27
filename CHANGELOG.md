@@ -18,6 +18,11 @@ a milestone.
 - **Add several alike at once.** Add vessel has a **How many** box: eight
   1 gal carboys in one go, each its own vessel, numbered "1 gal carboy 1" to
   "8" (or after your own name). Adding more later carries on the numbers.
+- **Sort your vessels** by Type (carboys, buckets, jars…, smallest first),
+  Size (smallest first, whatever the type), Name, or Free first (the lines
+  with the most free vessels at the top). Your choice is remembered.
+- **Jug is now Jar.** Vessels saved as jugs become jars. Names you typed stay
+  as they are.
 
 ## v0.3.1 – 2026-11-26
 

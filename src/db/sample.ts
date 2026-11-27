@@ -335,9 +335,9 @@ export async function loadSampleData(): Promise<void> {
   b3.vessels = [{ vesselId: 'sample-jug-b', volumeL: null }];
   await putMany('equipment', [
     vessel('sample-bucket', 'Small bucket', 'bucket', 2, 14.99, 'Food-grade, with a grommet lid. Room for fruit in primary.'),
-    vessel('sample-jug-a', 'Jug A', 'jug', 1, 7.99),
-    vessel('sample-jug-b', 'Jug B', 'jug', 1, 7.99),
-    vessel('sample-jug-c', 'Jug C', 'jug', 1, 7.99),
+    vessel('sample-jug-a', 'Jar A', 'jar', 1, 7.99),
+    vessel('sample-jug-b', 'Jar B', 'jar', 1, 7.99),
+    vessel('sample-jug-c', 'Jar C', 'jar', 1, 7.99),
     vessel('sample-carboy', '5 gal carboy', 'carboy', 5, 39.99, 'Glass. For the day a batch grows up.'),
     gear('sample-hydrometer', 'Hydrometer', 12.99, 'Triple scale, with the test jar'),
     gear('sample-siphon', 'Auto-siphon', 14.99),

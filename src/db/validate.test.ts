@@ -120,3 +120,7 @@ test('a batch and a racking entry keep vessel ids only when they are text', () =
   assert.equal(r.vesselId, 'v2');
   assert.equal(r.fromVesselId, null);
 });
+
+test('a vessel saved as a jug comes back as a jar (renamed in v0.3.2)', () => {
+  assert.equal(cleanRecord('equipment', { id: 'j', name: 'Jug A', kind: 'vessel', vesselType: 'jug' })!.vesselType, 'jar');
+});

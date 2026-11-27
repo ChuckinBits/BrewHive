@@ -309,12 +309,15 @@ export type VolumeUnit = 'gal' | 'L';
 // --- Equipment (v0.3)
 
 /** What a vessel is. A batch ferments or ages in one. */
-export type VesselType = 'carboy' | 'bucket' | 'jug' | 'keg' | 'barrel' | 'tank' | 'other';
+export type VesselType = 'carboy' | 'bucket' | 'jar' | 'keg' | 'barrel' | 'tank' | 'other';
+
+/** Orders for the Equipment screen's vessels: by type, size, name, or with free ones first. */
+export type VesselSort = 'type' | 'size' | 'name' | 'free';
 
 export const VESSEL_TYPES: { id: VesselType; label: string }[] = [
   { id: 'carboy', label: 'Carboy' },
   { id: 'bucket', label: 'Bucket' },
-  { id: 'jug', label: 'Jug' },
+  { id: 'jar', label: 'Jar' },
   { id: 'keg', label: 'Keg' },
   { id: 'barrel', label: 'Barrel' },
   { id: 'tank', label: 'Tank' },
@@ -553,4 +556,6 @@ export interface Settings {
   currency?: string;
   /** Hides the + Add buttons on batches' ingredients, for people who keep the list but don't log it. */
   hideIngredientAdd?: boolean;
+  /** How the Equipment screen orders its vessel lines. */
+  vesselSort?: VesselSort;
 }
