@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased
+## v0.3.3 – 2026-11-26
 
 ### Equipment
 
@@ -19,6 +19,9 @@ a milestone.
   hydrometer, refractometer, thermometer, pH meter, scale, wine thief,
   siphon, tubing, airlock, funnel, and more. It picks one from the name as
   you type (Auto-siphon gets the siphon) until you choose your own.
+
+**Updating from v0.3.2:** nothing to do. Your gear gets an icon when you
+next edit it; until then it keeps the plain flask.
 
 ## v0.3.2 – 2026-11-26
 
