@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased
+## v0.3.4 – 2026-11-27
 
 ### Carbonation
 
@@ -36,6 +36,10 @@ a milestone.
   batch back to Secondary, whichever way it was logged.
 - **Safer examples.** Pasteurization's examples are now 140 °F (60 °C) for
   22 minutes.
+
+**Updating from v0.3.3:** nothing to do. Your step feedings and
+backsweetenings stay as they are. Bottles already in your cellar are
+still; edit them to mark them petillant or sparkling.
 
 ## v0.3.3 – 2026-11-26
 
