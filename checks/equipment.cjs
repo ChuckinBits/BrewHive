@@ -50,6 +50,11 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 3. A new batch picks a vessel; too small warns
   await p.goto(BASE + '/#/batches/new');
+  // The gear picker's styles must not leak into the batch's own icon and color picker.
+  await p.locator('.swatches > *').first().waitFor();
+  const swatchTops = await p.locator('.swatches > *').evaluateAll((els) => els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)));
+  ok(swatchTops.length === 3 && new Set(swatchTops).size === 1, 'the color swatches sit in a row: ' + swatchTops.join(', '));
+  ok((await p.locator('.icon-picker').evaluate((e) => getComputedStyle(e).display)) !== 'grid', 'the batch icon picker keeps its own layout');
   await p.getByLabel('Name').fill('Vessel Test'); await p.getByLabel('Volume', { exact: true }).fill('5');
   await p.getByLabel('Vessel').selectOption({ label: 'Jar A · 1 gal · free' });
   ok(await until(async () => (await p.getByText("Jar A holds 1 gal, less than the 5 gal of this batch.").count() === 1)), 'picking a 1 gal jar for 5 gal warns');

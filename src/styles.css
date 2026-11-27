@@ -2777,12 +2777,12 @@ button.library-row {
 }
 
 /* Gear icon picker: a grid of small tiles, the chosen one filled. */
-.icon-picker {
+.gear-icon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
   gap: 6px;
 }
-.icon-pick {
+.gear-icon {
   display: grid;
   place-items: center;
   height: 44px;
@@ -2792,10 +2792,10 @@ button.library-row {
   color: var(--muted);
   cursor: pointer;
 }
-.icon-pick:hover {
+.gear-icon:hover {
   color: var(--ink);
 }
-.icon-pick-on {
+.gear-icon-on {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--ink);

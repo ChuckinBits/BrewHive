@@ -303,9 +303,9 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
             <span className="field-label" id="gear-icon-label">
               Icon
             </span>
-            <div className="icon-picker" role="radiogroup" aria-labelledby="gear-icon-label">
+            <div className="gear-icon-grid" role="radiogroup" aria-labelledby="gear-icon-label">
               {GEAR_ICONS.map((g) => (
-                <button key={g.id} type="button" role="radio" aria-checked={icon === g.id} aria-label={g.label} title={g.label} className={icon === g.id ? 'icon-pick icon-pick-on' : 'icon-pick'} onClick={() => setPicked(g.id)}>
+                <button key={g.id} type="button" role="radio" aria-checked={icon === g.id} aria-label={g.label} title={g.label} className={icon === g.id ? 'gear-icon gear-icon-on' : 'gear-icon'} onClick={() => setPicked(g.id)}>
                   <Icon name={gearIcon(g.id)} size={22} />
                 </button>
               ))}
