@@ -5,6 +5,25 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Carbonation
+
+- **Carbonated entry.** A new timeline entry for when a batch is carbonated:
+  Natural (primed with sugar, in bottles or a keg) or Forced (CO₂ in a keg),
+  and how fizzy, Petillant or Sparkling. Natural can note what it was primed
+  with and how much; Forced can note the pressure. It's dated on its own, so
+  a batch can be racked, aged and carbonated later.
+- **Carbonation when bottling.** Bottling asks whether the bottles are
+  still, naturally carbonated in the bottle, or filled from a force
+  carbonated keg, and adds the Carbonated entry for you. A batch that's
+  already carbonated keeps its carbonation.
+- **Bubbles.** A carbonated batch and its bottles show fine streams of
+  bubbles rising, and the batch's vessel loses its airlock (it's sealed).
+  Its Details say how it was carbonated, and the cellar shows Still,
+  Petillant or Sparkling, which you can change when editing bottles.
+  Removing the Carbonated entry makes the batch still again.
+
 ## v0.3.3 – 2026-11-26
 
 ### Equipment

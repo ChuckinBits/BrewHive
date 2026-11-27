@@ -3,6 +3,7 @@
 import { type BatchEvent, type EventType, type LibraryIngredient, type Settings } from '../../db/types.ts';
 import { type IconName } from '../../icons/Icon.tsx';
 import { fmtPercent, fmtSG, fmtTempBoth } from '../../lib/format.ts';
+import { carbonationSummary } from '../../lib/carbonation.ts';
 
 export const EVENT_ICONS: Record<EventType, IconName> = {
   gravity: 'droplet',
@@ -12,6 +13,7 @@ export const EVENT_ICONS: Record<EventType, IconName> = {
   feeding: 'honey',
   rack: 'rack',
   stabilize: 'check',
+  carbonate: 'fizz',
   backsweeten: 'honey',
   fining: 'sparkle',
   tasting: 'glass',
@@ -27,6 +29,7 @@ export const EVENT_ICONS: Record<EventType, IconName> = {
 /** The short value shown after an entry's title, such as "1.045", "3.60" or "1 oz". */
 export function eventValue(event: BatchEvent, settings: Settings): string {
   if (event.type === 'ingredient') return event.amount ?? '';
+  if (event.type === 'carbonate') return carbonationSummary(event);
   if (event.type === 'stabilize') {
     // Pasteurization: "Pasteurization · 160 °F for 15 min".
     const held = [event.value != null ? fmtTempBoth(event.value, event.tempUnit, settings.tempUnit) : '', event.minutes != null ? `${event.minutes} min` : ''].filter(Boolean).join(' for ');

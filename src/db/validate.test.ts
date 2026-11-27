@@ -129,3 +129,17 @@ test('equipment: a gear icon is kept only when it is one BrewHive draws', () => 
   assert.equal(cleanRecord('equipment', { id: 'g1', name: 'Hydrometer', kind: 'gear', icon: 'hydrometer' })!.icon, 'hydrometer');
   assert.equal('icon' in cleanRecord('equipment', { id: 'g2', name: 'Hydrometer', kind: 'gear', icon: 'rocket' })!, false);
 });
+
+test('events and cellar: carbonation details are kept only when they make sense', () => {
+  const e = cleanRecord('events', { id: 'e1', batchId: 'b1', date: '2026-11-01', type: 'carbonate', carbMethod: 'fizzy', carbLevel: 'very', primer: 'Honey', primerAmount: 7, psi: -3 })!;
+  assert.equal(e.carbMethod, 'natural');
+  assert.equal('carbLevel' in e, false);
+  assert.equal(e.primer, 'Honey');
+  assert.equal('primerAmount' in e, false);
+  assert.equal('psi' in e, false);
+  const ok = cleanRecord('events', { id: 'e2', batchId: 'b1', date: '2026-11-01', type: 'carbonate', carbMethod: 'forced', carbLevel: 'petillant', psi: 12 })!;
+  assert.deepEqual([ok.carbMethod, ok.carbLevel, ok.psi], ['forced', 'petillant', 12]);
+  const bottles = { id: 'c1', name: 'Traditional', bottledDate: '2026-11-01', count: 3, bottleSizeMl: 750 };
+  assert.equal(cleanRecord('cellar', { ...bottles, carbonation: 'sparkling' })!.carbonation, 'sparkling');
+  assert.equal('carbonation' in cleanRecord('cellar', { ...bottles, carbonation: 'flat' })!, false);
+});

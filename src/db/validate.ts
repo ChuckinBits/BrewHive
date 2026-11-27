@@ -3,7 +3,7 @@
 // skipped, and loose ends (a missing note, a number saved as text) are tidied up, rather than
 // letting one bad record break a page.
 
-import { BATCH_STATUSES, BEVERAGE_TYPES, EVENT_TYPES, INGREDIENT_STAGES, GEAR_ICONS, POUR_TYPES, VESSEL_TYPES, type Settings } from './types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, CARB_LEVELS, CARB_METHODS, EVENT_TYPES, INGREDIENT_STAGES, GEAR_ICONS, POUR_TYPES, VESSEL_TYPES, type Settings } from './types.ts';
 import type { StoreName } from './idb.ts';
 
 type Rec = Record<string, unknown>;
@@ -31,6 +31,8 @@ const STAGE_IDS = INGREDIENT_STAGES.map((s) => s.id);
 const POUR_IDS = POUR_TYPES.map((t) => t.id);
 const VESSEL_IDS = VESSEL_TYPES.map((t) => t.id);
 const GEAR_ICON_IDS = GEAR_ICONS.map((t) => t.id);
+const CARB_METHOD_IDS = CARB_METHODS.map((t) => t.id);
+const CARB_LEVEL_IDS = CARB_LEVELS.map((t) => t.id);
 /** Optional list of vessels with amounts: entries without a text id are dropped, amounts are numbers or null. */
 const fills = (r: Rec, key: string) => {
   if (!(key in r)) return;
@@ -94,6 +96,11 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     fills(r, 'vessels');
     fills(r, 'fromVessels');
     numberOrNull(r, 'fromVolumeL');
+    // Carbonated entries: an unknown method makes it natural; other unknown details are dropped.
+    if (r.type === 'carbonate' && !oneOf(r.carbMethod, CARB_METHOD_IDS)) r.carbMethod = 'natural';
+    if ('carbLevel' in r && !oneOf(r.carbLevel, CARB_LEVEL_IDS)) delete r.carbLevel;
+    for (const key of ['primer', 'primerAmount']) if (key in r && !isText(r[key])) delete r[key];
+    if ('psi' in r && !(isNumber(r.psi) && r.psi > 0)) delete r.psi;
     return true;
   },
   cellar: (r) => {
@@ -103,6 +110,7 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     text(r, 'location');
     numberOrNull(r, 'abv');
     if (!isText(r.bestAfter)) r.bestAfter = null;
+    if ('carbonation' in r && !oneOf(r.carbonation, CARB_LEVEL_IDS)) delete r.carbonation;
     return true;
   },
   pours: (r) => {

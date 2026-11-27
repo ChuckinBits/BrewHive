@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { batches, events, ingredients, useQuery } from '../../db/store.ts';
-import { BATCH_STATUSES, EVENT_TYPES, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit, type VesselFill } from '../../db/types.ts';
+import { BATCH_STATUSES, CARB_LEVELS, CARB_METHODS, EVENT_TYPES, PRIMING_SUGARS, type CarbLevel, type CarbMethod, eventLabel, INGREDIENT_STAGES, STABILIZE_METHODS, statusLabel, type Batch, type BatchEvent, type BatchStatus, type EventType, type IngredientLine, type IngredientStage, type Settings, type TempUnit, type VesselFill } from '../../db/types.ts';
 import { useIngredientFields } from '../../components/StagedIngredients.tsx';
 import { currentCost } from '../../components/CostCard.tsx';
-import { Field, RatingInput, Sheet, TEMP_UNITS, UnitField, toast } from '../../components/ui.tsx';
+import { Field, RatingInput, Segmented, Sheet, TEMP_UNITS, UnitField, toast } from '../../components/ui.tsx';
 import { Icon } from '../../icons/Icon.tsx';
 import { batchAbv, finalReading, markedFinals, sweetnessOf, isFermentationComplete } from '../../lib/batch.ts';
 import { ingredientStageAt, lineFromEntry, stageAfterRemoving } from '../../lib/stages.ts';
@@ -66,7 +66,7 @@ function isLaterStage(to: BatchStatus, from: BatchStatus): boolean {
  * those types keep their own.
  */
 // An Estimated ABV entry is made from Gravity ("No reading? Enter an estimated ABV"), so it has no button of its own.
-const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'temperature', 'ph', 'moved'];
+const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'carbonate', 'temperature', 'ph', 'moved'];
 // A soft hyphen lets Backsweetened break across two lines on a narrow button.
 const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change', feeding: 'Step feed', backsweeten: 'Back\u00ADsweetened' };
 /** The grid button an entry type is under: an Estimated ABV is a kind of gravity entry. */
@@ -110,6 +110,12 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
   // Pasteurization's temperature and hold time, both optional.
   const [pasteurTemp, setPasteurTemp] = useState(existing?.type === 'stabilize' && existing.value != null ? tempToInput(existing.value, existing.tempUnit ?? settings.tempUnit) : '');
   const [minutes, setMinutes] = useState(existing?.minutes != null ? String(existing.minutes) : '');
+  // Carbonated: how and how fizzy, plus the priming sugar (natural) or pressure (forced), both optional.
+  const [carbMethod, setCarbMethod] = useState<CarbMethod>(existing?.carbMethod ?? 'natural');
+  const [carbLevel, setCarbLevel] = useState<CarbLevel>(existing?.carbLevel ?? 'sparkling');
+  const [primer, setPrimer] = useState(existing?.primer ?? PRIMING_SUGARS[0]);
+  const [primerAmount, setPrimerAmount] = useState(existing?.primerAmount ?? '');
+  const [psi, setPsi] = useState(existing?.psi != null ? String(existing.psi) : '');
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   // Racking: the vessel it went into. Shown only once you have vessels (More → Equipment).
   const [rackFills, setRackFills] = useState<VesselFill[]>(existing ? (rackedInto(existing) ?? []) : []);
@@ -181,6 +187,8 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
         if (parsed == null) return setError('Enter the temperature, or leave it empty.');
       }
       if (minutes.trim() !== '' && !((parseNum(minutes) ?? -1) > 0)) return setError('Enter how many minutes, or leave it empty.');
+    } else if (kind === 'carb' && carbMethod === 'forced' && psi.trim() !== '' && !((parseNum(psi) ?? -1) > 0 && (parseNum(psi) ?? 99) <= 60)) {
+      return setError('Enter the pressure in PSI, between 1 and 60, or leave it empty.');
     } else if (kind === 'place' && !place.trim()) {
       return setError('Enter where the batch went, such as Basement.');
     } else if (kind === 'ingredient' && !ingredient.name.trim()) {
@@ -203,6 +211,11 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
       unit: picked?.unit,
       ingredientId: picked?.ingredientId,
       method: kind === 'method' ? method : undefined,
+      carbMethod: kind === 'carb' ? carbMethod : undefined,
+      carbLevel: kind === 'carb' ? carbLevel : undefined,
+      primer: kind === 'carb' && carbMethod === 'natural' ? primer : undefined,
+      primerAmount: kind === 'carb' && carbMethod === 'natural' && primerAmount.trim() ? primerAmount.trim() : undefined,
+      psi: kind === 'carb' && carbMethod === 'forced' && psi.trim() !== '' ? (parseNum(psi) ?? undefined) : undefined,
       rating: kind === 'rating' ? rating : undefined,
       taster: type === 'tasting' && taster.trim() ? taster.trim() : undefined,
       tempUnit: kind === 'temp' || (pasteurizing && parsed != null) ? tempUnit : undefined,
@@ -481,6 +494,40 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
               ))}
             </select>
           </Field>
+        )}
+        {kind === 'carb' && (
+          <>
+            <div className="field">
+              <span className="field-label">Method</span>
+              <Segmented label="Method" value={carbMethod} options={CARB_METHODS} onChange={(m) => { setError(''); setCarbMethod(m); }} />
+              <span className="field-hint">{carbMethod === 'natural' ? 'Primed with sugar, in bottles or a keg.' : 'CO₂ from a tank, in a keg.'}</span>
+            </div>
+            <div className="field">
+              <span className="field-label">How fizzy</span>
+              <Segmented label="How fizzy" value={carbLevel} options={CARB_LEVELS} onChange={setCarbLevel} />
+              <span className="field-hint">{carbLevel === 'petillant' ? 'Lightly sparkling.' : 'Fully sparkling, like Champagne.'}</span>
+            </div>
+            {carbMethod === 'natural' ? (
+              <div className="form-pair">
+                <Field label="Primed with">
+                  <select value={primer} onChange={(e) => setPrimer(e.target.value)}>
+                    {PRIMING_SUGARS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Amount (optional)">
+                  <input type="text" value={primerAmount} placeholder="3/4 cup" onChange={(e) => setPrimerAmount(e.target.value)} />
+                </Field>
+              </div>
+            ) : (
+              <Field label="Pressure (PSI, optional)">
+                <input type="text" inputMode="decimal" value={psi} placeholder="30" onChange={(e) => { setError(''); setPsi(e.target.value); }} />
+              </Field>
+            )}
+          </>
         )}
         {pasteurizing && (
           <div className="form-pair">

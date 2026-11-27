@@ -36,7 +36,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Add entry' }).click();
   const grid = p.getByRole('radiogroup', { name: 'What happened?' });
   const opts = await grid.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-  ok(JSON.stringify(opts) === JSON.stringify(['Gravity reading', 'Ingredient', 'Tasting', 'Note', 'Stage change', 'Racked', 'Step feeding', 'Backsweetened', 'Stabilized', 'Temperature', 'pH', 'Relocate']), '6: the grid starts with the most used: ' + opts.join(', '));
+  ok(JSON.stringify(opts) === JSON.stringify(['Gravity reading', 'Ingredient', 'Tasting', 'Note', 'Stage change', 'Racked', 'Step feeding', 'Backsweetened', 'Stabilized', 'Carbonated', 'Temperature', 'pH', 'Relocate']), '6: the grid starts with the most used: ' + opts.join(', '));
   ok(await until(async () => (await grid.getByRole('radio', { name: 'Gravity reading' }).getAttribute('aria-checked') === 'true')), '6: Gravity reading is the default');
   ok(await until(async () => (await grid.getByRole('radio', { name: /Fining|Nutrients|Yeast pitched/ }).count() === 0)), '6: Fining, Nutrients and Yeast pitched are Ingredient entries now');
   await p.getByLabel('Specific gravity').fill('1.020'); await p.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(300);

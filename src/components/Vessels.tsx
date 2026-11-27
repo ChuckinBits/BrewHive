@@ -3,7 +3,7 @@
 // All three share a 96 x 132 canvas and stand on y = 124, so they line up
 // on a shelf.
 
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { FlavorStack } from '../icons/FlavorIcon.tsx';
 
 const W = 96;
@@ -178,11 +178,39 @@ interface VesselProps extends Common {
   level: number;
   /** Bubbles rise and the airlock ticks while the batch is in primary. */
   fermenting?: boolean;
+  /** Carbonated: fine streams of bubbles, and no airlock (the vessel is sealed). */
+  carbonated?: boolean;
   shape?: VesselShape;
 }
 
+/**
+ * Carbonation: fine streams of tiny bubbles, each rising from a spot near the bottom up to the
+ * liquid's top, unlike fermentation's few big ones. `columns` are the streams' starting points.
+ */
+function Fizz({ columns, top }: { columns: [number, number][]; top: number }) {
+  return (
+    <g className="fizz" fill="#FFFFFF">
+      {columns.flatMap(([x, y], c) => {
+        const rise = y - top - 3;
+        if (rise < 8) return [];
+        return [0, 1, 2, 3].map((i) => (
+          <circle
+            key={`${c}-${i}`}
+            cx={x}
+            cy={y}
+            r={(i + c) % 2 ? 0.8 : 1}
+            style={{ '--rise': `${-rise}px`, '--at': i / 4, animationDelay: `${(i * 0.55 + c * 0.15).toFixed(2)}s` } as CSSProperties}
+          />
+        ));
+      })}
+    </g>
+  );
+}
+
 /** A batch in its vessel: clear, with the liquid at its level, an airlock and the flavor label. */
-export function VesselArt({ icon, extraIcons = [], color, level, fermenting = false, size = 118, shape = 'carboy' }: VesselProps) {
+export function VesselArt({ icon, extraIcons = [], color, level, fermenting: active = false, carbonated = false, size = 118, shape = 'carboy' }: VesselProps) {
+  // A carbonated batch is sealed, so it shows its fizz rather than fermenting.
+  const fermenting = active && !carbonated;
   const clip = useId();
   const s = SHAPES[shape];
   const top = s.bottom - Math.max(0, Math.min(1, level)) * s.span;
@@ -195,10 +223,14 @@ export function VesselArt({ icon, extraIcons = [], color, level, fermenting = fa
         </clipPath>
       </defs>
       {s.behind}
-      {/* Airlock and its stem, down into the stopper */}
-      <rect className="vessel-glass vessel-line" x="41" y={a} width="14" height="11" rx="3.5" strokeWidth="1.75" />
-      {fermenting && <circle className="airlock-bubble" cx="48" cy={a + 5.5} r="2.2" />}
-      <rect className="vessel-glass vessel-line" x="45.5" y={a + 11} width="5" height="8" strokeWidth="1.75" />
+      {/* Airlock and its stem, down into the stopper. Carbonated vessels are sealed instead. */}
+      {!carbonated && (
+        <>
+          <rect className="vessel-glass vessel-line" x="41" y={a} width="14" height="11" rx="3.5" strokeWidth="1.75" />
+          {fermenting && <circle className="airlock-bubble" cx="48" cy={a + 5.5} r="2.2" />}
+          <rect className="vessel-glass vessel-line" x="45.5" y={a + 11} width="5" height="8" strokeWidth="1.75" />
+        </>
+      )}
       {/* Glass, then the liquid clipped to the glass */}
       <path className="vessel-glass" d={s.body} />
       <g clipPath={`url(#${clip})`}>
@@ -208,6 +240,7 @@ export function VesselArt({ icon, extraIcons = [], color, level, fermenting = fa
             <rect x="0" y={top} width={W} height={fermenting ? 5 : 2.5} fill="#FFFFFF" opacity={fermenting ? 0.5 : 0.28} />
           </>
         )}
+        {carbonated && level > 0 && <Fizz columns={s.bubbles.map(([x, y]) => [x, y])} top={top} />}
         {fermenting && (
           <g className="bubbles" fill="#FFFFFF">
             {s.bubbles.map(([cx, cy, r]) => (
@@ -254,9 +287,11 @@ const BOTTLE_BODY = 'M42 10H54V38C54 48 67 50 67 63V118Q67 124 61 124H35Q29 124 
 interface BottleProps extends Common {
   /** An empty bottle is drawn as clear glass. */
   empty?: boolean;
+  /** Sparkling or petillant: fine streams of bubbles. */
+  carbonated?: boolean;
 }
 
-export function Bottle({ icon, extraIcons = [], color, empty = false, size = 118 }: BottleProps) {
+export function Bottle({ icon, extraIcons = [], color, empty = false, carbonated = false, size = 118 }: BottleProps) {
   const clip = useId();
   return (
     <svg className="vessel" width={(size * W) / H} height={size} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
@@ -269,6 +304,7 @@ export function Bottle({ icon, extraIcons = [], color, empty = false, size = 118
       {!empty && (
         <g clipPath={`url(#${clip})`}>
           <rect x="24" y="26" width="48" height="100" fill={color} />
+          {carbonated && <Fizz columns={[[34, 121], [40, 122], [56, 122], [62, 121]]} top={26} />}
         </g>
       )}
       <path className="vessel-line" d={BOTTLE_BODY} fill="none" strokeWidth="2" strokeLinejoin="round" />

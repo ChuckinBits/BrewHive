@@ -282,6 +282,8 @@ export async function loadSampleData(): Promise<void> {
     event(b5.id, 'gravity', at(180), 1.0),
     { ...event(b5.id, 'gravity', at(150), 0.998), final: true },
     stage(b5.id, at(95), 'aging', 'bottled', '5 × 750 mL'),
+    // Bottle conditioned with a little honey.
+    { ...event(b5.id, 'carbonate', at(95)), carbMethod: 'natural', carbLevel: 'sparkling', primer: 'Honey', primerAmount: '3 oz' },
   ];
 
   const c1: CellarEntry = {
@@ -295,6 +297,7 @@ export async function loadSampleData(): Promise<void> {
     bestAfter: daysFromToday(-5),
     location: 'Hall closet, top shelf',
     abv: 13.4,
+    carbonation: 'sparkling',
     icon: 'traditional',
     color: '#E8A33A',
     rating: 8,
