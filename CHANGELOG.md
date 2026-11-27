@@ -19,10 +19,16 @@ a milestone.
   carbonated keg, and adds the Carbonated entry for you. A batch that's
   already carbonated keeps its carbonation.
 - **Bubbles.** A carbonated batch and its bottles show fine streams of
-  bubbles rising, and the batch's vessel loses its airlock (it's sealed).
+  bubbles rising, gentler and slower when petillant, and the batch's vessel
+  loses its airlock (it's sealed).
   Its Details say how it was carbonated, and the cellar shows Still,
   Petillant or Sparkling, which you can change when editing bottles.
   Removing the Carbonated entry makes the batch still again.
+
+### Timeline
+
+- **Safer examples.** Pasteurization's examples are now 140 °F (60 °C) for
+  22 minutes.
 
 ## v0.3.3 – 2026-11-26
 

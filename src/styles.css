@@ -663,6 +663,11 @@ a.shelf-item:hover .shelf-visual {
   animation: fizz-rise 2.2s linear infinite;
 }
 
+/* Petillant: fewer bubbles, rising more slowly. */
+.fizz-gentle circle {
+  animation-duration: 3.6s;
+}
+
 @keyframes fizz-rise {
   0% {
     opacity: 0;

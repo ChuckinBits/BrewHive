@@ -54,7 +54,7 @@ export function CellarScreen() {
   const items: ShelfEntry[] = sorted.map((entry) => ({
     key: entry.id,
     to: `/cellar/${entry.id}`,
-    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonated={entry.carbonation != null} />,
+    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonation={entry.carbonation} />,
     icons: iconsOf(entry),
     title: entry.name,
     subtitle: view === 'shelf' ? `${entry.count} × ${fmtBottle(entry.bottleSizeMl)}` : `${fmtBottle(entry.bottleSizeMl)} · ${readiness(entry)}`,
@@ -150,7 +150,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
       <section className="hero">
         <RatingBadge rating={entry.rating} reserve />
         <span className={isReady(entry) ? 'shelf-glow' : undefined}>
-          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonated={entry.carbonation != null} size={168} />
+          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonation={entry.carbonation} size={168} />
         </span>
         <p className="hero-sub">
           {entry.style || 'Mead'} · {readiness(entry)}

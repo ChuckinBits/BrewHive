@@ -33,7 +33,8 @@ const statusOrder = (b: Batch) => BATCH_STATUSES.findIndex((s) => s.id === b.sta
 export function BatchArt({ batch, size, equipment: gear = [], timeline = [] }: { batch: Batch; size?: number; equipment?: Equipment[]; timeline?: BatchEvent[] }) {
   if (batch.status === 'archived') return <Book icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} size={size} />;
   const shape = shapeFor(vesselsOf(batch, gear)[0]?.vessel.vesselType);
-  return <VesselArt shape={shape} icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} carbonated={carbonationOf(timeline) != null} size={size} />;
+  const carbonated = carbonationOf(timeline);
+  return <VesselArt shape={shape} icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} carbonation={carbonated ? (carbonated.carbLevel ?? 'sparkling') : undefined} size={size} />;
 }
 
 export function statusLabel(batch: Batch): string {

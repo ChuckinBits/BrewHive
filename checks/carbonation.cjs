@@ -42,6 +42,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await carbRows().count()) === 1 && /Petillant · forced, 12 PSI/.test(await carbRows().first().textContent())), 'the timeline shows Carbonated: Petillant · forced, 12 PSI');
   ok(await until(async () => (await fact('Carbonation')) === 'Petillant · forced, 12 PSI'), 'Details shows the carbonation');
   ok(await until(async () => (await airlock()) === 0 && (await fizz()) > 0), 'the batch art loses its airlock and fizzes');
+  ok(await until(async () => (await hero.locator('.fizz-gentle').count()) === 1 && (await fizz()) === 8), 'petillant fizzes gently: half the bubbles, slower');
   await p.screenshot({ path: out + '/carbonated-batch.png' });
 
   // 2. Removing the entry makes it still again
@@ -57,7 +58,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByRole('button', { name: 'Add to cellar' }).click(); await d.waitFor({ state: 'detached' });
   await p.waitForURL(/#\/cellar\//);
   ok(await until(async () => (await fact('Carbonation')) === 'Sparkling'), 'the bottles are sparkling');
-  ok(await until(async () => (await hero.locator('.fizz circle').count()) > 0), 'and the bottle fizzes');
+  ok(await until(async () => (await hero.locator('.fizz circle').count()) === 16 && (await hero.locator('.fizz-gentle').count()) === 0), 'and the bottle fizzes fully');
   await p.screenshot({ path: out + '/carbonated-bottle.png' });
   await p.locator('dd a', { hasText: 'Fizzy' }).click(); await p.waitForSelector('.hero');
   ok(await until(async () => (await carbRows().count()) === 1 && /Sparkling · natural, honey 3 oz/.test(await carbRows().first().textContent())), 'bottling added a Carbonated entry: Sparkling · natural, honey 3 oz');

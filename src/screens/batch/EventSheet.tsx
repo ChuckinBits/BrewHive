@@ -524,7 +524,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
               </div>
             ) : (
               <Field label="Pressure (PSI, optional)">
-                <input type="text" inputMode="decimal" value={psi} placeholder="30" onChange={(e) => { setError(''); setPsi(e.target.value); }} />
+                <input type="text" inputMode="decimal" value={psi} placeholder="12" onChange={(e) => { setError(''); setPsi(e.target.value); }} />
               </Field>
             )}
           </>
@@ -534,14 +534,14 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
             <UnitField
               label="Temperature (optional)"
               value={pasteurTemp}
-              placeholder={tempUnit === 'F' ? '160' : '70'}
+              placeholder={tempUnit === 'F' ? '140' : '60'}
               onChange={setPasteurTemp}
               unit={tempUnit}
               units={TEMP_UNITS}
               onUnit={setTempUnit}
             />
             <Field label="Time (minutes)">
-              <input type="text" inputMode="decimal" value={minutes} placeholder="15" onChange={(e) => setMinutes(e.target.value)} />
+              <input type="text" inputMode="decimal" value={minutes} placeholder="22" onChange={(e) => setMinutes(e.target.value)} />
             </Field>
           </div>
         )}
