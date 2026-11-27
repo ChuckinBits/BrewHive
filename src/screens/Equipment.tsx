@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import { ConfirmSheet, Field, Segmented, Sheet, TopBar, UnitField, VOLUME_UNITS, toast } from '../components/ui.tsx';
 import { batches, currencyOf, equipment, saveSettings, useQuery, useSettings } from '../db/store.ts';
-import { VESSEL_TYPES, type Batch, type Equipment, type VesselSort, type VesselType, type VolumeUnit } from '../db/types.ts';
-import { MAX_AT_ONCE, batchesIn, groupVessels, numberedNames, priceTotal, sortGroups, suggestVesselName, vesselTypeLabel } from '../lib/equipment.ts';
+import { GEAR_ICONS, VESSEL_TYPES, type Batch, type Equipment, type GearIcon, type VesselSort, type VesselType, type VolumeUnit } from '../db/types.ts';
+import { MAX_AT_ONCE, batchesIn, gearIcon, groupVessels, guessGearIcon, numberedNames, priceTotal, sortGroups, suggestVesselName, vesselIcon, vesselTypeLabel } from '../lib/equipment.ts';
 import { fmtMoney } from '../lib/cost.ts';
 import { fmtVolume, parseNum, volumeFromInput, volumeToInput } from '../lib/format.ts';
 import { volumeUnitOf } from '../lib/units.ts';
@@ -44,7 +44,7 @@ export function EquipmentScreen() {
       <button type="button" className="library-row equipment-row" onClick={() => setEditing({ item: v, kind: 'vessel' })}>
         {withSize && (
           <span className="timeline-icon">
-            <Icon name="batches" size={20} />
+            <Icon name={vesselIcon(v.vesselType)} size={20} />
           </span>
         )}
         <span className="equipment-text">
@@ -104,7 +104,7 @@ export function EquipmentScreen() {
                 <li key={group.key} className="vessel-group">
                   <button type="button" className="library-row equipment-row vessel-group-head" aria-expanded={isOpen} onClick={() => toggle(group.key)}>
                     <span className="timeline-icon">
-                      <Icon name="batches" size={20} />
+                      <Icon name={vesselIcon(group.vessels[0].vesselType)} size={20} />
                     </span>
                     <span className="equipment-text">
                       <span className="library-name">{group.label}</span>
@@ -139,7 +139,7 @@ export function EquipmentScreen() {
               <li key={g.id}>
                 <button type="button" className="library-row equipment-row" onClick={() => setEditing({ item: g, kind: 'gear' })}>
                   <span className="timeline-icon">
-                    <Icon name="flask" size={20} />
+                    <Icon name={gearIcon(g.icon)} size={20} />
                   </span>
                   <span className="equipment-text">
                     <span className="library-name">
@@ -197,6 +197,9 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
   // With several, the price can be typed for each one or for all of them together.
   const [priceFor, setPriceFor] = useState<'each' | 'total'>('each');
   const [notes, setNotes] = useState(item?.notes ?? '');
+  // Gear's picture: the one picked, or else one that fits the name as it's typed.
+  const [picked, setPicked] = useState<GearIcon | null>(item?.icon ?? null);
+  const icon: GearIcon = picked ?? guessGearIcon(name) ?? 'other';
   // Adding several alike at once (new vessels only).
   const [count, setCount] = useState(String(item?.quantity ?? 1));
   const [error, setError] = useState('');
@@ -260,7 +263,7 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
         kind,
         notes: notes.trim(),
         price: priceValue,
-        ...(isVessel ? {} : { quantity: howMany }),
+        ...(isVessel ? {} : { quantity: howMany, icon }),
         ...(isVessel ? { vesselType, capacityL: capacity.trim() ? capacityL : null, capacityUnit } : {}),
       });
     }
@@ -295,6 +298,21 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
         <Field label="Name" hint={isVessel ? (Number(count) > 1 && !item ? 'The name they share: each gets its number after it.' : name.trim() ? 'Tell them apart, such as Carboy A or Big bucket.' : `Left empty, it's called ${suggested}.`) : undefined}>
           <input type="text" value={name} placeholder={isVessel ? suggested : 'Hydrometer'} autoFocus={!item && !isVessel} onChange={(e) => setName(e.target.value)} />
         </Field>
+        {!isVessel && (
+          <div className="field">
+            <span className="field-label" id="gear-icon-label">
+              Icon
+            </span>
+            <div className="gear-icon-grid" role="radiogroup" aria-labelledby="gear-icon-label">
+              {GEAR_ICONS.map((g) => (
+                <button key={g.id} type="button" role="radio" aria-checked={icon === g.id} aria-label={g.label} title={g.label} className={icon === g.id ? 'gear-icon gear-icon-on' : 'gear-icon'} onClick={() => setPicked(g.id)}>
+                  <Icon name={gearIcon(g.id)} size={22} />
+                </button>
+              ))}
+            </div>
+            <span className="field-hint">{GEAR_ICONS.find((g) => g.id === icon)?.label}{picked ? '' : ' · picked from the name'}</span>
+          </div>
+        )}
         {!isVessel && countField}
         <Field label={`Price (${currency}, optional)`} hint={priceHint}>
           <div className="price-row">

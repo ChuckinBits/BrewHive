@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { timelineOf } from '../lib/split.ts';
-import { batches, events, usePrefs, useQuery } from '../db/store.ts';
+import { batches, equipment, events, usePrefs, useQuery } from '../db/store.ts';
 import { loadSampleData } from '../db/sample.ts';
-import { BATCH_STATUSES, type Batch, type BatchEvent } from '../db/types.ts';
-import { Book, Carboy } from '../components/Vessels.tsx';
+import { BATCH_STATUSES, type Batch, type BatchEvent, type Equipment } from '../db/types.ts';
+import { Book, Carboy, VesselArt, shapeFor } from '../components/Vessels.tsx';
+import { vesselsOf } from '../lib/equipment.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { EmptyState, Fab, TopBar, toast } from '../components/ui.tsx';
 import { abvEstimate, batchAbv, fillLevel, isActive } from '../lib/batch.ts';
@@ -27,10 +28,11 @@ const SORTS = [
 
 const statusOrder = (b: Batch) => BATCH_STATUSES.findIndex((s) => s.id === b.status);
 
-/** A batch's shelf artwork: a carboy, or a book spine once archived. */
-export function BatchArt({ batch, size }: { batch: Batch; size?: number }) {
+/** A batch's shelf artwork: the vessel it's in (a carboy when there's none), or a book spine once archived. */
+export function BatchArt({ batch, size, equipment: gear = [] }: { batch: Batch; size?: number; equipment?: Equipment[] }) {
   if (batch.status === 'archived') return <Book icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} size={size} />;
-  return <Carboy icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
+  const shape = shapeFor(vesselsOf(batch, gear)[0]?.vessel.vesselType);
+  return <VesselArt shape={shape} icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
 }
 
 export function statusLabel(batch: Batch): string {
@@ -50,7 +52,7 @@ export function batchSubtitle(batch: Batch): string {
 export function BatchesScreen() {
   const { view, sort, setView, setSort } = usePrefs('batches', 'newest');
   const [filter, setFilter] = useState<Filter>('active');
-  const data = useQuery(async () => ({ batches: await batches.list(), events: await events.list() }));
+  const data = useQuery(async () => ({ batches: await batches.list(), events: await events.list(), equipment: await equipment.list() }));
 
   if (!data) return <TopBar title="Batches" />;
 
@@ -91,7 +93,7 @@ export function BatchesScreen() {
     return {
       key: batch.id,
       to: `/batches/${batch.id}`,
-      visual: <BatchArt batch={batch} />,
+      visual: <BatchArt batch={batch} equipment={data.equipment} />,
       icons: iconsOf(batch),
       title: batch.name,
       subtitle: batchSubtitle(batch),

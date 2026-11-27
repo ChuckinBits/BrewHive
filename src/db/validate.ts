@@ -3,7 +3,7 @@
 // skipped, and loose ends (a missing note, a number saved as text) are tidied up, rather than
 // letting one bad record break a page.
 
-import { BATCH_STATUSES, BEVERAGE_TYPES, EVENT_TYPES, INGREDIENT_STAGES, POUR_TYPES, VESSEL_TYPES, type Settings } from './types.ts';
+import { BATCH_STATUSES, BEVERAGE_TYPES, EVENT_TYPES, INGREDIENT_STAGES, GEAR_ICONS, POUR_TYPES, VESSEL_TYPES, type Settings } from './types.ts';
 import type { StoreName } from './idb.ts';
 
 type Rec = Record<string, unknown>;
@@ -30,6 +30,7 @@ const BEVERAGE_IDS = BEVERAGE_TYPES.map((t) => t.id);
 const STAGE_IDS = INGREDIENT_STAGES.map((s) => s.id);
 const POUR_IDS = POUR_TYPES.map((t) => t.id);
 const VESSEL_IDS = VESSEL_TYPES.map((t) => t.id);
+const GEAR_ICON_IDS = GEAR_ICONS.map((t) => t.id);
 /** Optional list of vessels with amounts: entries without a text id are dropped, amounts are numbers or null. */
 const fills = (r: Rec, key: string) => {
   if (!(key in r)) return;
@@ -135,6 +136,7 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if ('capacityUnit' in r && r.capacityUnit !== 'gal' && r.capacityUnit !== 'L') delete r.capacityUnit;
     numberOrNull(r, 'price');
     if ('quantity' in r && !(isNumber(r.quantity) && Number.isInteger(r.quantity) && r.quantity >= 1)) delete r.quantity;
+    if ('icon' in r && !oneOf(r.icon, GEAR_ICON_IDS)) delete r.icon;
     return true;
   },
 };

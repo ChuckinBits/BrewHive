@@ -5,6 +5,21 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Equipment
+
+- **A picture for each vessel.** A batch is drawn in the vessel it's in, on
+  the shelf and on its page: a carboy, a bucket with its lid, a jar, a keg,
+  an oak barrel, or a conical fermenter on legs. Each is see-through, shows
+  the batch inside, and wears an airlock. Other vessels stay a carboy.
+- **Vessel icons.** Each vessel type has its own icon on the Equipment
+  screen.
+- **Gear icon picker.** Gear has an Icon field with 21 to choose from:
+  hydrometer, refractometer, thermometer, pH meter, scale, wine thief,
+  siphon, tubing, airlock, funnel, and more. It picks one from the name as
+  you type (Auto-siphon gets the siphon) until you choose your own.
+
 ## v0.3.2 – 2026-11-26
 
 ### Equipment

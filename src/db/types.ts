@@ -324,6 +324,35 @@ export const VESSEL_TYPES: { id: VesselType; label: string }[] = [
   { id: 'other', label: 'Other vessel' },
 ];
 
+/** The pictures gear can have. Other is the plain flask. */
+export type GearIcon =
+  | 'hydrometer' | 'refractometer' | 'thermometer' | 'ph' | 'scale' | 'thief' | 'siphon' | 'tubing' | 'airlock' | 'funnel'
+  | 'strainer' | 'spoon' | 'kettle' | 'spray' | 'brush' | 'bottle' | 'capper' | 'corker' | 'timer' | 'wrench' | 'other';
+
+export const GEAR_ICONS: { id: GearIcon; label: string }[] = [
+  { id: 'hydrometer', label: 'Hydrometer' },
+  { id: 'refractometer', label: 'Refractometer' },
+  { id: 'thermometer', label: 'Thermometer' },
+  { id: 'ph', label: 'pH meter' },
+  { id: 'scale', label: 'Scale' },
+  { id: 'thief', label: 'Wine thief' },
+  { id: 'siphon', label: 'Siphon' },
+  { id: 'tubing', label: 'Tubing' },
+  { id: 'airlock', label: 'Airlock' },
+  { id: 'funnel', label: 'Funnel' },
+  { id: 'strainer', label: 'Strainer' },
+  { id: 'spoon', label: 'Spoon' },
+  { id: 'kettle', label: 'Pot' },
+  { id: 'spray', label: 'Sanitizer' },
+  { id: 'brush', label: 'Brush' },
+  { id: 'bottle', label: 'Bottle' },
+  { id: 'capper', label: 'Capper' },
+  { id: 'corker', label: 'Corker' },
+  { id: 'timer', label: 'Timer' },
+  { id: 'wrench', label: 'Tool' },
+  { id: 'other', label: 'Other' },
+];
+
 /**
  * A piece of equipment. Vessels hold batches and have a capacity; other gear (a hydrometer, a
  * siphon, a pH meter) is a list with notes. Which batch a vessel holds is the batch's vesselId.
@@ -341,6 +370,8 @@ export interface Equipment extends Base {
   price?: number | null;
   /** For gear: how many of it you have, such as 10 airlocks. Missing means one. */
   quantity?: number;
+  /** For gear: the picture beside its name. Missing means the plain one. */
+  icon?: GearIcon;
   notes: string;
 }
 /** What a batch or recipe aims for: a final gravity (the ABV follows), or an ABV (the final gravity follows). */
