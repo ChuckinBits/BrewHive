@@ -38,6 +38,8 @@ interface EventSheetProps {
   onClose: () => void;
   /** Called after a backsweetening ticked to ferment is added to a batch that is past fermentation. */
   onRestart: () => void;
+  /** Called with each entry saved, and what it was before an edit: BatchDetail offers stage moves from it. */
+  onLogged?: (saved: Partial<BatchEvent>, before: BatchEvent | null) => void;
   /** Called after a Stabilized entry is added to a batch that is still fermenting. */
   onStabilized: () => void;
   /** Called after a new Stage change entry moves the batch to Secondary, to offer racking into a vessel. */
@@ -77,7 +79,7 @@ const GRID_LABELS: Partial<Record<EventType, string>> = { status: 'Stage change'
 const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: GRID_LABELS[id] ?? EVENT_TYPES.find((t) => t.id === id)?.label ?? id }));
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
-export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized, onSecondary, onSeveral }: EventSheetProps) {
+export function EventSheet({ batch, settings, existing, onClose, onRestart, onLogged, onStabilized, onSecondary, onSeveral }: EventSheetProps) {
   const isStage = existing?.type === 'status';
   // "Batch rating" entries come from the rating slider; they are edited, not added, here.
   const isReview = existing?.type === 'review';
@@ -288,6 +290,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     const reratedBatch = rateBatch || (drivesBatchRating && rating !== batch.rating);
     toast(reratedBatch ? (existing ? 'Entry updated, and the batch rating too' : 'Saved, and the batch rating updated') : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
+    onLogged?.({ ...(existing ?? {}), ...fields, type }, existing);
     // Sugar that ferments, added to a batch past fermentation: offer to move it back to Secondary.
     const fermentedBefore = existing?.type === 'feeding' || existing?.ferments === true;
     if (fermentingSugar && !fermentedBefore && isFermentationComplete(batch)) onRestart();

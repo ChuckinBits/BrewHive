@@ -41,7 +41,7 @@ import {
   targetReached,
 } from '../lib/batch.ts';
 import { addedLines, currentIngredientStage, timelineSections } from '../lib/stages.ts';
-import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolume, fmtVolumeBoth, nowLocal } from '../lib/format.ts';
+import { fmtDate, fmtDateShort, fmtPercent, fmtSG, fmtVolume, fmtVolumeBoth, nowLocal, today } from '../lib/format.ts';
 import { Link, navigate } from '../lib/router.tsx';
 import { BatchArt, batchSubtitle } from './Batches.tsx';
 import { EVENT_ICONS, entryCategory, eventValue, isBottledEntry, newestFirst } from './batch/entries.ts';
@@ -75,6 +75,16 @@ export function BatchDetailScreen({ id }: { id: string }) {
   }, [id]);
 
   const library = useQuery(() => ingredients.list()) ?? [];
+  /**
+   * Yeast pitched today or earlier on a Planned batch means it's fermenting: offer to move it to Primary.
+   * A pitch dated in the future is still a plan. An edit asks only if it wasn't a pitch by then already.
+   */
+  const pitchDate = (e: Partial<BatchEvent> | null) =>
+    e && !e.deletedAt && e.date && e.date.slice(0, 10) <= today() && (e.type === 'pitch' || entryCategory(e as BatchEvent, library) === 'yeast') ? e.date : null;
+  const offerPrimary = (saved: Partial<BatchEvent>, before: BatchEvent | null) => {
+    const date = pitchDate(saved);
+    if (date && !pitchDate(before) && data?.batch?.status === 'planned') setPitched(date);
+  };
   const categories = categoriesOf(settings);
   // An ingredient entry shows its category's icon; other entries, their type's.
   const iconFor = (event: BatchEvent) => {
@@ -107,6 +117,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const [logging, setLogging] = useState<IngredientLine | null>(null);
   // Backsweetening ticked to ferment after fermentation ended: offer to go back to Secondary.
   const [restarting, setRestarting] = useState(false);
+  // Yeast pitched while Planned: when, to offer the move to Primary as of then.
+  const [pitched, setPitched] = useState<string | null>(null);
   // Offered after moving to Secondary, when you track vessels: which one it was racked into.
   const [racking, setRacking] = useState(false);
   // After racking into several vessels: offered sub-batches.
@@ -508,9 +520,9 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       {savingRecipe && <RecipeSheet batch={batch} events={data.events} recipe={data.recipe} settings={settings} onClose={() => setSavingRecipe(false)} />}
       {entry && (
-        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} onSecondary={() => hasVessels && setRacking(true)} onSeveral={(fills, date) => setSplitting({ fills, date })} />
+        <EventSheet batch={batch} settings={settings} existing={entry === 'new' ? null : entry} onClose={() => setEntry(null)} onLogged={offerPrimary} onRestart={() => setRestarting(true)} onStabilized={() => setFinishing('stabilized')} onSecondary={() => hasVessels && setRacking(true)} onSeveral={(fills, date) => setSplitting({ fills, date })} />
       )}
-      {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} />}
+      {logging && <LogIngredientSheet batch={batch} line={logging} onClose={() => setLogging(null)} onLogged={offerPrimary} />}
       {racking && <RackSheet batch={batch} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setRacking(false)} onSeveral={(fills, date) => setSplitting({ fills, date })} />}
       {splitting && <SplitSheet batch={batch} fills={splitting.fills} date={splitting.date} unit={batch.volumeUnit ?? volumeUnitOf(settings)} onClose={() => setSplitting(null)} />}
       {undoingSplit && (
@@ -527,6 +539,23 @@ export function BatchDetailScreen({ id }: { id: string }) {
         />
       )}
       {finishing && <FinishSheet batch={batch} timeline={data.events} stabilized={finishing === 'stabilized'} onClose={() => setFinishing(false)} />}
+      {pitched && (
+        <ConfirmSheet
+          title="Yeast pitched"
+          message={`${batch.name} is fermenting now. Move it to Primary?`}
+          confirmLabel="Move to Primary"
+          cancelLabel="Keep it planned"
+          tone="normal"
+          onClose={() => setPitched(null)}
+          onConfirm={async () => {
+            const date = pitched;
+            setPitched(null);
+            const latest = await batches.get(batch.id);
+            if (latest?.status === 'planned') await changeStatus(latest, 'primary', {}, date);
+            toast('Moved to Primary');
+          }}
+        />
+      )}
       {restarting && (
         <ConfirmSheet
           title="Fermenting again?"
