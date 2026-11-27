@@ -1,7 +1,7 @@
 // Equipment: which batches each vessel holds, how much room is left in it, and how racking moves a
 // batch from one set of vessels to another. A batch can be in several vessels at once.
 
-import type { Batch, BatchEvent, Equipment, VesselFill, VesselSort, VolumeUnit } from '../db/types.ts';
+import type { Batch, BatchEvent, Equipment, GearIcon, VesselFill, VesselSort, VesselType, VolumeUnit } from '../db/types.ts';
 import { VESSEL_TYPES } from '../db/types.ts';
 import { fmtVolume } from './format.ts';
 
@@ -218,4 +218,43 @@ export function sortGroups(groups: VesselGroup[], sort: VesselSort, batches: Bat
     free: (a, b) => free(b) - free(a) || byType(a, b),
   };
   return [...groups].sort(order[sort]);
+}
+
+/** The line icon for a vessel type. Other vessels look like a carboy. */
+export function vesselIcon(type: VesselType | undefined) {
+  return type && type !== 'other' && type !== 'carboy' ? (`vessel-${type}` as const) : ('batches' as const);
+}
+
+/** The line icon for a piece of gear. */
+export function gearIcon(icon: GearIcon | undefined) {
+  return icon && icon !== 'other' ? (`gear-${icon}` as const) : ('flask' as const);
+}
+
+// Words in a gear name that point to its picture, checked in order.
+const GEAR_WORDS: [RegExp, GearIcon][] = [
+  [/refract/i, 'refractometer'],
+  [/hydrometer|tilt|ispindel|gravity/i, 'hydrometer'],
+  [/thermo|temp/i, 'thermometer'],
+  [/\bph\b/i, 'ph'],
+  [/scale/i, 'scale'],
+  [/thief|sampl|pipette/i, 'thief'],
+  [/siphon|racking cane|auto.?siphon/i, 'siphon'],
+  [/tub(e|ing)|hose/i, 'tubing'],
+  [/airlock|bung|stopper/i, 'airlock'],
+  [/funnel/i, 'funnel'],
+  [/strain|sieve|bag/i, 'strainer'],
+  [/spoon|paddle|stir|whisk|degass/i, 'spoon'],
+  [/pot\b|kettle/i, 'kettle'],
+  [/sanit|spray|star.?san|cleaner/i, 'spray'],
+  [/brush/i, 'brush'],
+  [/capper/i, 'capper'],
+  [/cork/i, 'corker'],
+  [/bottl/i, 'bottle'],
+  [/timer|clock/i, 'timer'],
+  [/wrench|tool|drill/i, 'wrench'],
+];
+
+/** A picture that fits a gear name, such as the hydrometer for Hydrometer. */
+export function guessGearIcon(name: string): GearIcon | null {
+  return GEAR_WORDS.find(([re]) => re.test(name))?.[1] ?? null;
 }

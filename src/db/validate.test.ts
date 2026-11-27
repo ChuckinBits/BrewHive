@@ -124,3 +124,8 @@ test('a batch and a racking entry keep vessel ids only when they are text', () =
 test('a vessel saved as a jug comes back as a jar (renamed in v0.3.2)', () => {
   assert.equal(cleanRecord('equipment', { id: 'j', name: 'Jug A', kind: 'vessel', vesselType: 'jug' })!.vesselType, 'jar');
 });
+
+test('equipment: a gear icon is kept only when it is one BrewHive draws', () => {
+  assert.equal(cleanRecord('equipment', { id: 'g1', name: 'Hydrometer', kind: 'gear', icon: 'hydrometer' })!.icon, 'hydrometer');
+  assert.equal('icon' in cleanRecord('equipment', { id: 'g2', name: 'Hydrometer', kind: 'gear', icon: 'rocket' })!, false);
+});

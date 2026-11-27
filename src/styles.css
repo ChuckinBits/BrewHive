@@ -2775,3 +2775,28 @@ button.library-row {
 .price-row .segmented {
   flex: none;
 }
+
+/* Gear icon picker: a grid of small tiles, the chosen one filled. */
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 6px;
+}
+.icon-pick {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-pick:hover {
+  color: var(--ink);
+}
+.icon-pick-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}

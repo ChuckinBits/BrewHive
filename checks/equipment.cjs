@@ -40,6 +40,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await addVessel({ type: 'Jar', capacity: '1', name: 'Jar A' });
   await p.getByRole('button', { name: 'Add gear' }).click();
   await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel('Price', { exact: true }).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
+  ok(await until(async () => (await d.getByRole('radio', { name: 'Hydrometer' }).getAttribute('aria-checked')) === 'true'), 'gear named Hydrometer gets the hydrometer icon');
+  await d.getByRole('radio', { name: 'Wine thief' }).click();
+  ok(await until(async () => (await d.getByRole('radio', { name: 'Wine thief' }).getAttribute('aria-checked')) === 'true' && (await d.getByRole('radio', { checked: true }).count()) === 1), 'the icon picker picks one');
+  await d.getByRole('radio', { name: 'Hydrometer' }).click();
   await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
   ok(await until(async () => ((await row('Hydrometer').textContent()).includes('$12.99') && (await row('Hydrometer').textContent()).includes('Triple scale'))), 'gear shows its notes and price');
   ok(await until(async () => ((await p.locator('.card-head .muted').textContent()) === 'All free')), 'both vessels are free');
@@ -54,6 +58,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
   const batchUrl = p.url();
   ok(await until(async () => ((await fact('Vessel')) === 'Jar AFull')), 'the batch page shows the vessel and that it is full: ' + (await fact('Vessel')));
+  ok(await until(async () => (await p.locator('.hero svg.vessel').getAttribute('data-shape')) === 'jar'), 'the batch page draws the batch in a jar');
 
   // 4. The Equipment screen shows what's in each vessel
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');

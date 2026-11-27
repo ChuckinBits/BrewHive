@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Batch, BatchEvent, Equipment } from '../db/types.ts';
-import { batchesIn, fillInOrder, fillsAfterRemovingRack, groupVessels, numberedNames, priceTotal, sortGroups, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
+import { batchesIn, fillInOrder, gearIcon, guessGearIcon, vesselIcon, fillsAfterRemovingRack, groupVessels, numberedNames, priceTotal, sortGroups, fillsOf, fmtHeadspace, headspace, listNames, normalizeFills, rackedInto, suggestVesselName, vesselChoices, vesselsOf, vesselWarning, volumeAfterRack } from './equipment.ts';
 
 const base = { createdAt: '', updatedAt: '', deletedAt: null };
 const GAL = 3.785411784;
@@ -136,4 +136,26 @@ test('vessel lines sort by type, size, name or free first', () => {
 
 test('gear with a quantity counts each one in the total', () => {
   assert.deepEqual(priceTotal([{ ...vessel({ price: 1.5 }), kind: 'gear', quantity: 10 }, { ...vessel({ price: 12.99 }), kind: 'gear' }]), { total: 27.99, unpriced: 0 });
+});
+
+test('icons: each vessel type has its own, and other vessels and gear fall back', () => {
+  assert.equal(vesselIcon('tank'), 'vessel-tank');
+  assert.equal(vesselIcon('carboy'), 'batches');
+  assert.equal(vesselIcon('other'), 'batches');
+  assert.equal(vesselIcon(undefined), 'batches');
+  assert.equal(gearIcon('siphon'), 'gear-siphon');
+  assert.equal(gearIcon('other'), 'flask');
+  assert.equal(gearIcon(undefined), 'flask');
+});
+
+test('guessGearIcon: a picture that fits the name, or none', () => {
+  assert.equal(guessGearIcon('Triple scale hydrometer'), 'hydrometer');
+  assert.equal(guessGearIcon('Brix refractometer'), 'refractometer');
+  assert.equal(guessGearIcon('Auto-siphon'), 'siphon');
+  assert.equal(guessGearIcon('Bottle capper'), 'capper');
+  assert.equal(guessGearIcon('Bottle brush'), 'brush');
+  assert.equal(guessGearIcon('Bottle filler'), 'bottle');
+  assert.equal(guessGearIcon('pH meter'), 'ph');
+  assert.equal(guessGearIcon('Star San spray'), 'spray');
+  assert.equal(guessGearIcon('Mystery box'), null);
 });

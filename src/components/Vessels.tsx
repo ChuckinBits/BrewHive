@@ -1,9 +1,9 @@
-// The shelf artwork: a carboy for a batch, a book for a recipe and a bottle
-// for the cellar. Each one shows its flavor icon large and centered.
+// The shelf artwork: a batch in its vessel (a carboy, bucket, jar, keg, barrel or conical tank), a
+// book for a recipe and a bottle for the cellar. Each one shows its flavor icon large and centered.
 // All three share a 96 x 132 canvas and stand on y = 124, so they line up
 // on a shelf.
 
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { FlavorStack } from '../icons/FlavorIcon.tsx';
 
 const W = 96;
@@ -20,55 +20,216 @@ interface Common {
   size?: number;
 }
 
-const CARBOY_BODY = 'M41 25V32C41 41 11 42 11 64V112Q11 124 23 124H73Q85 124 85 112V64C85 42 55 41 55 32V25Z';
+/** What a batch sits in on the shelf and the batch page. Other vessels are drawn as a carboy. */
+export type VesselShape = 'carboy' | 'bucket' | 'jar' | 'keg' | 'barrel' | 'tank';
 
-interface CarboyProps extends Common {
+interface Shape {
+  /** The inside, where the liquid goes (also the glass). */
+  body: string;
+  /** The liquid fills up from `bottom`, `span` high when full. */
+  bottom: number;
+  span: number;
+  /** Where the airlock sits: its top. It is 14 wide, centered on x = 48. */
+  airlockTop: number;
+  /** The flavor label. */
+  label: { cx: number; cy: number; r: number };
+  /** A light streak down the glass. */
+  shine: string;
+  /** Bubbles near the bottom while fermenting. */
+  bubbles: [number, number, number][];
+  /** Drawn behind the glass (legs), and on top of it (lids, hoops, collars). */
+  behind?: ReactNode;
+  front?: ReactNode;
+  /** Drawn over the liquid, under the outline (a wood tint, staves). */
+  tint?: ReactNode;
+}
+
+const TAN = '#C9A27A';
+const RUBBER = '#3A322B';
+const IRON = '#4A3A2C';
+
+const SHAPES: Record<VesselShape, Shape> = {
+  carboy: {
+    body: 'M41 25V32C41 41 11 42 11 64V112Q11 124 23 124H73Q85 124 85 112V64C85 42 55 41 55 32V25Z',
+    bottom: 124,
+    span: 84,
+    airlockTop: 2,
+    label: { cx: 48, cy: 86, r: 21 },
+    shine: 'M18 70V106',
+    bubbles: [[20, 116, 2], [76, 118, 1.6], [25, 119, 1.3], [72, 114, 2.2]],
+    front: <rect className="vessel-line" x="40" y="20" width="16" height="6" rx="2" fill={TAN} strokeWidth="1.75" />,
+  },
+  // A clear plastic pail: lid with a grommet, and lugs for its handle.
+  bucket: {
+    body: 'M14 38L20 119Q20.4 124 25 124H71Q75.6 124 76 119L82 38Z',
+    bottom: 124,
+    span: 82,
+    airlockTop: 7,
+    label: { cx: 48, cy: 84, r: 21 },
+    shine: 'M22 52L25.5 106',
+    bubbles: [[26, 116, 2], [70, 118, 1.6], [30, 119, 1.3], [66, 114, 2.2]],
+    front: (
+      <>
+        {/* Handle lugs on the sides, where the wire handle hooks in */}
+        <rect className="vessel-line" x="11.5" y="44" width="5" height="9" rx="2" fill={TAN} strokeWidth="1.5" />
+        <rect className="vessel-line" x="79.5" y="44" width="5" height="9" rx="2" fill={TAN} strokeWidth="1.5" />
+        <rect className="vessel-glass vessel-line" x="10" y="31" width="76" height="8" rx="2.5" strokeWidth="2" />
+        <path className="vessel-line" d="M15 45H81" strokeWidth="1" opacity="0.45" />
+        <rect className="vessel-line" x="41.5" y="26" width="13" height="5" rx="1.5" fill={TAN} strokeWidth="1.5" />
+      </>
+    ),
+  },
+  // A wide-mouth jar: shoulders, a short neck and a screw lid with the airlock through it.
+  jar: {
+    body: 'M30 36V41C30 46 17 46 17 55V116Q17 124 25 124H71Q79 124 79 116V55C79 46 66 46 66 41V36Z',
+    bottom: 124,
+    span: 80,
+    airlockTop: 5,
+    label: { cx: 48, cy: 87, r: 21 },
+    shine: 'M23 62V108',
+    bubbles: [[24, 116, 2], [72, 118, 1.6], [28, 119, 1.3], [68, 114, 2.2]],
+    front: (
+      <>
+        <rect className="vessel-line" x="27" y="25" width="42" height="11" rx="2.5" fill="#B9B1A5" strokeWidth="2" />
+        <path className="vessel-line" d="M33 28V33M39 28V33M45 28V33M51 28V33M57 28V33M63 28V33" strokeWidth="1" opacity="0.5" />
+      </>
+    ),
+  },
+  // A ball-lock keg: rubber collar with a handle slot on top, rubber base below.
+  keg: {
+    body: 'M20 34Q20 30 25 30H71Q76 30 76 34V114H20Z',
+    bottom: 114,
+    span: 80,
+    airlockTop: 1,
+    label: { cx: 48, cy: 74, r: 20 },
+    shine: 'M26 40V104',
+    bubbles: [[26, 106, 2], [70, 108, 1.6], [30, 109, 1.3], [66, 104, 2.2]],
+    front: (
+      <>
+        <path d="M20 17Q20 13 25 13H71Q76 13 76 17V33H20Z" fill={RUBBER} className="vessel-line" strokeWidth="2" strokeLinejoin="round" />
+        <rect x="31" y="18" width="34" height="6" rx="3" className="vessel-glass" />
+        <path d="M18 112H78V120Q78 124 74 124H22Q18 124 18 120Z" fill={RUBBER} className="vessel-line" strokeWidth="2" strokeLinejoin="round" />
+        <rect className="vessel-line" x="41.5" y="10" width="13" height="4" rx="1.5" fill={TAN} strokeWidth="1.5" />
+      </>
+    ),
+  },
+  // An upright barrel: bulging staves, iron hoops, a bung with the airlock.
+  barrel: {
+    body: 'M24 30C13 56 13 98 24 124H72C83 98 83 56 72 30Z',
+    bottom: 124,
+    span: 90,
+    airlockTop: 6,
+    label: { cx: 48, cy: 80, r: 20 },
+    shine: 'M22 60C20 74 20 88 22 102',
+    bubbles: [[26, 116, 2], [70, 118, 1.6], [30, 120, 1.3], [66, 114, 2.2]],
+    tint: (
+      <>
+        <rect x="8" y="26" width="80" height="100" fill="#8A5A2B" opacity="0.18" />
+        <path d="M33 30C30 56 30 98 33 124M48 30V124M63 30C66 56 66 98 63 124" stroke="#6B4423" strokeWidth="1" opacity="0.35" fill="none" />
+        <rect x="8" y="37" width="80" height="5" fill={IRON} opacity="0.9" />
+        <rect x="8" y="50" width="80" height="5" fill={IRON} opacity="0.9" />
+        <rect x="8" y="105" width="80" height="5" fill={IRON} opacity="0.9" />
+        <rect x="8" y="117" width="80" height="4" fill={IRON} opacity="0.9" />
+      </>
+    ),
+    front: (
+      <>
+        <path className="vessel-line" d="M24 30H72" strokeWidth="2" />
+        <rect className="vessel-line" x="41.5" y="25" width="13" height="5" rx="1.5" fill={TAN} strokeWidth="1.5" />
+      </>
+    ),
+  },
+  // A conical fermenter: domed lid, straight body, a cone down to a dump valve, three legs.
+  tank: {
+    body: 'M22 34H74V84L53 106H43L22 84Z',
+    bottom: 106,
+    span: 72,
+    airlockTop: 1,
+    label: { cx: 48, cy: 60, r: 19 },
+    shine: 'M27 40V80',
+    bubbles: [[44, 100, 2], [52, 101, 1.6], [34, 92, 1.3], [62, 92, 2.2]],
+    behind: (
+      <g className="vessel-line" strokeWidth="2.5" strokeLinecap="round" fill="none">
+        <path d="M26 82L15 122M70 82L81 122M48 98V122" />
+        <path d="M11 123H19M77 123H85M44 123H52" strokeWidth="3" />
+      </g>
+    ),
+    front: (
+      <>
+        <path className="vessel-glass vessel-line" d="M20 34Q48 16 76 34Z" strokeWidth="2" strokeLinejoin="round" />
+        <path className="vessel-line" d="M18 34H78" strokeWidth="2.5" strokeLinecap="round" />
+        <path className="vessel-line" d="M22 84H74" strokeWidth="1" opacity="0.4" />
+        <rect className="vessel-line" x="43" y="106" width="10" height="6" rx="1.5" fill="#B9B1A5" strokeWidth="1.5" />
+        <path className="vessel-line" d="M53 109H61" strokeWidth="2.5" strokeLinecap="round" />
+        <rect className="vessel-line" x="74" y="70" width="7" height="5" rx="1.5" fill="#B9B1A5" strokeWidth="1.5" />
+        <rect className="vessel-line" x="41.5" y="21" width="13" height="5" rx="1.5" fill={TAN} strokeWidth="1.5" />
+      </>
+    ),
+  },
+};
+
+/** The shape for a vessel type: kinds without a drawing of their own are carboys. */
+export function shapeFor(vesselType: string | undefined): VesselShape {
+  return vesselType && vesselType in SHAPES ? (vesselType as VesselShape) : 'carboy';
+}
+
+interface VesselProps extends Common {
   /** 0 (empty) to 1 (full). */
   level: number;
   /** Bubbles rise and the airlock ticks while the batch is in primary. */
   fermenting?: boolean;
+  shape?: VesselShape;
 }
 
-export function Carboy({ icon, extraIcons = [], color, level, fermenting = false, size = 118 }: CarboyProps) {
+/** A batch in its vessel: clear, with the liquid at its level, an airlock and the flavor label. */
+export function VesselArt({ icon, extraIcons = [], color, level, fermenting = false, size = 118, shape = 'carboy' }: VesselProps) {
   const clip = useId();
-  const top = 124 - Math.max(0, Math.min(1, level)) * 84;
+  const s = SHAPES[shape];
+  const top = s.bottom - Math.max(0, Math.min(1, level)) * s.span;
+  const a = s.airlockTop;
   return (
-    <svg className="vessel" width={(size * W) / H} height={size} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+    <svg className="vessel" width={(size * W) / H} height={size} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" data-shape={shape}>
       <defs>
         <clipPath id={clip}>
-          <path d={CARBOY_BODY} />
+          <path d={s.body} />
         </clipPath>
       </defs>
-      {/* Airlock and bung */}
-      <rect className="vessel-glass vessel-line" x="41" y="2" width="14" height="11" rx="3.5" strokeWidth="1.75" />
-      {fermenting && <circle className="airlock-bubble" cx="48" cy="7.5" r="2.2" />}
-      <rect className="vessel-glass vessel-line" x="45.5" y="13" width="5" height="8" strokeWidth="1.75" />
-      <rect className="vessel-line" x="40" y="20" width="16" height="6" rx="2" fill="#C9A27A" strokeWidth="1.75" />
+      {s.behind}
+      {/* Airlock and its stem, down into the stopper */}
+      <rect className="vessel-glass vessel-line" x="41" y={a} width="14" height="11" rx="3.5" strokeWidth="1.75" />
+      {fermenting && <circle className="airlock-bubble" cx="48" cy={a + 5.5} r="2.2" />}
+      <rect className="vessel-glass vessel-line" x="45.5" y={a + 11} width="5" height="8" strokeWidth="1.75" />
       {/* Glass, then the liquid clipped to the glass */}
-      <path className="vessel-glass" d={CARBOY_BODY} />
+      <path className="vessel-glass" d={s.body} />
       <g clipPath={`url(#${clip})`}>
         {level > 0 && (
           <>
-            <rect x="6" y={top} width="84" height={130 - top} fill={color} />
-            <rect x="6" y={top} width="84" height={fermenting ? 5 : 2.5} fill="#FFFFFF" opacity={fermenting ? 0.5 : 0.28} />
+            <rect x="0" y={top} width={W} height={H - top} fill={color} />
+            <rect x="0" y={top} width={W} height={fermenting ? 5 : 2.5} fill="#FFFFFF" opacity={fermenting ? 0.5 : 0.28} />
           </>
         )}
         {fermenting && (
           <g className="bubbles" fill="#FFFFFF">
-            <circle cx="20" cy="116" r="2" />
-            <circle cx="76" cy="118" r="1.6" />
-            <circle cx="25" cy="119" r="1.3" />
-            <circle cx="72" cy="114" r="2.2" />
+            {s.bubbles.map(([cx, cy, r]) => (
+              <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+            ))}
           </g>
         )}
+        {s.tint}
       </g>
-      <path className="vessel-line" d={CARBOY_BODY} fill="none" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M18 70V106" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path className="vessel-line" d={s.body} fill="none" strokeWidth="2" strokeLinejoin="round" />
+      <path d={s.shine} stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" fill="none" />
+      {s.front}
       {/* Label with the flavor icon */}
-      <circle cx="48" cy="86" r="21" fill={LABEL_FILL} stroke={LABEL_INK} strokeWidth="1.5" />
-      <FlavorStack icons={[icon, ...extraIcons]} size={30} x={33} y={71} />
+      <circle cx={s.label.cx} cy={s.label.cy} r={s.label.r} fill={LABEL_FILL} stroke={LABEL_INK} strokeWidth="1.5" />
+      <FlavorStack icons={[icon, ...extraIcons]} size={s.label.r * 1.43} x={s.label.cx - s.label.r * 0.715} y={s.label.cy - s.label.r * 0.715} />
     </svg>
   );
+}
+
+/** A batch in a carboy: the shelf's default. */
+export function Carboy(props: Omit<VesselProps, 'shape'>) {
+  return <VesselArt {...props} shape="carboy" />;
 }
 
 export function Book({ icon, extraIcons = [], color, size = 118 }: Common) {

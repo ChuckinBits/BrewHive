@@ -173,7 +173,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={batch.rating} reserve />
-        <BatchArt batch={batch} size={168} />
+        <BatchArt batch={batch} size={168} equipment={data.equipment} />
         <p className="hero-sub">
           {batch.style || 'Mead'} · {batchSubtitle(batch)}
         </p>
