@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
 const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
@@ -37,7 +39,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await stat(3) === '13.1%')), 'new batch: Potential 13.1%');
   const add = async (type, sg, opts = {}) => {
     await p.getByRole('button', { name: 'Add entry' }).click();
-    await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel(type), exact: true }).click();
+    await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel(type), exact: true }).click(); await sugarAs(p, type);
     if (sg) await p.getByLabel(type === 'gravity' ? 'Specific gravity' : /^Gravity after adding/).fill(sg);
     if (opts.when) await p.getByLabel('When').fill(opts.when);
     if (opts.shot) await p.screenshot({ path: `${out}/${opts.shot}.png` });
@@ -49,7 +51,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await add('gravity', '1.020', { when: t(13) });
   ok(await until(async () => (await stat(2) === '10.5%')), 'after 1.020: ABV so far 10.5%');
   await add('feeding', '1.040', { when: t(14), shot: '2-feeding-sheet', check: async () => {
-    ok(await until(async () => (await p.getByLabel('This will ferment').count() === 0)), 'step feeding: no checkbox, it always ferments');
+    ok(await until(async () => (await p.getByLabel(/^This will ferment/).isChecked())), 'step feeding: "This will ferment (step feed)" is ticked');
   } });
   ok(await until(async () => (await stat(2) === '10.5%')), 'after feeding to 1.040: ABV so far stays 10.5%');
   ok(await until(async () => (await stat(3) === '15.8%')), 'after feeding: Potential rises to 15.8% (15.75%)');

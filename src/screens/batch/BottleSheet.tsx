@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { batches, cellar, events } from '../../db/store.ts';
-import { type Batch, type BatchEvent } from '../../db/types.ts';
-import { Field, Sheet, toast } from '../../components/ui.tsx';
+import { CARB_LEVELS, PRIMING_SUGARS, type Batch, type BatchEvent, type CarbLevel } from '../../db/types.ts';
+import { Field, Segmented, Sheet, toast } from '../../components/ui.tsx';
+import { carbonationOf, carbonationSummary } from '../../lib/carbonation.ts';
 import { Icon } from '../../icons/Icon.tsx';
 import { abvEstimate, batchAbv, finalReading, finalGravity, isFermentationComplete } from '../../lib/batch.ts';
 import { fmtBottle, nowLocal, parseNum, today } from '../../lib/format.ts';
@@ -11,6 +12,14 @@ import { BOTTLE_UNITS, bottlingError, bottlingNote, lineBottleMl, newLine, sugge
 import { navigate } from '../../lib/router.tsx';
 import { FinalReadingFields, NO_FINAL_READING, finalReadingError, saveFinalReading, type FinalReading } from '../../components/FinalReading.tsx';
 import { isBottledEntry } from './entries.ts';
+
+/** How the bottles are carbonated, for a batch not carbonated yet. */
+type BottleCarb = 'still' | 'natural' | 'forced';
+const BOTTLE_CARBS: { id: BottleCarb; label: string }[] = [
+  { id: 'still', label: 'Still' },
+  { id: 'natural', label: 'Natural' },
+  { id: 'forced', label: 'Forced' },
+];
 
 /** The size a unit starts at when picked. */
 const UNIT_START_SIZE: Record<BottleUnit, string> = { ml: '750', floz: '12', cup: '1', pint: '1', quart: '1', l: '1', other: '' };
@@ -38,6 +47,30 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
   const [bestAfter, setBestAfter] = useState('');
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
+  // Carbonation: a batch already carbonated keeps it. Otherwise the bottles are still, primed to carbonate
+  // in the bottle, or filled from a keg that was force carbonated; those two add a Carbonated entry.
+  const carbonated = carbonationOf(timeline);
+  const [carb, setCarb] = useState<BottleCarb>('still');
+  const [carbLevel, setCarbLevel] = useState<CarbLevel>('sparkling');
+  const [primer, setPrimer] = useState(PRIMING_SUGARS[0]);
+  const [primerAmount, setPrimerAmount] = useState('');
+  // What the bottles are: the batch's carbonation, or the one picked here.
+  const bottleCarbonation: CarbLevel | undefined = carbonated ? (carbonated.carbLevel ?? 'sparkling') : carb === 'still' ? undefined : carbLevel;
+
+  /** Logs the carbonation picked here, at bottling. */
+  const saveCarbonation = async (date: string) => {
+    if (carbonated || carb === 'still') return;
+    await events.save({
+      batchId: batch.id,
+      type: 'carbonate',
+      date,
+      value: null,
+      note: '',
+      carbMethod: carb,
+      carbLevel,
+      ...(carb === 'natural' ? { primer, ...(primerAmount.trim() ? { primerAmount: primerAmount.trim() } : {}) } : {}),
+    });
+  };
 
   const update = (id: string, patch: Partial<BottleLine>) => {
     setError('');
@@ -77,6 +110,7 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
           location: location.trim(),
           abv: abv != null ? Number(abv.toFixed(1)) : null,
           abvEstimated: abvEstimate(batch, latest) != null,
+          ...(bottleCarbonation ? { carbonation: bottleCarbonation } : {}),
           icon: batch.icon,
           extraIcons: batch.extraIcons ?? [],
           color: batch.color,
@@ -86,6 +120,7 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
       );
     }
     if (!alreadyBottled) await batches.save({ ...batch, status: 'bottled' });
+    await saveCarbonation(now);
     // A bottling entry records real bottles, so it is never replaced by a later stage tap.
     if (emptyEntry) await events.save({ ...emptyEntry, note: bottlingNote(lines), auto: false });
     else
@@ -111,6 +146,7 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
     const now = nowLocal();
     if (asksFinal) await saveFinalReading(batch.id, final, now);
     await batches.save({ ...batch, status: 'bottled' });
+    await saveCarbonation(now);
     await events.save({ batchId: batch.id, type: 'status', date: now, value: null, note: '', toStatus: 'bottled', fromStatus: batch.status, auto: false });
     toast('Marked as bottled');
     onClose();
@@ -200,6 +236,41 @@ export function BottleSheet({ batch, timeline, entry, onEditEntry, onClose }: Bo
         <Field label="Where are they stored? (optional)">
           <input type="text" value={location} placeholder="Basement rack" onChange={(e) => setLocation(e.target.value)} />
         </Field>
+        <h3 className="stage-divider">Carbonation</h3>
+        {carbonated ? (
+          <p className="field-hint">Carbonated: {carbonationSummary(carbonated)}. The bottles will be {(carbonated.carbLevel ?? 'sparkling') === 'petillant' ? 'petillant' : 'sparkling'}.</p>
+        ) : (
+          <>
+            <div className="field">
+              <Segmented label="Carbonation" value={carb} options={BOTTLE_CARBS} onChange={setCarb} />
+              <span className="field-hint">
+                {carb === 'still' ? 'No bubbles.' : carb === 'natural' ? 'Primed with sugar to carbonate in the bottle.' : 'Filled from a keg carbonated with CO₂.'}
+              </span>
+            </div>
+            {carb !== 'still' && (
+              <div className="field">
+                <span className="field-label">How fizzy</span>
+                <Segmented label="How fizzy" value={carbLevel} options={CARB_LEVELS} onChange={setCarbLevel} />
+              </div>
+            )}
+            {carb === 'natural' && (
+              <div className="form-pair">
+                <Field label="Primed with">
+                  <select value={primer} onChange={(e) => setPrimer(e.target.value)}>
+                    {PRIMING_SUGARS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Amount (optional)">
+                  <input type="text" value={primerAmount} placeholder="3/4 cup" onChange={(e) => setPrimerAmount(e.target.value)} />
+                </Field>
+              </div>
+            )}
+          </>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}

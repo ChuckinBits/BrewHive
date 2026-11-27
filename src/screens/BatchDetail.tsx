@@ -48,6 +48,7 @@ import { EVENT_ICONS, entryCategory, eventValue, isBottledEntry, newestFirst } f
 import { EventSheet } from './batch/EventSheet.tsx';
 import { FinishSheet } from './batch/FinishSheet.tsx';
 import { BottleSheet } from './batch/BottleSheet.tsx';
+import { carbonationOf, carbonationSummary } from '../lib/carbonation.ts';
 import { LogIngredientSheet } from './batch/LogIngredientSheet.tsx';
 
 /** The batch stage an ingredient stage's "Move to" button moves to. */
@@ -153,6 +154,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const subBatches = batch.status === 'split' ? subBatchesOf(batch, data.allBatches) : [];
   const undoable = batch.status === 'split' && canUndoSplit(batch, subBatches, data.allEvents ?? []);
   const inVessels = vesselsOf(batch, data.equipment);
+  // Its latest Carbonated entry, if any: the batch is carbonated from then on.
+  const carbonated = carbonationOf(data.events);
   const vesselUnit = batch.volumeUnit ?? volumeUnitOf(settings);
   const setStatus = async (status: BatchStatus) => {
     // Bottling asks how many bottles first, then fills the cellar. Tapping Bottled again adds more.
@@ -173,7 +176,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
 
       <section className="hero">
         <RatingBadge rating={batch.rating} reserve />
-        <BatchArt batch={batch} size={168} equipment={data.equipment} />
+        <BatchArt batch={batch} size={168} equipment={data.equipment} timeline={data.events} />
         <p className="hero-sub">
           {batch.style || 'Mead'} · {batchSubtitle(batch)}
         </p>
@@ -307,6 +310,12 @@ export function BatchDetailScreen({ id }: { id: string }) {
                   );
                 })}
               </dd>
+            </>
+          )}
+          {carbonated && (
+            <>
+              <dt>Carbonation</dt>
+              <dd>{carbonationSummary(carbonated)}</dd>
             </>
           )}
           <dt>Started</dt>

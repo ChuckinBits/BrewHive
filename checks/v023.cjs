@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -77,14 +79,14 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
 
   // Stage change starts on the next stage.
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
-  await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stage change' }), exact: true }).click();
+  await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stage change' }), exact: true }).click(); await sugarAs(p, { label: 'Stage change' });
   ok(await until(async () => (await d.getByRole('combobox', { name: 'Move to' }).inputValue() === 'secondary')), 'Stage change shows Move to, starting on Secondary for a Primary batch');
   ok(await until(async () => (await d.getByText('The batch moves to this stage.').count() === 1)), 'and says the batch moves');
   await d.getByRole('button', { name: 'Close' }).first().click(); await d.waitFor({ state: 'detached' });
 
   // #54: Pasteurization with temperature and time.
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
-  await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stabilized' }), exact: true }).click();
+  await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stabilized' }), exact: true }).click(); await sugarAs(p, { label: 'Stabilized' });
   ok(await until(async () => (await d.getByRole('textbox', { name: 'Temperature (optional)' }).count() === 0)), 'no temperature for Chemical');
   await d.getByRole('combobox', { name: 'Method' }).selectOption('Pasteurization');
   await d.getByRole('textbox', { name: 'Temperature (optional)' }).fill('160');

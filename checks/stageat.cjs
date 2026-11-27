@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 const pad = (n) => String(n).padStart(2, '0');
@@ -27,7 +29,7 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   await p.getByRole('button', { name: /^(Start batch|Save batch|Add batch)$/ }).click(); await p.waitForSelector('.hero');
   const addStage = async (to, date) => {
     await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
-    await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stage change' }), exact: true }).click();
+    await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: 'Stage change' }), exact: true }).click(); await sugarAs(p, { label: 'Stage change' });
     await d.getByRole('combobox', { name: 'Move to' }).selectOption(to);
     await d.getByLabel('When', { exact: true }).fill(date + 'T09:00');
     await d.getByRole('button', { name: 'Save entry' }).click(); await d.waitFor({ state: 'detached' });
@@ -35,7 +37,7 @@ const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `$
   await addStage('secondary', day(-40)); await addStage('bottled', day(-10));
   const addIngredient = async (name, date) => {
     await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
-    await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click();
+    await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click(); await sugarAs(p, 'ingredient');
     await d.getByRole('combobox', { name: 'Ingredient', exact: true }).fill(name); await d.getByLabel('Quantity').fill('1');
     await d.getByLabel('When', { exact: true }).fill(date + 'T12:00');
   };

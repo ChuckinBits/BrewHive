@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
@@ -46,7 +48,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const abvAfter = await stat('ABV');
 
   // Ticked backsweetening while Aging offers Secondary
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('backsweeten'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('backsweeten'), exact: true }).click(); await sugarAs(p, 'backsweeten');
   await d.getByRole('textbox', { name: /Gravity after adding/ }).fill('1.030');
   await d.getByLabel(/This will ferment/).check();
   await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
@@ -67,7 +69,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForURL(/#\/batches\/[^n]/); await p.waitForSelector('.hero');
   const quick = p.url();
   const addReading = async (sg, isFinal = false) => {
-    await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click();
+    await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click(); await sugarAs(p, 'gravity');
     await d.getByRole('textbox', { name: 'Specific gravity' }).fill(sg); if (isFinal) await d.getByLabel('Final gravity reading').check();
     await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   };
@@ -94,7 +96,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByRole('textbox', { name: 'Estimated ABV (%)' }).fill('13'); await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await stat('ABV')).startsWith('≈ 13'))), 'an Estimated ABV entry can be added by hand');
   // A later reading replaces the estimate
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click(); await sugarAs(p, 'gravity');
   await d.getByRole('textbox', { name: 'Specific gravity' }).fill('1.000'); await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => (await stat('ABV') === '13.1%')), 'a later reading replaces the estimate (' + await stat('ABV') + ')');
 
@@ -102,14 +104,14 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.goto(BASE + '/#/batches'); await p.waitForSelector('.chips');
   await p.getByRole('link', { name: /Orchard Cyser/ }).first().click(); await p.waitForSelector('.hero');
   const orchard = p.url();
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click(); await sugarAs(p, 'gravity');
   ok(await until(async () => (!(await d.getByLabel('Final gravity reading').isChecked()))), 'gravity readings have a Final gravity reading box, off by default');
   await d.getByRole('textbox', { name: 'Specific gravity' }).fill('1.004'); await d.getByLabel('Final gravity reading').check();
   ok(await until(async () => (await d.getByText(/Moving to Aging or bottling won't ask for it again/).count() === 1)), 'ticked with no final yet: explains it');
   await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => (await p.locator('.final-chip').count() === 1)), 'the reading shows the Final chip on the timeline');
   await p.screenshot({ path: out + '/26-chip.png' });
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('gravity'), exact: true }).click(); await sugarAs(p, 'gravity');
   await d.getByText(/This batch already has a final gravity reading/).waitFor({ timeout: 3000 }).catch(() => {});
   ok(await until(async () => (await d.getByText(/This batch already has a final gravity reading: 1\.004/).count() === 1)), 'a later reading says the batch already has one');
   await d.getByRole('textbox', { name: 'Specific gravity' }).fill('1.002'); await d.getByLabel('Final gravity reading').check();
@@ -126,9 +128,9 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await addReading('1.012');
   ok(await until(async () => (await stat('ABV') === settled)), 'nor does a later higher one');
   // A step feeding after the final reading warns, then the reading stops counting as final (its mark is kept)
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('feeding'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('feeding'), exact: true }).click(); await sugarAs(p, 'feeding');
   await d.getByText(/won't count as the final gravity/).waitFor({ timeout: 3000 }).catch(() => {});
-  ok(await until(async () => (await d.getByText(/the 1\.002 reading on .* won't count as the final gravity\.$/).count() === 1)), 'a step feeding after the final reading warns it won\'t count as the final gravity');
+  ok(await until(async () => (await d.getByText(/the 1\.002 reading on .* won't count as the final gravity\. Untick "This will ferment" and it counts again\.$/).count() === 1)), 'a step feeding after the final reading warns it won\'t count as the final gravity');
   await p.screenshot({ path: out + '/26-warn.png' });
   await d.getByRole('textbox', { name: /Gravity after adding/ }).fill('1.030'); await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   if (await d.getByRole('button', { name: 'Keep it here' }).count()) { await d.getByRole('button', { name: 'Keep it here' }).click(); await p.waitForTimeout(200); }

@@ -5,6 +5,38 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Carbonation
+
+- **Carbonated entry.** A new timeline entry for when a batch is carbonated:
+  Natural (primed with sugar, in bottles or a keg) or Forced (CO₂ in a keg),
+  and how fizzy, Petillant or Sparkling. Natural can note what it was primed
+  with and how much; Forced can note the pressure. It's dated on its own, so
+  a batch can be racked, aged and carbonated later.
+- **Carbonation when bottling.** Bottling asks whether the bottles are
+  still, naturally carbonated in the bottle, or filled from a force
+  carbonated keg, and adds the Carbonated entry for you. A batch that's
+  already carbonated keeps its carbonation.
+- **Bubbles.** A carbonated batch and its bottles show fine streams of
+  bubbles rising, gentler and slower when petillant, and the batch's vessel
+  loses its airlock (it's sealed).
+  Its Details say how it was carbonated, and the cellar shows Still,
+  Petillant or Sparkling, which you can change when editing bottles.
+  Removing the Carbonated entry makes the batch still again.
+
+### Timeline
+
+- **Sugar added.** Step feeding and backsweetening are one entry now,
+  Sugar added. Tick "This will ferment (step feed)" for a step feeding, or
+  leave it unticked to backsweeten. It starts ticked while the batch is
+  fermenting and unticked from Aging on. The timeline still says Step
+  feeding or Backsweetened, and your older entries are unchanged. Sugar
+  that ferments, added after fermentation finished, offers to move the
+  batch back to Secondary, whichever way it was logged.
+- **Safer examples.** Pasteurization's examples are now 140 °F (60 °C) for
+  22 minutes.
+
 ## v0.3.3 – 2026-11-26
 
 ### Equipment

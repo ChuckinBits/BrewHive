@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { batches, cellar, pours, usePrefs, useQuery } from '../db/store.ts';
-import { POUR_TYPES, type Batch, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
+import { CARB_LEVELS, POUR_TYPES, type Batch, type CarbLevel, type CellarEntry, type Pour, type PourType } from '../db/types.ts';
+import { carbLevelLabel } from '../lib/carbonation.ts';
 import { archiveBatch } from '../db/actions.ts';
 import { CELLAR_FILTERS, inCellarFilter, shouldAskToArchive, shouldResetArchivePrompt, type CellarFilter } from '../lib/cellar.ts';
 import { IconPicker } from '../components/IconPicker.tsx';
@@ -53,7 +54,7 @@ export function CellarScreen() {
   const items: ShelfEntry[] = sorted.map((entry) => ({
     key: entry.id,
     to: `/cellar/${entry.id}`,
-    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} />,
+    visual: <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonation={entry.carbonation} />,
     icons: iconsOf(entry),
     title: entry.name,
     subtitle: view === 'shelf' ? `${entry.count} × ${fmtBottle(entry.bottleSizeMl)}` : `${fmtBottle(entry.bottleSizeMl)} · ${readiness(entry)}`,
@@ -149,7 +150,7 @@ export function CellarDetailScreen({ id }: { id: string }) {
       <section className="hero">
         <RatingBadge rating={entry.rating} reserve />
         <span className={isReady(entry) ? 'shelf-glow' : undefined}>
-          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} size={168} />
+          <Bottle icon={entry.icon} extraIcons={entry.extraIcons} color={entry.color} empty={entry.count === 0} carbonation={entry.carbonation} size={168} />
         </span>
         <p className="hero-sub">
           {entry.style || 'Mead'} · {readiness(entry)}
@@ -180,6 +181,8 @@ export function CellarDetailScreen({ id }: { id: string }) {
               <dd>{fmtDate(entry.bestAfter)}</dd>
             </>
           )}
+          <dt>Carbonation</dt>
+          <dd>{entry.carbonation ? carbLevelLabel(entry.carbonation) : 'Still'}</dd>
           {entry.location && (
             <>
               <dt>Stored</dt>
@@ -405,6 +408,8 @@ interface Draft {
   bestAfter: string;
   location: string;
   abv: string;
+  /** Still, or how fizzy. */
+  carbonation: CarbLevel | 'still';
   icon: string;
   extraIcons: string[];
   color: string;
@@ -429,6 +434,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
           extraIcons: [],
           color: getFlavor(DEFAULT_FLAVOR).color,
           notes: '',
+          carbonation: 'still',
         },
       };
     }
@@ -445,6 +451,7 @@ export function CellarFormScreen({ id }: { id?: string }) {
         bestAfter: entry.bestAfter ?? '',
         location: entry.location,
         abv: entry.abv != null ? String(entry.abv) : '',
+        carbonation: entry.carbonation ?? 'still',
         icon: entry.icon,
         extraIcons: entry.extraIcons ?? [],
         color: entry.color,
@@ -494,6 +501,7 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
       abv,
       // A typed ABV is the person's own number, no longer the estimate from bottling.
       abvEstimated: existing?.abvEstimated && abv === existing.abv ? true : undefined,
+      carbonation: draft.carbonation === 'still' ? undefined : draft.carbonation,
       icon: draft.icon,
       extraIcons: draft.extraIcons,
       color: draft.color,
@@ -546,6 +554,11 @@ function CellarForm({ draft: initial, existing, back, title }: { draft: Draft; e
           <Field label="Stored (optional)">
             <input type="text" value={draft.location} placeholder="Basement rack" onChange={(e) => set({ location: e.target.value })} />
           </Field>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Carbonation</span>
+          <Segmented label="Carbonation" value={draft.carbonation} options={[{ id: 'still', label: 'Still' }, ...CARB_LEVELS]} onChange={(carbonation) => set({ carbonation })} />
         </div>
 
         <Field label="Notes">

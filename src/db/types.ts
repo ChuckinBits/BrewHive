@@ -115,6 +115,7 @@ export type EventType =
   | 'rack'
   | 'stabilize'
   | 'backsweeten'
+  | 'carbonate'
   | 'fining'
   | 'tasting'
   | 'status'
@@ -124,7 +125,7 @@ export type EventType =
   | 'estimate'
   | 'note';
 
-type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'abv' | 'place' | 'ingredient' | 'method' | 'rating';
+type EntryField = 'sg' | 'sg-after' | 'temp' | 'ph' | 'abv' | 'place' | 'ingredient' | 'method' | 'rating' | 'carb';
 
 /** Event types the user can add by hand: Gravity reading first, as the most common, then A to Z. */
 export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[] = [
@@ -132,6 +133,7 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[]
   ...(
     [
       { id: 'backsweeten', label: 'Backsweetened', value: 'sg-after' },
+      { id: 'carbonate', label: 'Carbonated', value: 'carb' },
       { id: 'estimate', label: 'Estimated ABV', value: 'abv' },
       { id: 'fining', label: 'Fining' },
       { id: 'ingredient', label: 'Ingredient', value: 'ingredient' },
@@ -148,6 +150,23 @@ export const EVENT_TYPES: { id: EventType; label: string; value?: EntryField }[]
     ] as { id: EventType; label: string; value?: EntryField }[]
   ).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })),
 ];
+
+/** How a batch was carbonated: priming sugar (in bottles or a keg), or CO2 from a tank. */
+export type CarbMethod = 'natural' | 'forced';
+export const CARB_METHODS: { id: CarbMethod; label: string }[] = [
+  { id: 'natural', label: 'Natural' },
+  { id: 'forced', label: 'Forced' },
+];
+
+/** How fizzy: petillant is lightly sparkling, sparkling is fully so. */
+export type CarbLevel = 'petillant' | 'sparkling';
+export const CARB_LEVELS: { id: CarbLevel; label: string }[] = [
+  { id: 'petillant', label: 'Petillant' },
+  { id: 'sparkling', label: 'Sparkling' },
+];
+
+/** What natural carbonation was primed with. */
+export const PRIMING_SUGARS = ['Honey', 'Corn sugar', 'Table sugar', 'Other'];
 
 /** How a batch was stabilized, chosen on a "Stabilized" entry. */
 export const STABILIZE_METHODS = ['Chemical', 'Pasteurization', 'Filtration', 'Nagardo', 'Other'];
@@ -511,6 +530,14 @@ export interface BatchEvent extends Base {
   method?: string;
   /** For pasteurization: how long it was held, in minutes. Its temperature is `value` (°C, typed in `tempUnit`). */
   minutes?: number;
+  /** For "carbonate" entries: how, and how fizzy. */
+  carbMethod?: CarbMethod;
+  carbLevel?: CarbLevel;
+  /** For natural carbonation: what it was primed with (one of PRIMING_SUGARS) and how much, as typed ("3/4 cup"). Both optional. */
+  primer?: string;
+  primerAmount?: string;
+  /** For forced carbonation: the pressure set, in PSI. Optional. */
+  psi?: number;
   /** For "tasting" and "review" entries: a 0 to 10 rating, or null. */
   rating?: number | null;
   /** For "tasting" entries: who tasted it, if not the user. Optional. */
@@ -540,6 +567,8 @@ export interface CellarEntry extends Base {
   abv: number | null;
   /** True when the ABV came from an estimate at bottling, not from gravity readings. */
   abvEstimated?: boolean;
+  /** How fizzy the bottles are. Missing means still. */
+  carbonation?: CarbLevel;
   icon: string;
   /** Up to two more icons shown behind the main one, in order. */
   extraIcons?: string[];

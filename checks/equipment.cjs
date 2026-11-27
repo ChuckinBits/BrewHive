@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 // v0.3 Equipment: vessels and gear, a batch's vessel, racking into another, headspace, and removing.
@@ -91,7 +93,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 7. Racking from Add entry, into the carboy again
   await p.getByRole('button', { name: 'Add entry' }).click();
-  await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('rack'), exact: true }).click();
+  await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('rack'), exact: true }).click(); await sugarAs(p, 'rack');
   await d.getByLabel('Racked into').selectOption({ label: '5 gal carboy · 5 gal · free' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await fact('Vessel')).startsWith('5 gal carboy'))), 'a Racked entry from Add entry moves it to the carboy');

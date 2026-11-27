@@ -657,6 +657,32 @@ a.shelf-item:hover .shelf-visual {
   animation: airlock-tick 1.6s ease-in-out infinite;
 }
 
+/* Carbonation: tiny bubbles stream up steadily, all the way to the top. Each one's rise is in --rise. */
+.fizz circle {
+  opacity: 0;
+  animation: fizz-rise 2.2s linear infinite;
+}
+
+/* Petillant: fewer bubbles, rising more slowly. */
+.fizz-gentle circle {
+  animation-duration: 3.6s;
+}
+
+@keyframes fizz-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  10%,
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--rise));
+  }
+}
+
 @keyframes bubble-rise {
   0% {
     opacity: 0;
@@ -685,8 +711,14 @@ a.shelf-item:hover .shelf-visual {
 
 @media (prefers-reduced-motion: reduce) {
   .bubbles circle,
-  .airlock-bubble {
+  .airlock-bubble,
+  .fizz circle {
     animation: none;
+  }
+  /* Still streams: each bubble held part of the way up. */
+  .fizz circle {
+    opacity: 0.7;
+    transform: translateY(calc(var(--rise) * var(--at)));
   }
   .bubbles circle {
     opacity: 0.5;

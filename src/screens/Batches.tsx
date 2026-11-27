@@ -7,6 +7,7 @@ import { loadSampleData } from '../db/sample.ts';
 import { BATCH_STATUSES, type Batch, type BatchEvent, type Equipment } from '../db/types.ts';
 import { Book, Carboy, VesselArt, shapeFor } from '../components/Vessels.tsx';
 import { vesselsOf } from '../lib/equipment.ts';
+import { carbonationOf } from '../lib/carbonation.ts';
 import { Collection, SortSelect, ViewToggle, byRating, type ShelfEntry } from '../components/Shelf.tsx';
 import { EmptyState, Fab, TopBar, toast } from '../components/ui.tsx';
 import { abvEstimate, batchAbv, fillLevel, isActive } from '../lib/batch.ts';
@@ -29,10 +30,11 @@ const SORTS = [
 const statusOrder = (b: Batch) => BATCH_STATUSES.findIndex((s) => s.id === b.status);
 
 /** A batch's shelf artwork: the vessel it's in (a carboy when there's none), or a book spine once archived. */
-export function BatchArt({ batch, size, equipment: gear = [] }: { batch: Batch; size?: number; equipment?: Equipment[] }) {
+export function BatchArt({ batch, size, equipment: gear = [], timeline = [] }: { batch: Batch; size?: number; equipment?: Equipment[]; timeline?: BatchEvent[] }) {
   if (batch.status === 'archived') return <Book icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} size={size} />;
   const shape = shapeFor(vesselsOf(batch, gear)[0]?.vessel.vesselType);
-  return <VesselArt shape={shape} icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} size={size} />;
+  const carbonated = carbonationOf(timeline);
+  return <VesselArt shape={shape} icon={batch.icon} extraIcons={batch.extraIcons} color={batch.color} level={fillLevel(batch.status)} fermenting={batch.status === 'primary'} carbonation={carbonated ? (carbonated.carbLevel ?? 'sparkling') : undefined} size={size} />;
 }
 
 export function statusLabel(batch: Batch): string {
@@ -93,7 +95,7 @@ export function BatchesScreen() {
     return {
       key: batch.id,
       to: `/batches/${batch.id}`,
-      visual: <BatchArt batch={batch} equipment={data.equipment} />,
+      visual: <BatchArt batch={batch} equipment={data.equipment} timeline={eventsByBatch.get(batch.id)} />,
       icons: iconsOf(batch),
       title: batch.name,
       subtitle: batchSubtitle(batch),

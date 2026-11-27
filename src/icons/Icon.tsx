@@ -42,6 +42,16 @@ const PATHS = {
   chevron: <path d="M9 5l7 7-7 7" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  // Carbonation: bubbles rising, small to large.
+  fizz: (
+    <>
+      <circle cx="8" cy="17" r="3.5" />
+      <circle cx="15.5" cy="10.5" r="2.5" />
+      <circle cx="9.5" cy="6" r="1.6" />
+      <circle cx="17" cy="3.8" r="1" />
+      <circle cx="16.5" cy="18.5" r="1.4" />
+    </>
+  ),
   edit: (
     <>
       <path d="M4 20h4L19 9l-4-4L4 16z" />
