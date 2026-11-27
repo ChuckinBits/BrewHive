@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased
+## v0.3.2 – 2026-11-26
 
 ### Equipment
 
@@ -30,6 +30,9 @@ a milestone.
   with the most free vessels at the top). Your choice is remembered.
 - **Jug is now Jar.** Vessels saved as jugs become jars. Names you typed stay
   as they are.
+
+**Updating from v0.3.1:** nothing to do. Vessels you saved as jugs are now
+jars; their names stay as you typed them.
 
 ## v0.3.1 – 2026-11-26
 
