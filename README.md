@@ -6,11 +6,11 @@ BrewHive is an open source, private-by-default brew log that makes tracking brew
 
 **Use it at [brewhive.app](https://brewhive.app).** It runs in any modern browser and can be installed to your home screen or desktop from there.
 
-The latest release is **v0.3.3**: a complete local brew log that installs as an app from the browser, with an ingredient library, batch costs, your equipment, and batches you can rack into several vessels or split into sub-batches. The rest of **v0.3** adds ingredient inventory, calculators and more. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
+The latest release is **v0.3.4**: a complete local brew log that installs as an app from the browser, with an ingredient library, batch costs, your equipment, and batches you can rack into several vessels or split into sub-batches. The rest of **v0.3** adds ingredient inventory, calculators and more. See the [roadmap](#roadmap) and the [changelog](CHANGELOG.md).
 
 ## What it does today
 
-- **Batches.** Track each batch from Planned through Primary, Secondary, Aging and Bottled, then archive it. Log gravity readings, ingredients, nutrients, step feeding, backsweetening, stabilizing, racking, tastings and notes on a timeline, divided by stage. See the ABV, a gravity chart and the points of sugar added.
+- **Batches.** Track each batch from Planned through Primary, Secondary, Aging and Bottled, then archive it. Log gravity readings, ingredients, nutrients, step feeding, backsweetening, stabilizing, carbonation, racking, tastings and notes on a timeline, divided by stage. See the ABV, a gravity chart and the points of sugar added.
 - **Final gravity.** Moving a batch to Aging or bottling it asks for the final reading, which settles the ABV. No reading? Enter an estimated ABV instead.
 - **Targets.** Aim for a final gravity or an ABV. Aiming for an ABV shows the gravity it finishes at, or how much more sugar it needs, and the batch page says when the target is reached.
 - **Recipes.** Save ingredients by stage, steps and targets, then start a batch from a recipe with one tap. Save a batch as a recipe, and update the recipe as the batch evolves.
@@ -106,7 +106,7 @@ The app has only two runtime dependencies, React and React DOM. Volumes are stor
 | --- | --- |
 | **v0.1** (released) | Local PWA: recipes, batches, timeline, cellar, shelf views, icons, ratings, backup |
 | **v0.2** (released, latest v0.2.9) | Ingredient library: categories, icons, 100 starter ingredients, costs and batch totals |
-| **v0.3** (in progress, latest v0.3.3) | Equipment screen (vessels and gear, in v0.3.0), splitting batches across vessels (v0.3.1), ingredient inventory, calculators, photos, reminders, Simple / Advanced mode |
+| **v0.3** (in progress, latest v0.3.4) | Equipment screen (vessels and gear, in v0.3.0), splitting batches across vessels (v0.3.1), ingredient inventory, calculators, photos, reminders, Simple / Advanced mode |
 | v0.4 | iOS and Android apps with Capacitor |
 | v0.5 | Optional sync through a self-hosted server |
 | v0.6 | Community recipes on Nostr, with zaps |
