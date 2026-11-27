@@ -22,7 +22,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
 
   await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
-  ok(await until(async () => (await grid().getByRole('radio').count() === 13)), 'Add entry shows 13 icon buttons, no Est. ABV');
+  ok(await until(async () => (await grid().getByRole('radio').count() === 12)), 'Add entry shows 12 icon buttons, no Est. ABV');
   await d.getByRole('button', { name: 'No reading? Enter an estimated ABV' }).click();
   ok(await until(async () => (await d.getByRole('textbox', { name: 'Estimated ABV (%)' }).count() === 1 && await grid().getByRole('radio', { name: 'Gravity reading' }).getAttribute('aria-checked') === 'true')), 'Gravity offers an estimated ABV, still under Gravity');
   await d.getByRole('textbox', { name: 'Estimated ABV (%)' }).fill('12');

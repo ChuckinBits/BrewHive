@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 (async () => {
@@ -22,7 +24,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('button', { name: /gal/i }).first().click().catch(() => {}); await p.getByRole('button', { name: /°F|Fahrenheit/ }).first().click().catch(() => {});
   await p.goto(BASE + '/#/batches'); await p.waitForSelector('.chips');
   await p.getByRole('link', { name: /Winter Spice/ }).click(); await p.waitForSelector('.hero');
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('temperature'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('temperature'), exact: true }).click(); await sugarAs(p, 'temperature');
   const d = p.getByRole('dialog');
   ok(await until(async () => (await d.getByRole('button', { name: 'Fahrenheit' }).getAttribute('aria-pressed') === 'true')), 'temperature starts on the default °F');
   await d.getByRole('button', { name: 'Celsius' }).click();

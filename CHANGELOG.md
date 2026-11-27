@@ -27,6 +27,13 @@ a milestone.
 
 ### Timeline
 
+- **Sugar added.** Step feeding and backsweetening are one entry now,
+  Sugar added. Tick "This will ferment (step feed)" for a step feeding, or
+  leave it unticked to backsweeten. It starts ticked while the batch is
+  fermenting and unticked from Aging on. The timeline still says Step
+  feeding or Backsweetened, and your older entries are unchanged. Sugar
+  that ferments, added after fermentation finished, offers to move the
+  batch back to Secondary, whichever way it was logged.
 - **Safer examples.** Pasteurization's examples are now 140 °F (60 °C) for
   22 minutes.
 

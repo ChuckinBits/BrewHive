@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 const pad = (n) => String(n).padStart(2, '0');
@@ -25,7 +27,7 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   const status = async () => (await p.getByRole('group', { name: 'Status' }).getByRole('button', { pressed: true }).textContent()).trim();
   // The batch saves just after the sheet closes: wait for the stage to settle before reading it.
   const statusBecomes = async (want) => { await p.getByRole('group', { name: 'Status' }).getByRole('button', { pressed: true, name: want }).waitFor({ timeout: 3000 }).catch(() => {}); return status(); };
-  const addEntry = async (type) => { await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor(); await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: type }), exact: true }).click(); };
+  const addEntry = async (type) => { await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor(); await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel({ label: type }), exact: true }).click(); await sugarAs(p, { label: type }); };
   const chartDots = () => p.locator('.chart-dot').count();
 
   await p.goto(BASE + '/#/batches/new'); await p.waitForSelector('form');
@@ -46,7 +48,7 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
 
   // Backsweetening: sweetness shows; unticked stays off the chart
   const dotsBefore = await chartDots();
-  await addEntry('Backsweetened');
+  await addEntry('Sugar added'); await sugarAs(p, 'backsweeten');
   const sg = d.getByRole('textbox', { name: 'Gravity after adding (optional)' });
   await sg.fill('1.005'); ok(await until(async () => ((await d.locator('.sweetness').textContent()).startsWith('Dry'))), 'typing 1.005: Dry');
   await sg.fill('1.018'); ok(await until(async () => ((await d.locator('.sweetness').textContent()).startsWith('Semi-sweet'))), '1.018: Semi-sweet');

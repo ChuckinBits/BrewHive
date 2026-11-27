@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const keepStage = async (p) => { const k = p.getByRole('button', { name: /^Keep it in / }); await k.waitFor({ timeout: 5000 }); await k.click(); await p.waitForTimeout(200); };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -25,7 +27,7 @@ const xtra = async (p, label) => ((await tile(p, label).locator('.stat-extra').t
   const d = p.getByRole('dialog').last();
   const add = async (type, opts = {}) => {
     await p.getByRole('button', { name: 'Add entry' }).click();
-    await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel(type), exact: true }).click();
+    await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel(type), exact: true }).click(); await sugarAs(p, type);
     if (opts.sg) await p.getByLabel(type === 'gravity' ? 'Specific gravity' : /^Gravity after adding/).fill(opts.sg);
     if (opts.ferment) await p.getByLabel('This will ferment').check();
     if (opts.when) await p.getByLabel('When').fill(opts.when);

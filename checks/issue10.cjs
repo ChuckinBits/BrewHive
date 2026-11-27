@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -77,7 +79,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   // The sample data has vessels, so moving to Secondary offers racking into one (v0.3): not now.
   await p.getByRole('dialog', { name: 'Racked into a new vessel?' }).getByRole('button', { name: 'Not now' }).click(); await p.waitForTimeout(200);
   ok(await until(async () => (await p.getByRole('button', { name: 'Log Raspberries as added' }).count() === 1 && await p.getByRole('button', { name: 'Log Clover honey as added' }).count() === 1)), '3: in Secondary, Raspberries become tappable and Primary ones still are');
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click(); await sugarAs(p, 'ingredient');
   ok(await until(async () => (await p.getByLabel(/^Add to batch ingredients/).isChecked())), '2: "Add to batch ingredients" is checked by default');
   ok(await until(async () => (await p.getByRole('dialog').getByRole('combobox', { name: 'Stage' }).inputValue() === 'secondary')), '2: its Stage is the one the batch is in now: Secondary');
   await p.getByRole('dialog').getByRole('combobox', { name: 'Ingredient', exact: true }).fill('Lemon zest'); await p.getByRole('dialog').getByLabel('Quantity').fill('1'); await p.getByRole('dialog').getByLabel('Unit').first().selectOption('');
@@ -86,7 +88,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const secondary = p.locator('.staged-ingredients section', { has: p.locator('.stage-divider', { hasText: 'Secondary ingredients' }) });
   ok(await until(async () => (await secondary.locator('.staged-row-done', { hasText: 'Lemon zest' }).count() === 1)), '2: Lemon zest joins Secondary ingredients, already ticked off');
   // unchecked: not added to the list
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('ingredient'), exact: true }).click(); await sugarAs(p, 'ingredient');
   await p.getByLabel(/^Add to batch ingredients/).uncheck();
   await p.getByRole('dialog').getByRole('combobox', { name: 'Ingredient', exact: true }).fill('Tannin'); await p.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => (await p.locator('.staged-row', { hasText: 'Tannin' }).count() === 0 && (await p.locator('.timeline-title > span').allTextContents()).includes('Added Tannin'))), '2: unchecked, it goes on the timeline only');

@@ -10,7 +10,9 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
     await new Promise((r) => setTimeout(r, 100));
   }
 };
-const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Step feeding', backsweeten: 'Backsweetened', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+const ENTRY_LABELS = { gravity: 'Gravity reading', ingredient: 'Ingredient', tasting: 'Tasting', note: 'Note', status: 'Stage change', rack: 'Racked', feeding: 'Sugar added', backsweeten: 'Sugar added', stabilize: 'Stabilized', temperature: 'Temperature', ph: 'pH', moved: 'Relocate', estimate: 'Estimated ABV', fining: 'Fining', nutrient: 'Nutrients', pitch: 'Yeast pitched' };
+// Step feeding and backsweetening are one Sugar added button; its "This will ferment" box picks which.
+const sugarAs = async (p, type) => { if (type !== 'feeding' && type !== 'backsweeten') return; const box = p.getByLabel(/^This will ferment/); if (type === 'feeding') await box.check(); else await box.uncheck(); };
 const entryLabel = (arg) => (typeof arg === 'string' ? (ENTRY_LABELS[arg] ?? arg) : arg.label);
 const out = process.argv[2];
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
@@ -49,7 +51,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1)), '4: changing it again the same day updates that one entry (8.5)');
 
   // 1 + 2: tasting with checkbox (default on) and a taster
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click(); await sugarAs(p, 'tasting');
   const box = p.getByLabel('Set as the batch rating');
   ok(await until(async () => (await box.isDisabled())), '1: the checkbox waits until a rating is picked');
   await p.getByRole('dialog').getByRole('slider', { name: 'Rating' }).fill('9');
@@ -63,7 +65,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await reviews() === 1 && await p.locator('.timeline-entry .rating[aria-label="Rated 8.5 out of 10"]').count() === 1)), '4: the tasting did not overwrite today\'s Batch rating entry (still 8.5)');
 
   // 1: unticked tasting leaves the batch rating alone
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click(); await sugarAs(p, 'tasting');
   await p.getByRole('dialog').getByRole('slider', { name: 'Rating' }).fill('5');
   await p.getByLabel('Set as the batch rating').uncheck();
   await p.getByLabel(/^Taster/).fill('Ana');
@@ -71,7 +73,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await heroRating() === 'Rated 9 out of 10')), '1: an unticked tasting of 5 leaves the batch at 9');
 
   // 2: known tasters are suggested
-  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click();
+  await p.getByRole('button', { name: 'Add entry' }).click(); await p.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: entryLabel('tasting'), exact: true }).click(); await sugarAs(p, 'tasting');
   await p.waitForFunction(() => document.querySelectorAll('#known-tasters option').length >= 2, null, { timeout: 5000 }).catch(() => {});
   const suggestions = await p.locator('#known-tasters option').evaluateAll(os => os.map(o => o.value));
   ok(JSON.stringify(suggestions) === JSON.stringify(['Ana', 'Sam']), '2: earlier tasters are suggested: ' + suggestions.join(', '));

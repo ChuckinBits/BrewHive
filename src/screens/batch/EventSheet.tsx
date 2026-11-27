@@ -66,12 +66,15 @@ function isLaterStage(to: BatchStatus, from: BatchStatus): boolean {
  * those types keep their own.
  */
 // An Estimated ABV entry is made from Gravity ("No reading? Enter an estimated ABV"), so it has no button of its own.
-const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'backsweeten', 'stabilize', 'carbonate', 'temperature', 'ph', 'moved'];
-// A soft hyphen lets Backsweetened break across two lines on a narrow button.
-const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change', feeding: 'Step feed', backsweeten: 'Back\u00ADsweetened' };
-/** The grid button an entry type is under: an Estimated ABV is a kind of gravity entry. */
-const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravity' : type);
-const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: id === 'status' ? 'Stage change' : (EVENT_TYPES.find((t) => t.id === id)?.label ?? id) }));
+const ENTRY_ORDER: EventType[] = ['gravity', 'ingredient', 'tasting', 'note', 'status', 'rack', 'feeding', 'stabilize', 'carbonate', 'temperature', 'ph', 'moved'];
+const SHORT_LABELS: Partial<Record<EventType, string>> = { gravity: 'Gravity', status: 'Stage change' };
+/**
+ * The grid button an entry type is under: an Estimated ABV is a kind of gravity entry, and step feeding
+ * and backsweetening are both Sugar added (whether it ferments decides which).
+ */
+const gridChoice = (type: EventType): EventType => (type === 'estimate' ? 'gravity' : type === 'backsweeten' ? 'feeding' : type);
+const GRID_LABELS: Partial<Record<EventType, string>> = { status: 'Stage change', feeding: 'Sugar added' };
+const ENTRY_CHOICES = ENTRY_ORDER.map((id) => ({ id, label: GRID_LABELS[id] ?? EVENT_TYPES.find((t) => t.id === id)?.label ?? id }));
 
 /** Adds a timeline entry, or edits one: its kind, date, reading and note. */
 export function EventSheet({ batch, settings, existing, onClose, onRestart, onStabilized, onSecondary, onSeveral }: EventSheetProps) {
@@ -91,8 +94,10 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
   const [note, setNote] = useState(isStage && !existing?.toStatus ? '' : (existing?.note ?? ''));
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // Backsweetening: off unless ticked. Step feeding always ferments, so it has no checkbox.
+  // Sugar added: ticking "This will ferment" makes it a step feeding, unticked a backsweetening.
+  // An older backsweetening marked to ferment stays one, with the box ticked.
   const [ferments, setFerments] = useState(existing?.ferments === true);
+  const keepsBacksweeten = existing?.type === 'backsweeten';
   // Gravity readings: whether this is the final gravity. Off unless ticked; a batch has only one.
   const [isFinal, setIsFinal] = useState(existing?.final === true);
   // The same ingredient fields as the batch's ingredient sheet, with the date in place of the stage.
@@ -283,7 +288,9 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
     const reratedBatch = rateBatch || (drivesBatchRating && rating !== batch.rating);
     toast(reratedBatch ? (existing ? 'Entry updated, and the batch rating too' : 'Saved, and the batch rating updated') : existing ? 'Entry updated' : 'Added to the timeline');
     onClose();
-    if (type === 'backsweeten' && fields.ferments && !(existing?.ferments) && isFermentationComplete(batch)) onRestart();
+    // Sugar that ferments, added to a batch past fermentation: offer to move it back to Secondary.
+    const fermentedBefore = existing?.type === 'feeding' || existing?.ferments === true;
+    if (fermentingSugar && !fermentedBefore && isFermentationComplete(batch)) onRestart();
     // Stabilizing stops fermentation, so offer to finish it: the final reading and the move to Aging.
     if (type === 'stabilize' && !existing && (batch.status === 'primary' || batch.status === 'secondary')) onStabilized();
     // Racked into several vessels: offer sub-batches.
@@ -335,8 +342,9 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
                   aria-label={t.label}
                   className="entry-choice"
                   onClick={() => {
-                    if (type === t.id) return;
-                    setType(t.id);
+                    if (gridChoice(type) === t.id) return;
+                    // Sugar added while fermenting is a step feed; later, it's backsweetening.
+                    setType(t.id === 'feeding' && !['planned', 'primary', 'secondary'].includes(batch.status) ? 'backsweeten' : t.id);
                     setValue('');
                     setError('');
                   }}
@@ -443,20 +451,23 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
                 <strong>{sweetness.label}</strong> <span className="muted">({sweetness.range})</span>
               </p>
             )}
-            {type === 'backsweeten' && (
-              <>
-                <label className="check-field">
-                  <input type="checkbox" checked={ferments} onChange={(e) => setFerments(e.target.checked)} />
-                  This will ferment
-                </label>
-                <p className="field-hint">
-                  {ferments
-                    ? 'The added sugar raises the potential ABV, for example after adding yeast again.'
-                    : 'Tick this if you expect the added sugar to ferment, so it raises the potential ABV.'}
-                </p>
-              </>
-            )}
-            {type === 'feeding' && <p className="field-hint">The added sugar raises the potential ABV.</p>}
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={fermentingSugar}
+                onChange={(e) => {
+                  if (keepsBacksweeten) return setFerments(e.target.checked);
+                  setType(e.target.checked ? 'feeding' : 'backsweeten');
+                  setFerments(false);
+                }}
+              />
+              This will ferment (step feed)
+            </label>
+            <p className="field-hint">
+              {fermentingSugar
+                ? `${type === 'feeding' ? 'A step feeding: the' : 'The'} added sugar raises the potential ABV.`
+                : 'Backsweetening, to sweeten the finished batch. Tick this if you expect the sugar to ferment.'}
+            </p>
           </>
         )}
         {kind === 'ingredient' && ingredient.fields}
@@ -591,7 +602,7 @@ export function EventSheet({ batch, settings, existing, onClose, onRestart, onSt
         )}
         {pausesFinal && otherFinal && (
           <p className="warning" role="note">
-            Fermentation isn't over while this sugar ferments, so the {fmtSG(otherFinal.value)} reading on {fmtDateShort(otherFinal.date)} won't count as the final gravity{type === 'backsweeten' ? '. Untick "This will ferment" and it counts again.' : '.'}
+            Fermentation isn't over while this sugar ferments, so the {fmtSG(otherFinal.value)} reading on {fmtDateShort(otherFinal.date)} won't count as the final gravity. Untick "This will ferment" and it counts again.
           </p>
         )}
         {kind === 'place' && (
