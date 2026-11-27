@@ -158,6 +158,16 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await d.getByRole('alert').getByText('How many should be a whole number from 1 to 50.').count() === 1)), 'more than 50 at once asks for fewer');
   await p.keyboard.press('Escape'); await d.waitFor({ state: 'detached' });
 
+  // 10b. Gear you have several of is one line with a count; the price is each
+  await p.getByRole('button', { name: 'Add gear' }).click();
+  await d.getByLabel('Name').fill('Airlock'); await d.getByLabel('How many').fill('10'); await d.getByLabel(/^Price each/).fill('1.50');
+  await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => ((await row('Airlock × 10').textContent()).endsWith('$15.00'))), 'ten airlocks are one line, "Airlock × 10", $15.00');
+  await row('Airlock × 10').click();
+  ok(await until(async () => ((await d.getByLabel('How many').inputValue()) === '10')), 'editing shows the count');
+  await d.getByLabel('How many').fill('12'); await d.getByRole('button', { name: 'Save' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => ((await row('Airlock × 12').textContent()).endsWith('$18.00'))), 'twelve now: $18.00');
+
   // 11. Sorting the vessel lines, remembered
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
   // The Vessels card's own lines: not the vessels inside an open group, nor the gear.

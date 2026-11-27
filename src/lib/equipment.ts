@@ -180,7 +180,8 @@ export function groupVessels(vessels: Equipment[], unit: VolumeUnit): VesselGrou
 /** What a set of equipment cost: the total of the prices given, and how many have none. */
 export function priceTotal(items: Equipment[]): { total: number; unpriced: number } {
   return {
-    total: Math.round(items.reduce((sum, e) => sum + (e.price ?? 0), 0) * 100) / 100,
+    // Gear with a quantity counts each one.
+    total: Math.round(items.reduce((sum, e) => sum + (e.price ?? 0) * (e.quantity ?? 1), 0) * 100) / 100,
     unpriced: items.filter((e) => e.price == null).length,
   };
 }

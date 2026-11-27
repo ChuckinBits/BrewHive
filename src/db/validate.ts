@@ -134,6 +134,7 @@ const CHECKS: Record<string, (r: Rec) => boolean> = {
     if (isNumber(r.capacityL) && r.capacityL <= 0) r.capacityL = null;
     if ('capacityUnit' in r && r.capacityUnit !== 'gal' && r.capacityUnit !== 'L') delete r.capacityUnit;
     numberOrNull(r, 'price');
+    if ('quantity' in r && !(isNumber(r.quantity) && Number.isInteger(r.quantity) && r.quantity >= 1)) delete r.quantity;
     return true;
   },
 };

@@ -2753,3 +2753,9 @@ button.library-row {
 .equipment-cost-total {
   font-weight: 700;
 }
+
+/* Gear you have several of: "Airlock × 10". */
+.gear-count {
+  color: var(--muted);
+  font-weight: 500;
+}

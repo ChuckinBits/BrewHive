@@ -18,6 +18,9 @@ a milestone.
 - **Add several alike at once.** Add vessel has a **How many** box: eight
   1 gal carboys in one go, each its own vessel, numbered "1 gal carboy 1" to
   "8" (or after your own name). Adding more later carries on the numbers.
+- **Gear you have several of.** Add gear has a **How many** box too, but
+  gear stays one line with its count, such as "Airlock × 10", priced each.
+  The totals count every one, and editing changes the count.
 - **Sort your vessels** by Type (carboys, buckets, jars…, smallest first),
   Size (smallest first, whatever the type), Name, or Free first (the lines
   with the most free vessels at the top). Your choice is remembered.

@@ -133,3 +133,7 @@ test('vessel lines sort by type, size, name or free first', () => {
   const busy = [batch({ id: 'x', vessels: [fill('c1')] }), batch({ id: 'y', vessels: [fill('c2')] }), batch({ id: 'z', vessels: [fill('big')] })];
   assert.deepEqual(names('free', busy), ['0.5 gal jar', 'Ale pail', '1 gal carboy', 'Big carboy'], 'two free jars, then one free pail; the busy ones last, by type');
 });
+
+test('gear with a quantity counts each one in the total', () => {
+  assert.deepEqual(priceTotal([{ ...vessel({ price: 1.5 }), kind: 'gear', quantity: 10 }, { ...vessel({ price: 12.99 }), kind: 'gear' }]), { total: 27.99, unpriced: 0 });
+});

@@ -337,8 +337,10 @@ export interface Equipment extends Base {
   capacityL?: number | null;
   /** The unit the capacity was entered in. Missing means the default from settings. */
   capacityUnit?: VolumeUnit;
-  /** What it cost, in the settings' currency. Optional. */
+  /** What it cost, in the settings' currency (each, for gear with a quantity). Optional. */
   price?: number | null;
+  /** For gear: how many of it you have, such as 10 airlocks. Missing means one. */
+  quantity?: number;
   notes: string;
 }
 /** What a batch or recipe aims for: a final gravity (the ABV follows), or an ABV (the final gravity follows). */
