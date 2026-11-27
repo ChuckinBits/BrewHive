@@ -21,6 +21,10 @@ a milestone.
 - **Gear you have several of.** Add gear has a **How many** box too, but
   gear stays one line with its count, such as "Airlock × 10", priced each.
   The totals count every one, and editing changes the count.
+- **Price each or in total.** When there's more than one, an **Each /
+  Total** switch sits beside the price. Bought eight carboys for $119.92?
+  Pick Total and type that: it works out $14.99 each for you. Switching
+  carries the number across.
 - **Sort your vessels** by Type (carboys, buckets, jars…, smallest first),
   Size (smallest first, whatever the type), Name, or Free first (the lines
   with the most free vessels at the top). Your choice is remembered.

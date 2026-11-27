@@ -39,7 +39,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await row('5 gal carboy').count() === 1)), 'an unnamed 5 gal carboy is called "5 gal carboy"');
   await addVessel({ type: 'Jar', capacity: '1', name: 'Jar A' });
   await p.getByRole('button', { name: 'Add gear' }).click();
-  await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel(/^Price/).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
+  await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel('Price', { exact: true }).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
   await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
   ok(await until(async () => ((await row('Hydrometer').textContent()).includes('$12.99') && (await row('Hydrometer').textContent()).includes('Triple scale'))), 'gear shows its notes and price');
   ok(await until(async () => ((await p.locator('.card-head .muted').textContent()) === 'All free')), 'both vessels are free');
@@ -141,7 +141,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const addMany = async (n) => {
     await p.getByRole('button', { name: 'Add vessel' }).first().click();
     await d.getByLabel('Type').selectOption({ label: 'Carboy' }); await d.getByLabel('Capacity', { exact: true }).fill('1');
-    await d.getByLabel('How many').fill(String(n)); await d.getByLabel(/^Price each/).fill('14.99');
+    await d.getByLabel('How many').fill(String(n)); await d.getByLabel('Price', { exact: true }).fill('14.99');
   };
   await addMany(8);
   ok(await until(async () => (await d.getByText('Each is added on its own, numbered: 1 gal carboy 1, 1 gal carboy 2…').count() === 1)), 'How many 8 says how they will be numbered');
@@ -160,7 +160,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 10b. Gear you have several of is one line with a count; the price is each
   await p.getByRole('button', { name: 'Add gear' }).click();
-  await d.getByLabel('Name').fill('Airlock'); await d.getByLabel('How many').fill('10'); await d.getByLabel(/^Price each/).fill('1.50');
+  await d.getByLabel('Name').fill('Airlock'); await d.getByLabel('How many').fill('10'); await d.getByLabel('Price', { exact: true }).fill('1.50');
   await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
   ok(await until(async () => ((await row('Airlock × 10').textContent()).endsWith('$15.00'))), 'ten airlocks are one line, "Airlock × 10", $15.00');
   await row('Airlock × 10').click();
@@ -168,17 +168,37 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByLabel('How many').fill('12'); await d.getByRole('button', { name: 'Save' }).click(); await d.waitFor({ state: 'detached' });
   ok(await until(async () => ((await row('Airlock × 12').textContent()).endsWith('$18.00'))), 'twelve now: $18.00');
 
+  // 10c. Bought together: type the total, it's divided; switching carries the number across
+  await p.getByRole('button', { name: 'Add vessel' }).first().click();
+  await d.getByLabel('Type').selectOption({ label: 'Jar' }); await d.getByLabel('Capacity', { exact: true }).fill('0.5');
+  await d.getByLabel('How many').fill('6'); await d.getByLabel('Name').fill('Pint jar');
+  const priceFor = d.getByRole('group', { name: 'Price for' });
+  await priceFor.getByRole('button', { name: 'Total' }).click();
+  await d.getByLabel('Price', { exact: true }).fill('29.94');
+  ok(await until(async () => (await d.getByText('$4.99 each.').count() === 1)), 'six jars, $29.94 total: $4.99 each');
+  await priceFor.getByRole('button', { name: 'Each' }).click();
+  ok(await until(async () => ((await d.getByLabel('Price', { exact: true }).inputValue()) === '4.99' && await d.getByText('$29.94 in all.').count() === 1)), 'switching to Each shows 4.99, and $29.94 in all');
+  await priceFor.getByRole('button', { name: 'Total' }).click();
+  await d.getByLabel('Price', { exact: true }).fill('30');
+  await d.getByRole('button', { name: 'Add 6 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  // They're grouped by type and size: open "0.5 gal jar".
+  await p.locator('.vessel-group-head', { hasText: '0.5 gal jar' }).click();
+  await row('Pint jar 1').click();
+  ok(await until(async () => ((await d.getByLabel('Price', { exact: true }).inputValue()) === '5')), 'a $30 total for six: each jar is $5');
+  ok(await until(async () => (await d.getByRole('group', { name: 'Price for' }).count() === 0)), 'one vessel on its own has no Each / Total');
+  await p.keyboard.press('Escape'); await d.waitFor({ state: 'detached' });
+
   // 11. Sorting the vessel lines, remembered
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
   // The Vessels card's own lines: not the vessels inside an open group, nor the gear.
   const lines = async () => (await p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Vessels' }) }).locator('ul.library-list:not(.vessel-group-list) > li > .equipment-row .library-name').allTextContents()).join(' | ');
   const sortBy = p.getByRole('group', { name: 'Sort vessels' });
   ok(await until(async () => ((await sortBy.getByRole('button', { pressed: true }).textContent()) === 'Type')), 'sorted by Type to start');
-  ok(await until(async () => (await lines()) === '1 gal carboy | Big carboy | 1 gal jar'), 'Type: carboys smallest first, then jars: ' + (await lines()));
+  ok(await until(async () => (await lines()) === '1 gal carboy | Big carboy | 0.5 gal jar | 1 gal jar'), 'Type: carboys smallest first, then jars: ' + (await lines()));
   await sortBy.getByRole('button', { name: 'Size' }).click();
-  ok(await until(async () => (await lines()) === '1 gal carboy | 1 gal jar | Big carboy'), 'Size: 1 gal carboys, 1 gal jars, then the 3 gal: ' + (await lines()));
+  ok(await until(async () => (await lines()) === '0.5 gal jar | 1 gal carboy | 1 gal jar | Big carboy'), 'Size: the pint jars, 1 gal carboys, 1 gal jars, then the 3 gal: ' + (await lines()));
   await sortBy.getByRole('button', { name: 'Name' }).click();
-  ok(await until(async () => (await lines()) === '1 gal carboy | 1 gal jar | Big carboy'), 'Name: A to Z: ' + (await lines()));
+  ok(await until(async () => (await lines()) === '0.5 gal jar | 1 gal carboy | 1 gal jar | Big carboy'), 'Name: A to Z: ' + (await lines()));
   await sortBy.getByRole('button', { name: 'Free first' }).click();
   ok(await until(async () => (await lines()).startsWith('1 gal carboy')), 'Free first: the ten free carboys lead: ' + (await lines()));
   await p.reload(); await p.waitForSelector('.equipment-row');

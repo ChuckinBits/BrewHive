@@ -2759,3 +2759,19 @@ button.library-row {
   color: var(--muted);
   font-weight: 500;
 }
+
+/* Price, with Each / Total beside it when there are several. */
+.price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.price-row .segmented {
+  flex: none;
+}

@@ -193,7 +193,9 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
   const [vesselType, setVesselType] = useState<VesselType>(item?.vesselType ?? 'carboy');
   const [capacityUnit, setCapacityUnit] = useState<VolumeUnit>(item?.capacityUnit ?? unit);
   const [capacity, setCapacity] = useState(volumeToInput(item?.capacityL ?? null, item?.capacityUnit ?? unit));
-  const [price, setPrice] = useState(item?.price != null ? String(item.price) : '');
+  const [price, setPrice] = useState(item?.price != null ? String(Math.round(item.price * 100) / 100) : '');
+  // With several, the price can be typed for each one or for all of them together.
+  const [priceFor, setPriceFor] = useState<'each' | 'total'>('each');
   const [notes, setNotes] = useState(item?.notes ?? '');
   // Adding several alike at once (new vessels only).
   const [count, setCount] = useState(String(item?.quantity ?? 1));
@@ -221,10 +223,29 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
     </Field>
   );
 
+  const several = Number(count) > 1 && (!item || !isVessel);
+  const typed = price.trim() ? parseNum(price.replace(/[^0-9.,-]/g, '')) : null;
+  const priceHint =
+    several && typed != null
+      ? priceFor === 'total'
+        ? `${fmtMoney(typed / Number(count), currency)} each.`
+        : `${fmtMoney(typed * Number(count), currency)} in all.`
+      : undefined;
+  /** Switching between each and total carries the number across, so it still means the same price. */
+  const switchPriceFor = (next: 'each' | 'total') => {
+    if (next !== priceFor && typed != null) {
+      const n = Number(count);
+      setPrice(String(Math.round((next === 'total' ? typed * n : typed / n) * 100) / 100));
+    }
+    setPriceFor(next);
+  };
+
   const save = async () => {
     if (isVessel && capacity.trim() && !(capacityL != null && capacityL > 0)) return setError('Capacity should be a number, such as 5 or 19.');
-    const priceValue = price.trim() ? parseNum(price.replace(/[^0-9.,-]/g, '')) : null;
-    if (price.trim() && (priceValue == null || priceValue < 0)) return setError('Enter what it cost, such as 34.99, or leave it empty.');
+    const typedPrice = price.trim() ? parseNum(price.replace(/[^0-9.,-]/g, '')) : null;
+    // A total is divided across them; kept to fractions of a cent so it adds back up.
+    const priceValue = typedPrice != null && several && priceFor === 'total' ? Math.round((typedPrice / Number(count)) * 10000) / 10000 : typedPrice;
+    if (price.trim() && (typedPrice == null || typedPrice < 0)) return setError('Enter what it cost, such as 34.99, or leave it empty.');
     const finalName = name.trim() || (isVessel ? suggested : '');
     if (!finalName) return setError('Enter what it is, such as Hydrometer.');
     const howMany = item && isVessel ? 1 : Number(count.trim() || '1');
@@ -275,8 +296,21 @@ function EquipmentSheet({ item, kind, unit, currency, batches: all, items, onClo
           <input type="text" value={name} placeholder={isVessel ? suggested : 'Hydrometer'} autoFocus={!item && !isVessel} onChange={(e) => setName(e.target.value)} />
         </Field>
         {!isVessel && countField}
-        <Field label={Number(count) > 1 && (!item || !isVessel) ? `Price each (${currency}, optional)` : `Price (${currency}, optional)`}>
-          <input type="text" inputMode="decimal" value={price} placeholder={isVessel ? '39.99' : '12.99'} onChange={(e) => setPrice(e.target.value)} />
+        <Field label={`Price (${currency}, optional)`} hint={priceHint}>
+          <div className="price-row">
+            <input type="text" inputMode="decimal" aria-label="Price" value={price} placeholder={isVessel ? '39.99' : '12.99'} onChange={(e) => setPrice(e.target.value)} />
+            {several && (
+              <Segmented<'each' | 'total'>
+                label="Price for"
+                value={priceFor}
+                options={[
+                  { id: 'each', label: 'Each' },
+                  { id: 'total', label: 'Total' },
+                ]}
+                onChange={switchPriceFor}
+              />
+            )}
+          </div>
         </Field>
         <Field label="Notes">
           <textarea rows={3} value={notes} placeholder={isVessel ? 'Glass, 3-piece airlock, small chip on the neck' : 'Where it lives, when it was calibrated'} onChange={(e) => setNotes(e.target.value)} />
