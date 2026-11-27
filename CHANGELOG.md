@@ -5,6 +5,32 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Equipment
+
+- **Alike vessels on one line.** Vessels of the same type and size are
+  grouped, such as "1 gal carboy · 8 vessels · 4 of 8 free". Tap the line to
+  see each one and the batch in it. A vessel with no twin stays on its own
+  line.
+- **What it cost.** The Equipment screen totals what your vessels and other
+  gear cost, and both together, and says how many have no price.
+- **Add several alike at once.** Add vessel has a **How many** box: eight
+  1 gal carboys in one go, each its own vessel, numbered "1 gal carboy 1" to
+  "8" (or after your own name). Adding more later carries on the numbers.
+- **Gear you have several of.** Add gear has a **How many** box too, but
+  gear stays one line with its count, such as "Airlock × 10", priced each.
+  The totals count every one, and editing changes the count.
+- **Price each or in total.** When there's more than one, an **Each /
+  Total** switch sits beside the price. Bought eight carboys for $119.92?
+  Pick Total and type that: it works out $14.99 each for you. Switching
+  carries the number across.
+- **Sort your vessels** by Type (carboys, buckets, jars…, smallest first),
+  Size (smallest first, whatever the type), Name, or Free first (the lines
+  with the most free vessels at the top). Your choice is remembered.
+- **Jug is now Jar.** Vessels saved as jugs become jars. Names you typed stay
+  as they are.
+
 ## v0.3.1 – 2026-11-26
 
 ### Equipment

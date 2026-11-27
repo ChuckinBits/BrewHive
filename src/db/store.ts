@@ -85,6 +85,12 @@ export async function syncOgEntry(batch: Batch, previousStartDate?: string): Pro
 }
 
 /** Batches with an OG but no OG entry (from before there were any) get one on their start date. */
+/** v0.3.2 renamed the Jug vessel type to Jar: vessels saved as jugs become jars. Names stay as typed. */
+export async function renameJugsToJars(): Promise<void> {
+  const jugs = (await getAll<Equipment>('equipment')).filter((e) => (e.vesselType as string) === 'jug');
+  if (jugs.length) await putMany('equipment', jugs.map((e) => ({ ...e, vesselType: 'jar' as const })));
+}
+
 export async function ensureOgEntries(): Promise<void> {
   const all = await getAll<BatchEvent>('events');
   const has = new Set(all.filter((e) => e.og && !e.deletedAt).map((e) => e.batchId));

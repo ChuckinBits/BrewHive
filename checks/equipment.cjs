@@ -32,14 +32,14 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
 
   // 1. Equipment is under More, and starts empty
   await p.goto(BASE + '/#/more'); await p.getByRole('link', { name: /Equipment/ }).click(); await p.waitForSelector('.topbar');
-  ok(await until(async () => (await p.getByText(/Carboys, buckets, jugs, kegs and barrels/).count() === 1)), 'More → Equipment, empty, says what vessels are for');
+  ok(await until(async () => (await p.getByText(/Carboys, buckets, jars, kegs and barrels/).count() === 1)), 'More → Equipment, empty, says what vessels are for');
 
   // 2. A vessel left unnamed is named from its capacity and type; gear has a price
   await addVessel({ type: 'Carboy', capacity: '5' });
   ok(await until(async () => (await row('5 gal carboy').count() === 1)), 'an unnamed 5 gal carboy is called "5 gal carboy"');
-  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug A' });
+  await addVessel({ type: 'Jar', capacity: '1', name: 'Jar A' });
   await p.getByRole('button', { name: 'Add gear' }).click();
-  await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel(/^Price/).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
+  await d.getByLabel('Name').fill('Hydrometer'); await d.getByLabel('Price', { exact: true }).fill('12.99'); await d.getByLabel('Notes').fill('Triple scale');
   await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
   ok(await until(async () => ((await row('Hydrometer').textContent()).includes('$12.99') && (await row('Hydrometer').textContent()).includes('Triple scale'))), 'gear shows its notes and price');
   ok(await until(async () => ((await p.locator('.card-head .muted').textContent()) === 'All free')), 'both vessels are free');
@@ -47,25 +47,25 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   // 3. A new batch picks a vessel; too small warns
   await p.goto(BASE + '/#/batches/new');
   await p.getByLabel('Name').fill('Vessel Test'); await p.getByLabel('Volume', { exact: true }).fill('5');
-  await p.getByLabel('Vessel').selectOption({ label: 'Jug A · 1 gal · free' });
-  ok(await until(async () => (await p.getByText("Jug A holds 1 gal, less than the 5 gal of this batch.").count() === 1)), 'picking a 1 gal jug for 5 gal warns');
+  await p.getByLabel('Vessel').selectOption({ label: 'Jar A · 1 gal · free' });
+  ok(await until(async () => (await p.getByText("Jar A holds 1 gal, less than the 5 gal of this batch.").count() === 1)), 'picking a 1 gal jar for 5 gal warns');
   await p.getByLabel('Volume', { exact: true }).fill('1');
   ok(await until(async () => (await p.locator('.vessel-warning').count() === 0)), '1 gal fits: no warning');
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
   const batchUrl = p.url();
-  ok(await until(async () => ((await fact('Vessel')) === 'Jug AFull')), 'the batch page shows the vessel and that it is full: ' + (await fact('Vessel')));
+  ok(await until(async () => ((await fact('Vessel')) === 'Jar AFull')), 'the batch page shows the vessel and that it is full: ' + (await fact('Vessel')));
 
   // 4. The Equipment screen shows what's in each vessel
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
-  ok(await until(async () => ((await row('Jug A').locator('.vessel-status').textContent()) === 'Vessel Test' && (await p.locator('.card-head .muted').textContent()) === '1 of 2 free')), 'Jug A holds Vessel Test; 1 of 2 free');
+  ok(await until(async () => ((await row('Jar A').locator('.vessel-status').textContent()) === 'Vessel Test' && (await p.locator('.card-head .muted').textContent()) === '1 of 2 free')), 'Jar A holds Vessel Test; 1 of 2 free');
 
-  // 5. Moving to Secondary offers racking; the carboy gets it, the jug is free again
+  // 5. Moving to Secondary offers racking; the carboy gets it, the jar is free again
   await p.goto(batchUrl); await p.waitForSelector('.hero');
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Secondary' }).click();
   ok(await until(async () => (await p.getByRole('dialog', { name: 'Racked into a new vessel?' }).count() === 1)), 'moving to Secondary asks which vessel it was racked into');
   // The vessel list loads a moment after the sheet opens.
   const opts = () => d.getByLabel('Racked into').locator('option').allTextContents();
-  ok(await until(async () => { const o = await opts(); return o.length === 3 && o[2] === 'Jug A · 1 gal · in it now'; }), 'its own vessel says "in it now", listed last: ' + (await opts()).join(' | '));
+  ok(await until(async () => { const o = await opts(); return o.length === 3 && o[2] === 'Jar A · 1 gal · in it now'; }), 'its own vessel says "in it now", listed last: ' + (await opts()).join(' | '));
   await d.getByRole('button', { name: 'Log racking' }).click();
   ok(await until(async () => (await d.getByRole('alert').getByText('Choose the vessel it went into').count() === 1)), 'Log racking without a vessel asks for one');
   await d.getByLabel('Racked into').selectOption({ label: '5 gal carboy · 5 gal · free' });
@@ -74,10 +74,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into 5 gal carboy' }).count() === 1)), 'the timeline says "Racked into 5 gal carboy"');
   ok(await until(async () => ((await fact('Vessel')) === '5 gal carboy4 gal headspace (80%)')), 'headspace in the carboy: 4 gal (80%): ' + (await fact('Vessel')));
 
-  // 6. Removing that racking puts it back in Jug A
+  // 6. Removing that racking puts it back in Jar A
   await p.getByRole('button', { name: /^Edit Racked into 5 gal carboy/ }).click();
   await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await p.waitForTimeout(400);
-  ok(await until(async () => ((await fact('Vessel')) === 'Jug AFull')), 'removing the racking puts it back in Jug A');
+  ok(await until(async () => ((await fact('Vessel')) === 'Jar AFull')), 'removing the racking puts it back in Jar A');
 
   // 7. Racking from Add entry, into the carboy again
   await p.getByRole('button', { name: 'Add entry' }).click();
@@ -85,6 +85,10 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await d.getByLabel('Racked into').selectOption({ label: '5 gal carboy · 5 gal · free' });
   await d.getByRole('button', { name: 'Save entry' }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await fact('Vessel')).startsWith('5 gal carboy'))), 'a Racked entry from Add entry moves it to the carboy');
+
+  // 7b. What it cost: no prices given yet, so nothing counted and it says so
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await p.locator('.equipment-cost').textContent()) === 'Vessels$0.00Other gear$12.99Total$12.99' && await p.getByText("2 items have no price, so they aren't counted.").count() === 1)), 'What it cost: vessels $0, gear $12.99, total $12.99, and 2 without a price');
 
   // 8. Deleting the carboy: the batch shows no vessel, and the timeline still names it
   await p.goto(BASE + '/#/equipment'); await row('5 gal carboy').click();
@@ -95,38 +99,121 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await p.locator('dt', { hasText: /^Vessel$/ }).count() === 0)), 'the batch no longer shows a vessel');
   ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into 5 gal carboy' }).count() === 1)), 'but its Racked entry still says where it went');
 
-  // 9. Several vessels: 2 gal in a 3 gal carboy, racked into two 1 gal jugs
+  // 9. Several vessels: 2 gal in a 3 gal carboy, racked into two 1 gal jars
   await p.goto(BASE + '/#/equipment');
   await addVessel({ type: 'Carboy', capacity: '3', name: 'Big carboy' });
-  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug B' });
-  await addVessel({ type: 'Jug', capacity: '1', name: 'Jug C' });
+  await addVessel({ type: 'Jar', capacity: '1', name: 'Jar B' });
+  await addVessel({ type: 'Jar', capacity: '1', name: 'Jar C' });
   await p.goto(BASE + '/#/batches/new');
-  await p.getByLabel('Name').fill('Two Jugs'); await p.getByLabel('Volume', { exact: true }).fill('2');
+  await p.getByLabel('Name').fill('Two Jars'); await p.getByLabel('Volume', { exact: true }).fill('2');
   await p.getByLabel('Vessel').selectOption({ label: 'Big carboy · 3 gal · free' });
   await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
   ok(await until(async () => ((await fact('Vessel')) === 'Big carboy1 gal headspace (33%)')), '2 gal in the 3 gal carboy: 1 gal headspace (33%)');
   await p.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Secondary' }).click();
   const rackSheet = p.getByRole('dialog', { name: 'Racked into a new vessel?' });
-  await rackSheet.getByLabel('Racked into').selectOption({ label: 'Jug B · 1 gal · free' });
+  await rackSheet.getByLabel('Racked into').selectOption({ label: 'Jar B · 1 gal · free' });
   await rackSheet.getByRole('button', { name: 'Add another vessel' }).click();
-  await rackSheet.getByLabel('Racked into 2').selectOption({ label: 'Jug C · 1 gal · free' });
-  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jug B').inputValue()) === '1' && (await rackSheet.getByLabel('Amount in Jug C').inputValue()) === '1')), 'two 1 gal jugs fill in order: 1 + 1');
+  await rackSheet.getByLabel('Racked into 2').selectOption({ label: 'Jar C · 1 gal · free' });
+  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jar B').inputValue()) === '1' && (await rackSheet.getByLabel('Amount in Jar C').inputValue()) === '1')), 'two 1 gal jars fill in order: 1 + 1');
   ok(await until(async () => (await rackSheet.getByText('2 gal across 2 vessels: all of it.').count() === 1)), 'and it says all 2 gal went in');
   // Typed a key at a time, as on a phone: the decimal point has to survive "0.".
-  await rackSheet.getByLabel('Amount in Jug C').fill(''); await rackSheet.getByLabel('Amount in Jug C').pressSequentially('0.8', { delay: 60 });
-  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jug C').inputValue()) === '0.8')), 'typing 0.8 a key at a time keeps the decimal point');
+  await rackSheet.getByLabel('Amount in Jar C').fill(''); await rackSheet.getByLabel('Amount in Jar C').pressSequentially('0.8', { delay: 60 });
+  ok(await until(async () => ((await rackSheet.getByLabel('Amount in Jar C').inputValue()) === '0.8')), 'typing 0.8 a key at a time keeps the decimal point');
   ok(await until(async () => (await rackSheet.getByText('1.8 gal across 2 vessels: 0.2 gal left behind. The batch becomes 1.8 gal.').count() === 1)), 'leaving 0.2 gal of lees behind: the batch becomes 1.8 gal');
   await p.screenshot({ path: `${out}/equipment-rack-two.png` });
   await rackSheet.getByRole('button', { name: 'Log racking' }).click(); await p.waitForTimeout(400);
-  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into Jug B and Jug C' }).count() === 1)), 'the timeline says "Racked into Jug B and Jug C"');
-  ok(await until(async () => ((await fact('Vessels')) === 'Jug B · 1 galFullJug C · 0.8 gal0.2 gal headspace (20%)')), 'Vessels: Jug B full, Jug C 0.8 gal with 0.2 gal headspace: ' + (await fact('Vessels')));
+  ok(await until(async () => (await p.locator('.timeline-title', { hasText: 'Racked into Jar B and Jar C' }).count() === 1)), 'the timeline says "Racked into Jar B and Jar C"');
+  ok(await until(async () => ((await fact('Vessels')) === 'Jar B · 1 galFullJar C · 0.8 gal0.2 gal headspace (20%)')), 'Vessels: Jar B full, Jar C 0.8 gal with 0.2 gal headspace: ' + (await fact('Vessels')));
   ok(await until(async () => ((await fact('Volume')).startsWith('1.8 gal'))), 'the batch is now 1.8 gal');
   await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
-  ok(await until(async () => ((await row('Jug B').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Jug C').locator('.vessel-status').textContent()) === 'Two Jugs' && (await row('Big carboy').locator('.vessel-status').textContent()) === 'Free')), 'both jugs hold Two Jugs, and the big carboy is free');
+  // Three 1 gal jars are one line, closed, with how many are free; it opens to show each.
+  const jars = p.locator('.vessel-group-head', { hasText: '1 gal jar' });
+  ok(await until(async () => ((await jars.textContent()) === '1 gal jar3 vessels1 of 3 free' && (await jars.getAttribute('aria-expanded')) === 'false')), 'the three 1 gal jars are one closed line: 1 of 3 free');
+  await jars.click();
+  ok(await until(async () => ((await row('Jar B').locator('.vessel-status').textContent()) === 'Two Jars' && (await row('Jar C').locator('.vessel-status').textContent()) === 'Two Jars' && (await row('Big carboy').locator('.vessel-status').textContent()) === 'Free')), 'both jars hold Two Jars, and the big carboy is free');
   await p.goBack(); await p.waitForSelector('.hero');
-  await p.getByRole('button', { name: /^Edit Racked into Jug B and Jug C/ }).click();
+  await p.getByRole('button', { name: /^Edit Racked into Jar B and Jar C/ }).click();
   await d.getByRole('button', { name: 'Remove entry' }).click(); await d.getByRole('button', { name: 'Remove', exact: true }).click(); await p.waitForTimeout(400);
   ok(await until(async () => ((await fact('Vessel')) === 'Big carboy1 gal headspace (33%)' && (await fact('Volume')).startsWith('2 gal'))), 'removing it puts the 2 gal back in the big carboy');
+
+  // 10. Several alike at once: eight 1 gal carboys, then two more, numbered on
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  const addMany = async (n) => {
+    await p.getByRole('button', { name: 'Add vessel' }).first().click();
+    await d.getByLabel('Type').selectOption({ label: 'Carboy' }); await d.getByLabel('Capacity', { exact: true }).fill('1');
+    await d.getByLabel('How many').fill(String(n)); await d.getByLabel('Price', { exact: true }).fill('14.99');
+  };
+  await addMany(8);
+  ok(await until(async () => (await d.getByText('Each is added on its own, numbered: 1 gal carboy 1, 1 gal carboy 2…').count() === 1)), 'How many 8 says how they will be numbered');
+  await d.getByRole('button', { name: 'Add 8 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => (await p.getByText('8 vessels added').count() === 1)), 'it says 8 vessels were added');
+  const carboys = p.locator('.vessel-group-head', { hasText: '1 gal carboy' });
+  ok(await until(async () => ((await carboys.textContent()) === '1 gal carboy8 vesselsAll free')), 'they are one line: 1 gal carboy, 8 vessels, all free');
+  await addMany(2); await d.getByRole('button', { name: 'Add 2 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  await carboys.click();
+  ok(await until(async () => (JSON.stringify(await p.locator('.vessel-group-list .library-name').allTextContents()).includes('"1 gal carboy 9","1 gal carboy 10"'))), 'two more carry on as 1 gal carboy 9 and 10');
+  ok(await until(async () => ((await carboys.textContent()) === '1 gal carboy10 vesselsAll free')), 'and the line counts 10');
+  await p.getByRole('button', { name: 'Add vessel' }).first().click();
+  await d.getByLabel('How many').fill('51'); await d.getByRole('button', { name: 'Add 51 vessels' }).click();
+  ok(await until(async () => (await d.getByRole('alert').getByText('How many should be a whole number from 1 to 50.').count() === 1)), 'more than 50 at once asks for fewer');
+  await p.keyboard.press('Escape'); await d.waitFor({ state: 'detached' });
+
+  // 10b. Gear you have several of is one line with a count; the price is each
+  await p.getByRole('button', { name: 'Add gear' }).click();
+  await d.getByLabel('Name').fill('Airlock'); await d.getByLabel('How many').fill('10'); await d.getByLabel('Price', { exact: true }).fill('1.50');
+  await d.getByRole('button', { name: 'Add gear' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => ((await row('Airlock × 10').textContent()).endsWith('$15.00'))), 'ten airlocks are one line, "Airlock × 10", $15.00');
+  await row('Airlock × 10').click();
+  ok(await until(async () => ((await d.getByLabel('How many').inputValue()) === '10')), 'editing shows the count');
+  await d.getByLabel('How many').fill('12'); await d.getByRole('button', { name: 'Save' }).click(); await d.waitFor({ state: 'detached' });
+  ok(await until(async () => ((await row('Airlock × 12').textContent()).endsWith('$18.00'))), 'twelve now: $18.00');
+
+  // 10c. Bought together: type the total, it's divided; switching carries the number across
+  await p.getByRole('button', { name: 'Add vessel' }).first().click();
+  await d.getByLabel('Type').selectOption({ label: 'Jar' }); await d.getByLabel('Capacity', { exact: true }).fill('0.5');
+  await d.getByLabel('How many').fill('6'); await d.getByLabel('Name').fill('Pint jar');
+  const priceFor = d.getByRole('group', { name: 'Price for' });
+  await priceFor.getByRole('button', { name: 'Total' }).click();
+  await d.getByLabel('Price', { exact: true }).fill('29.94');
+  ok(await until(async () => (await d.getByText('$4.99 each.').count() === 1)), 'six jars, $29.94 total: $4.99 each');
+  await priceFor.getByRole('button', { name: 'Each' }).click();
+  ok(await until(async () => ((await d.getByLabel('Price', { exact: true }).inputValue()) === '4.99' && await d.getByText('$29.94 in all.').count() === 1)), 'switching to Each shows 4.99, and $29.94 in all');
+  await priceFor.getByRole('button', { name: 'Total' }).click();
+  await d.getByLabel('Price', { exact: true }).fill('30');
+  await d.getByRole('button', { name: 'Add 6 vessels' }).click(); await d.waitFor({ state: 'detached' });
+  // They're grouped by type and size: open "0.5 gal jar".
+  await p.locator('.vessel-group-head', { hasText: '0.5 gal jar' }).click();
+  await row('Pint jar 1').click();
+  ok(await until(async () => ((await d.getByLabel('Price', { exact: true }).inputValue()) === '5')), 'a $30 total for six: each jar is $5');
+  ok(await until(async () => (await d.getByRole('group', { name: 'Price for' }).count() === 0)), 'one vessel on its own has no Each / Total');
+  await p.keyboard.press('Escape'); await d.waitFor({ state: 'detached' });
+
+  // 11. Sorting the vessel lines, remembered
+  await p.goto(BASE + '/#/equipment'); await p.waitForSelector('.equipment-row');
+  // The Vessels card's own lines: not the vessels inside an open group, nor the gear.
+  const lines = async () => (await p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Vessels' }) }).locator('ul.library-list:not(.vessel-group-list) > li > .equipment-row .library-name').allTextContents()).join(' | ');
+  const sortBy = p.getByRole('group', { name: 'Sort vessels' });
+  ok(await until(async () => ((await sortBy.getByRole('button', { pressed: true }).textContent()) === 'Type')), 'sorted by Type to start');
+  ok(await until(async () => (await lines()) === '1 gal carboy | Big carboy | 0.5 gal jar | 1 gal jar'), 'Type: carboys smallest first, then jars: ' + (await lines()));
+  await sortBy.getByRole('button', { name: 'Size' }).click();
+  ok(await until(async () => (await lines()) === '0.5 gal jar | 1 gal carboy | 1 gal jar | Big carboy'), 'Size: the pint jars, 1 gal carboys, 1 gal jars, then the 3 gal: ' + (await lines()));
+  await sortBy.getByRole('button', { name: 'Name' }).click();
+  ok(await until(async () => (await lines()) === '0.5 gal jar | 1 gal carboy | 1 gal jar | Big carboy'), 'Name: A to Z: ' + (await lines()));
+  await sortBy.getByRole('button', { name: 'Free first' }).click();
+  ok(await until(async () => (await lines()).startsWith('1 gal carboy')), 'Free first: the ten free carboys lead: ' + (await lines()));
+  await p.reload(); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await sortBy.getByRole('button', { pressed: true }).textContent()) === 'Free first')), 'the choice is remembered');
+
+  // 12. A vessel saved as a jug (before v0.3.2) opens as a jar
+  await p.evaluate(async () => {
+    const db = await new Promise(r => { const q = indexedDB.open('brewhive'); q.onsuccess = () => r(q.result); });
+    const now = new Date().toISOString();
+    const tx = db.transaction('equipment', 'readwrite');
+    tx.objectStore('equipment').put({ id: 'old-jug', name: 'Old growler', kind: 'vessel', vesselType: 'jug', capacityL: 1.89, capacityUnit: 'gal', price: null, notes: '', createdAt: now, updatedAt: now, deletedAt: null });
+    await new Promise(r => (tx.oncomplete = r));
+  });
+  await p.reload(); await p.waitForSelector('.equipment-row');
+  ok(await until(async () => ((await row('Old growler').textContent()).includes('Jar · 0.5 gal'))), 'an old Jug vessel shows as Jar');
 
   ok(errors.length === 0, 'no console errors ' + errors.join(' | '));
   await b.close();

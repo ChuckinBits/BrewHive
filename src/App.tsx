@@ -2,7 +2,7 @@
 // tab bar.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { batches, cellar, loadSettings, recipes, saveSettings, useSettings, ensureOgEntries, ensureStarterIngredients } from './db/store.ts';
+import { batches, cellar, loadSettings, recipes, saveSettings, useSettings, ensureOgEntries, ensureStarterIngredients, renameJugsToJars } from './db/store.ts';
 import { loadSampleData } from './db/sample.ts';
 import type { Settings } from './db/types.ts';
 import { isDemo } from './lib/demo.ts';
@@ -78,7 +78,7 @@ export function App() {
     // The starter ingredients go in once per device (see ensureStarterIngredients).
     // Batches from before the OG had a timeline entry get one.
     // If storage never answers, say so after a while rather than staying blank.
-    startup ??= withTimeout(loadSettings().then(seedDemo).then(ensureStarterIngredients).then(ensureOgEntries), 'opening BrewHive');
+    startup ??= withTimeout(loadSettings().then(seedDemo).then(ensureStarterIngredients).then(ensureOgEntries).then(renameJugsToJars), 'opening BrewHive');
     startup.then(
       () => setState('ready'),
       (error) => {

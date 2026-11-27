@@ -1,7 +1,7 @@
 // Equipment: which batches each vessel holds, how much room is left in it, and how racking moves a
 // batch from one set of vessels to another. A batch can be in several vessels at once.
 
-import type { Batch, BatchEvent, Equipment, VesselFill, VolumeUnit } from '../db/types.ts';
+import type { Batch, BatchEvent, Equipment, VesselFill, VesselSort, VolumeUnit } from '../db/types.ts';
 import { VESSEL_TYPES } from '../db/types.ts';
 import { fmtVolume } from './format.ts';
 
@@ -144,7 +144,78 @@ export function fillsAfterRemovingRack(entry: BatchEvent, batch: Batch, timeline
   return rackedFrom(entry);
 }
 
-/** "Jug A", "Jug A and Jug B", "Jug A, Jug B and Jug C". */
+/** "Jar A", "Jar A and Jar B", "Jar A, Jar B and Jar C". */
 export function listNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+export interface VesselGroup {
+  /** Type and capacity, such as "carboy|3.785". */
+  key: string;
+  /** "1 gal carboy", or "Carboy" for ones without a capacity. */
+  label: string;
+  vessels: Equipment[];
+}
+
+/**
+ * Vessels grouped by type and size, so eight 1 gal carboys are one line: groups by type in the
+ * order of VESSEL_TYPES, smallest first, and the vessels in each by name.
+ */
+export function groupVessels(vessels: Equipment[], unit: VolumeUnit): VesselGroup[] {
+  const groups = new Map<string, VesselGroup>();
+  for (const v of vessels) {
+    // Sizes typed in different units still match: compare to the milliliter.
+    const size = v.capacityL ? Math.round(v.capacityL * 1000) : 0;
+    const key = `${v.vesselType ?? 'other'}|${size}`;
+    const group = groups.get(key) ?? { key, label: suggestVesselName(v.vesselType, v.capacityL, v.capacityUnit ?? unit), vessels: [] };
+    group.vessels.push(v);
+    groups.set(key, group);
+  }
+  const typeOrder = (g: VesselGroup) => VESSEL_TYPES.findIndex((t) => t.id === g.key.split('|')[0]);
+  const sizeOf = (g: VesselGroup) => Number(g.key.split('|')[1]) || Infinity;
+  for (const g of groups.values()) g.vessels.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return [...groups.values()].sort((a, b) => typeOrder(a) - typeOrder(b) || sizeOf(a) - sizeOf(b));
+}
+
+/** What a set of equipment cost: the total of the prices given, and how many have none. */
+export function priceTotal(items: Equipment[]): { total: number; unpriced: number } {
+  return {
+    // Gear with a quantity counts each one.
+    total: Math.round(items.reduce((sum, e) => sum + (e.price ?? 0) * (e.quantity ?? 1), 0) * 100) / 100,
+    unpriced: items.filter((e) => e.price == null).length,
+  };
+}
+
+/** Most vessels added in one go. */
+export const MAX_AT_ONCE = 50;
+
+/**
+ * Names for vessels added together: "1 gal carboy 1", "… 2", carrying on after any already named
+ * that way ("… 9" when 1 to 8 exist). One vessel keeps the plain name.
+ */
+export function numberedNames(base: string, count: number, existing: string[]): string[] {
+  if (count <= 1) return [base];
+  const pattern = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (\\d+)$`, 'i');
+  const taken = existing.map((n) => Number(n.match(pattern)?.[1] ?? 0));
+  const start = Math.max(0, ...taken) + 1;
+  return Array.from({ length: count }, (_, i) => `${base} ${start + i}`);
+}
+
+/**
+ * The vessel lines in the order picked: by type (carboys, buckets, jars…, smallest first), by size
+ * (smallest first whatever the type), by name, or with the most free vessels first.
+ */
+export function sortGroups(groups: VesselGroup[], sort: VesselSort, batches: Batch[]): VesselGroup[] {
+  const typeOrder = (g: VesselGroup) => VESSEL_TYPES.findIndex((t) => t.id === g.key.split('|')[0]);
+  const sizeOf = (g: VesselGroup) => Number(g.key.split('|')[1]) || Infinity;
+  const byType = (a: VesselGroup, b: VesselGroup) => typeOrder(a) - typeOrder(b) || sizeOf(a) - sizeOf(b);
+  const label = (g: VesselGroup) => (g.vessels.length === 1 ? g.vessels[0].name : g.label);
+  const free = (g: VesselGroup) => g.vessels.filter((v) => batchesIn(v.id, batches).length === 0).length;
+  const order: Record<VesselSort, (a: VesselGroup, b: VesselGroup) => number> = {
+    type: byType,
+    size: (a, b) => sizeOf(a) - sizeOf(b) || typeOrder(a) - typeOrder(b),
+    name: (a, b) => label(a).localeCompare(label(b), undefined, { numeric: true }),
+    free: (a, b) => free(b) - free(a) || byType(a, b),
+  };
+  return [...groups].sort(order[sort]);
 }
