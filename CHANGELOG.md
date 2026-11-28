@@ -25,7 +25,8 @@ a milestone.
 
 ### Icons
 
-- **Five new flavor icons:** red apple, guava, lime, kiwi and apricot.
+- **Five new flavor icons:** guava, lime, kiwi, apricot, and a spice mix of
+  star anise, clove and allspice.
 - **A to Z.** The icon picker lists Traditional first, then every other
   flavor alphabetically.
 

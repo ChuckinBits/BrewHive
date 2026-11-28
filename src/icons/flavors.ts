@@ -253,20 +253,20 @@ export const FLAVORS: Flavor[] = [
     "body": "<path d=\"M15 16c2-3 6-4 9-2 3-2 7-1 9 2-3 1.5-6 1.5-9 .5-3 1-6 1-9-.5z\" fill=\"#4CA35A\"></path><g fill=\"#D6336C\"><circle cx=\"16\" cy=\"21\" r=\"4.6\"></circle><circle cx=\"24\" cy=\"21\" r=\"4.6\"></circle><circle cx=\"32\" cy=\"21\" r=\"4.6\"></circle><circle cx=\"16.5\" cy=\"28.5\" r=\"4.6\"></circle><circle cx=\"24\" cy=\"28.5\" r=\"4.6\"></circle><circle cx=\"31.5\" cy=\"28.5\" r=\"4.6\"></circle><circle cx=\"20\" cy=\"35.5\" r=\"4.6\"></circle><circle cx=\"28\" cy=\"35.5\" r=\"4.6\"></circle><circle cx=\"24\" cy=\"41\" r=\"3.8\"></circle></g><g fill=\"#FFFFFF\" fill-opacity=\"0.75\" stroke=\"none\"><circle cx=\"14.6\" cy=\"19.6\" r=\"1\"></circle><circle cx=\"22.6\" cy=\"27.1\" r=\"1\"></circle><circle cx=\"30.1\" cy=\"27.1\" r=\"1\"></circle><circle cx=\"18.6\" cy=\"34.1\" r=\"1\"></circle></g>"
   },
   {
-    "id": "red-apple",
-    "label": "Red apple",
-    "style": "Cyser",
-    "color": "#E3AE4E",
-    "strokeWidth": 2.0,
-    "body": "<path d=\"M24 15c-3-2-10-2.6-13 2.4C8 22.4 10 32 14 37.2c2.6 3.4 5.4 5.2 10 3.2 4.6 2 7.4.2 10-3.2 4-5.2 6-14.8 3-19.8C34 12.4 27 13 24 15z\" fill=\"#D8343B\"></path><path d=\"M24 15c0-4 1.4-7 4-9\" fill=\"none\"></path><path d=\"M26 10.4c3-1.6 6-1.2 8 .6-2 2.4-5.2 3-8 1.2\" fill=\"#4CA35A\"></path><path d=\"M14 23a8 8 0 0 1 4-5\" fill=\"none\" stroke=\"#F7B3B0\" stroke-width=\"2.5\"></path>"
-  },
-  {
     "id": "rose",
     "label": "Rose",
     "style": "Rhodomel",
     "color": "#E77FA3",
     "strokeWidth": 2.0,
     "body": "<path d=\"M22 36c-5-1-10 1-13 6 5 1 10-1 13-6zM26 36c5-1 10 1 13 6-5 1-10-1-13-6z\" fill=\"#4CA35A\"></path><g fill=\"#E0457B\"><circle cx=\"24\" cy=\"15\" r=\"8.5\"></circle><circle cx=\"33\" cy=\"21.5\" r=\"8.5\"></circle><circle cx=\"29.5\" cy=\"32\" r=\"8.5\"></circle><circle cx=\"18.5\" cy=\"32\" r=\"8.5\"></circle><circle cx=\"15\" cy=\"21.5\" r=\"8.5\"></circle></g><g fill=\"#C42F66\" stroke-width=\"1.6\"><circle cx=\"26.8\" cy=\"20.5\" r=\"5\"></circle><circle cx=\"28.6\" cy=\"26\" r=\"5\"></circle><circle cx=\"24\" cy=\"29.4\" r=\"5\"></circle><circle cx=\"19.4\" cy=\"26\" r=\"5\"></circle><circle cx=\"21.2\" cy=\"20.5\" r=\"5\"></circle></g><circle cx=\"24\" cy=\"24.5\" r=\"3.6\" fill=\"#8E1E4A\" stroke-width=\"1.6\"></circle><path d=\"M24 22.6a1.9 1.9 0 1 1-1.6 2.9\" fill=\"none\" stroke=\"#F7B5CF\" stroke-width=\"1.3\"></path>"
+  },
+  {
+    "id": "spice-mix",
+    "label": "Spice mix",
+    "style": "Metheglin",
+    "color": "#B8733E",
+    "strokeWidth": 2.0,
+    "body": "<g fill=\"#A0522A\" stroke-width=\"1.6\"><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(0 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(45 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(90 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(135 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(180 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(225 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(270 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"10.4\" rx=\"3.6\" ry=\"7.4\" transform=\"rotate(315 18 18)\"></ellipse></g><circle cx=\"18\" cy=\"18\" r=\"3.2\" fill=\"#7A3A1C\"></circle><g fill=\"#F2CC92\" stroke=\"none\"><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(0 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(45 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(90 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(135 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(180 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(225 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(270 18 18)\"></ellipse><ellipse cx=\"18\" cy=\"9\" rx=\"1.3\" ry=\"2.4\" transform=\"rotate(315 18 18)\"></ellipse></g><path d=\"M38 22L36.2 43a1.8 1.8 0 0 0 3.6 0z\" fill=\"#6B3A22\"></path><path d=\"M38 22c-3.4-.8-5.2-3.2-4.6-6 2.8-.5 4.3.8 4.6 2.6.3-1.8 1.8-3.1 4.6-2.6.6 2.8-1.2 5.2-4.6 6z\" fill=\"#8A4A2A\"></path><circle cx=\"38\" cy=\"13.4\" r=\"2.8\" fill=\"#B5643A\"></circle><g fill=\"#7A4A2C\"><circle cx=\"9.5\" cy=\"38\" r=\"4.6\"></circle><circle cx=\"19.5\" cy=\"40.5\" r=\"4.6\"></circle><circle cx=\"27.5\" cy=\"33.5\" r=\"4.6\"></circle></g><g fill=\"#D9A77A\" stroke=\"none\"><circle cx=\"8\" cy=\"36.5\" r=\"1.3\"></circle><circle cx=\"18\" cy=\"39\" r=\"1.3\"></circle><circle cx=\"26\" cy=\"32\" r=\"1.3\"></circle></g>"
   },
   {
     "id": "strawberry",
