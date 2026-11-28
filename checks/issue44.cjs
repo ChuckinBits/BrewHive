@@ -102,8 +102,9 @@ const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset);
   const sampleOgs = (await storedOg()).length;
   const withOg = await p.evaluate(async () => {
     const db = await new Promise((r) => { const q = indexedDB.open('brewhive'); q.onsuccess = () => r(q.result); });
-    return new Promise((r) => { const q = db.transaction('batches').objectStore('batches').getAll(); q.onsuccess = () => r(q.result.filter((b) => b.og != null && !b.deletedAt).length); });
+    return new Promise((r) => { const q = db.transaction('batches').objectStore('batches').getAll(); q.onsuccess = () => r(q.result.filter((b) => b.og != null && !b.deletedAt && !b.parentId).length); });
   });
+  // Sub-batches share the OG entry of the batch they were split from.
   ok(sampleOgs === withOg, 'every batch with an OG has an OG entry (' + sampleOgs + ' of ' + withOg + ')');
   await p.evaluate(async () => {
     const db = await new Promise((r) => { const q = indexedDB.open('brewhive'); q.onsuccess = () => r(q.result); });

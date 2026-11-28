@@ -56,12 +56,21 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await fining.locator('.timeline-icon svg').count() === 1)), 'the fining entry has an icon');
   await p.screenshot({ path: out + '/v024-timeline.png', fullPage: true });
 
-  // An older Yeast pitched entry keeps its type (sample data).
+  // An older Yeast pitched entry, as in a backup from before v0.2.4, keeps its type.
   const p2 = await (await b.newContext({ viewport: { width: 390, height: 844 } })).newPage();
   await p2.goto(BASE + '/'); await p2.waitForSelector('.empty');
   await p2.getByRole('button', { name: 'Load sample data' }).click(); await p2.waitForSelector('.shelf-item');
   await p2.getByText('Winter Spice').first().click(); await p2.waitForSelector('.hero');
-  await p2.locator('.timeline-entry', { hasText: 'Yeast pitched' }).first().click();
+  const batchId = p2.url().split('/').pop();
+  await p2.evaluate(async (batchId) => {
+    const db = await new Promise((r) => { const q = indexedDB.open('brewhive'); q.onsuccess = () => r(q.result); });
+    const tx = db.transaction('events', 'readwrite');
+    const t = new Date().toISOString();
+    tx.objectStore('events').put({ id: 'old-pitch', batchId, type: 'pitch', date: '2026-01-02T18:00', value: null, note: 'D47', createdAt: t, updatedAt: t, deletedAt: null });
+    await new Promise((r) => (tx.oncomplete = r));
+  }, batchId);
+  await p2.reload(); await p2.waitForSelector('.hero');
+  await p2.locator('.timeline-entry', { hasText: /^Yeast pitched(?!:)/ }).first().click();
   const d2 = p2.getByRole('dialog').last(); await d2.waitFor();
   ok(await until(async () => (await d2.getByRole('radio', { name: 'Yeast pitched' }).getAttribute('aria-checked') === 'true')), 'an older Yeast pitched entry opens as Yeast pitched');
   // An estimate saves as before.

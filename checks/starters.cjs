@@ -78,7 +78,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   await p.getByRole('link', { name: /Winter Spice/ }).first().click(); await p.waitForSelector('.hero');
   const details = p.locator('section.card', { has: p.getByRole('heading', { name: 'Details' }) });
   const cost = await details.locator('dt', { hasText: /^Ingredient cost$/ }).locator('xpath=following-sibling::dd[1]').textContent();
-  ok(await until(async () => (cost === '$8.44' && await details.getByText(/^No cost:|^No amount:|^Cost in other units:/).count() === 0)), 'a sample batch shows its full cost: ' + cost);
+  ok(await until(async () => (cost === '$11.42' && await details.getByText(/^No cost:|^No amount:|^Cost in other units:/).count() === 0)), 'a sample batch shows its full cost: ' + cost);
   // The recipe and the batch made from it agree
   const factOf = async (label) => details.locator('dt', { hasText: new RegExp('^' + label + '$') }).locator('xpath=following-sibling::dd[1]').textContent();
   await open('#/batches'); await p.getByRole('button', { name: /^Bottled/ }).click();
@@ -94,7 +94,7 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const brambleBatch = await factOf('Ingredient cost');
   const perGallon = await factOf('Per gallon');
   ok(perGallon === brambleBatch, 'a 1 gallon batch costs the same per gallon as in total: ' + perGallon);
-  ok(bramble === '$17.85' && brambleBatch === '$20.52', 'Bramble uses my Clover honey price: recipe ' + bramble + ', batch ' + brambleBatch + ' (with oak)');
+  ok(bramble === '$17.85' && brambleBatch === '$20.97', 'Bramble uses my Clover honey price: recipe ' + bramble + ', batch ' + brambleBatch + ' (with oak and nutrient)');
   await details.scrollIntoViewIfNeeded(); await p.screenshot({ path: out + '/starters-sample-batch.png' });
   await open('#/more');
   await p.getByRole('button', { name: 'Add sample data' }).click(); await p.waitForTimeout(800);

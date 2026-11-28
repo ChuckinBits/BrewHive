@@ -1821,12 +1821,16 @@ button.staged-row:hover {
 }
 
 .staged-name {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
+  max-width: 60%;
+  overflow-wrap: anywhere;
 }
 
+/* The name keeps its width (up to 60%); a long amount ("15 lb, frozen, then thawed") wraps instead of running into it. */
 .staged-row > .muted {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
   text-align: right;
 }
 
@@ -2590,12 +2594,13 @@ button.library-row {
   text-transform: none;
 }
 
-/* A card head with more than one action, stacked on the right: Edit, then Hide Add. */
+/* A card head with more than one action, side by side on the right of the title: Edit, then Hide Add. */
 .card-head-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
 }
 
 /*

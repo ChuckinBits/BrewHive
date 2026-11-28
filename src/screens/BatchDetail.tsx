@@ -332,7 +332,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
               <dd>{carbonationSummary(carbonated)}</dd>
             </>
           )}
-          <dt>Started</dt>
+          {/* A planned batch hasn't started: its date is when it's meant to. */}
+          <dt>{batch.status === 'planned' ? 'Planned start' : 'Started'}</dt>
           <dd>{fmtDate(batch.startDate)}</dd>
           {data.recipe && (
             <>

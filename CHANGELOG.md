@@ -14,9 +14,39 @@ a milestone.
   stage change is dated when the yeast went in, and the batch's start date
   becomes that day. A pitch dated in the future doesn't ask, since the batch
   is still a plan, and changing its date to today or earlier later does.
+- **Planned start.** A planned batch's Details say "Planned start" rather
+  than "Started".
+- **Long ingredient amounts** such as "15 lb, frozen, then thawed" wrap
+  instead of running into the name, and the Ingredients card's Edit and
+  Hide Add sit side by side.
 - **Log Primary ingredients while Planned.** A planned batch's Primary
   ingredients have Add buttons, so the honey, water and nutrients can go on
   the timeline before the yeast is pitched.
+
+### Icons
+
+- **Five new flavor icons:** guava, lime, kiwi, apricot, and a spice mix of
+  star anise, clove and allspice.
+- **A to Z.** The icon picker lists Traditional first, then every other
+  flavor alphabetically.
+
+### Sample data
+
+- **Every vessel type.** Winter Spice ages in an oak barrel, a new Lemon
+  Hydromel is kegged and force carbonated (petillant), and Strawberry
+  Sunrise is planned as a 5 gallon batch in a conical fermenter, with its
+  yeast ready to pitch.
+- **Gear with icons**, and a set of six airlocks to show counts and prices.
+- **An archived batch and a split.** Bramble Melomel #1 is archived (a book
+  on the shelf), linked to its bottles in the cellar. A new 6 gallon
+  Heirloom Cider, the first cider in the samples, fermented in the conical
+  and was split after primary: 5 gallons stay plain in the carboy, and a
+  gallon goes on oak to try it, each a sub-batch with its own timeline.
+- **A competition pour:** two bottles of Bramble Melomel #1 went to the
+  county fair.
+- **Up to date entries.** Yeast and nutrients are Ingredient entries, the
+  way they're logged now, and every batch logs what went in. There's also a
+  pH reading, a note, and a backsweetening after stabilizing.
 
 ## v0.3.4 – 2026-11-27
 
