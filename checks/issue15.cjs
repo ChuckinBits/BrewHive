@@ -19,10 +19,8 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   const style = () => p.locator('.select-button').textContent();
   const pickIcon = async (label) => {
     await p.locator('.icon-picker-button').click(); const d = p.getByRole('dialog');
-    // Swap the main icon: tap the new one, then remove the old one(s).
-    const before = await d.locator('.picked-name').allTextContents();
-    await d.getByRole('button', { name: label, exact: true }).click();
-    for (const old of before.map((t) => t.split(' ·')[0].trim())) if (old !== label && !(await d.locator('.picked-name').first().textContent()).startsWith(label)) await d.getByRole('button', { name: old, exact: true }).click();
+    // Tapping an icon changes the main one.
+    await d.locator('.icon-grid').getByRole('button', { name: label, exact: true }).click();
     await d.getByRole('button', { name: 'Done' }).click(); await p.waitForTimeout(150);
   };
   const type = (t) => p.getByRole('combobox', { name: 'Type' }).selectOption(t);

@@ -288,7 +288,7 @@ export async function loadSampleData(): Promise<void> {
     og: 1.052,
     targetFG: 1.0,
     ingredients: priced(lines(['Apple juice', '6', 'gal', 'no preservatives'], ['Pectic enzyme', '3', 'tsp'], ['Fermaid O', '6', 'g'], ['Lalvin 71B', '1', 'packet'])),
-    icon: 'apple',
+    icon: 'apple~red',
     color: '#E3AE4E',
     rating: null,
     notes: 'Split after primary to try a gallon on oak.',
