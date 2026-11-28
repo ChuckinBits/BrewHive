@@ -30,6 +30,12 @@ a milestone.
   Sunrise is planned as a 5 gallon batch in a conical fermenter, with its
   yeast ready to pitch.
 - **Gear with icons**, and a set of six airlocks to show counts and prices.
+- **An archived batch and a split.** Bramble Melomel #1 is archived (a book
+  on the shelf), linked to its bottles in the cellar. A new Heirloom Cider,
+  the first cider in the samples, was split after primary: half stays plain,
+  half goes on oak, each a sub-batch with its own timeline.
+- **A competition pour:** two bottles of Bramble Melomel #1 went to the
+  county fair.
 - **Up to date entries.** Yeast and nutrients are Ingredient entries, the
   way they're logged now, and every batch logs what went in. There's also a
   pH reading, a note, and a backsweetening after stabilizing.

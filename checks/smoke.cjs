@@ -34,7 +34,7 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   await page.getByLabel('Sort').selectOption('rating');
   await page.waitForTimeout(300);
   const order = await page.locator('.shelf-label strong').allTextContents();
-  assert(order[0] === 'Winter Spice' && order[1] === 'First Traditional' && order[2] === 'Lemon Hydromel' && order[3] === 'Orchard Cyser', 'sort by rating puts 8.5, 8, 7.5, 7 first: ' + order.join(' | '));
+  assert(order[0] === 'Winter Spice' && order[1] === 'First Traditional' && order[2] === 'Lemon Hydromel' && ['Orchard Cyser', 'Heirloom Cider A'].includes(order[3]), 'sort by rating puts 8.5, 8, 7.5, 7 first: ' + order.join(' | '));
 
   // Rate a batch: Change opens the rating sheet, Save sets it
   await page.getByRole('link', { name: /Bramble Melomel #2/ }).click();
@@ -58,7 +58,7 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   const file = `${shots}/backup.json`;
   await download.saveAs(file);
   const backup = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert(backup.app === 'brewhive' && backup.data.batches.length === 6 && backup.data.recipes.length === 3, `backup holds 6 batches and 3 recipes (${download.suggestedFilename()})`);
+  assert(backup.app === 'brewhive' && backup.data.batches.length === 10 && backup.data.recipes.length === 3, `backup holds 10 batches and 3 recipes (${download.suggestedFilename()})`);
   await page.getByRole('button', { name: 'Erase everything' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Erase everything' }).click();
   await page.getByText('Everything was erased').waitFor();
@@ -71,7 +71,7 @@ const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); co
   await page.goto(base + '#/');
   await page.waitForSelector('.shelf-item');
   await page.getByRole('button', { name: /^All/ }).click();
-  assert(await until(async () => (await page.locator('a.shelf-item').count() === 6)), 'restore brings back all 6 batches');
+  assert(await until(async () => (await page.locator('a.shelf-item').count() === 10)), 'restore brings back all 10 batches');
   assert(await until(async () => ((await page.getByLabel('Sort').inputValue()) === 'rating')), 'restore brings back settings (sort order)');
 
   // A bad file is refused politely

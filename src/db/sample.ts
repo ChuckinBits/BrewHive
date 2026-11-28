@@ -7,6 +7,7 @@ import type { Batch, BatchEvent, BatchStatus, CellarEntry, Equipment, EventType,
 import { L_PER_GAL } from '../lib/calc.ts';
 import { daysFromToday, newId } from '../lib/format.ts';
 import { entryFromLine, joinAmount } from '../lib/stages.ts';
+import { planSplit } from '../lib/split.ts';
 
 // Ingredients only the samples use (the rest are starter ingredients), priced so the samples show costs. Fixed ids: added once, never overwriting yours.
 const SAMPLE_INGREDIENTS: Pick<LibraryIngredient, 'id' | 'name' | 'category' | 'defaultUnit' | 'notes' | 'cost'>[] = [
@@ -251,6 +252,62 @@ export async function loadSampleData(): Promise<void> {
     notes: 'Light and quick. Kegged and carbonated to drink young.',
   });
 
+  // The first Bramble: bottled and archived, its bottles in the cellar. Archived batches sit on the shelf as books.
+  const b0 = batch({
+    name: 'Bramble Melomel #1',
+    recipeId: blackberry.id,
+    beverageType: 'mead',
+    style: 'Melomel',
+    status: 'archived',
+    statusBeforeArchive: 'bottled',
+    startDate: daysFromToday(-220),
+    volumeL: L_PER_GAL,
+    og: 1.104,
+    targetFG: 1.0,
+    ingredients: priced(staged(blackberry.ingredients)),
+    icon: 'blackberry',
+    color: '#4A2A5E',
+    rating: null,
+    notes: 'The first try at this recipe. #2 gets oak.',
+  });
+
+  // A cider split in two after primary: half stays plain, half goes on oak. The cider stops at Split,
+  // and each half is a sub-batch with its own timeline from then on, made the way the app's split makes them.
+  const splitDay = daysFromToday(-30) + 'T18:00';
+  const cider = batch({
+    name: 'Heirloom Cider',
+    recipeId: null,
+    beverageType: 'cider',
+    style: 'Farmhouse',
+    status: 'secondary',
+    startDate: daysFromToday(-50),
+    volumeL: 2 * L_PER_GAL,
+    og: 1.052,
+    targetFG: 1.0,
+    ingredients: priced(lines(['Apple juice', '2', 'gal', 'no preservatives'], ['Pectic enzyme', '1', 'tsp'], ['Fermaid O', '2', 'g'], ['Lalvin 71B', '1', 'packet'])),
+    icon: 'apple',
+    color: '#E3C26A',
+    rating: null,
+    notes: 'Split in two to see what oak does to it.',
+  });
+  const split = planSplit(
+    cider,
+    [
+      { name: 'Heirloom Cider A', vesselId: 'sample-jug-b', volumeL: L_PER_GAL },
+      { name: 'Heirloom Cider B', vesselId: 'sample-jug-d', volumeL: L_PER_GAL },
+    ],
+    splitDay,
+    newId,
+  );
+  const ciderSplit: Batch = split.parent;
+  const ciderA: Batch = { ...split.children[0], ...stamp(), status: 'aging', rating: 7, notes: 'The plain half, for comparison.' };
+  const ciderB: Batch = {
+    ...split.children[1],
+    ...stamp(),
+    notes: 'On oak cubes.',
+    ingredients: [...split.children[1].ingredients, ...priced([{ ...line('Oak cubes', '0.25', 'oz', 'medium toast'), stage: 'secondary' as const }])],
+  };
+
   const event = (batchId: string, type: EventType, date: string, value: number | null = null, note = ''): BatchEvent => ({
     id: newId(),
     batchId,
@@ -342,6 +399,35 @@ export async function loadSampleData(): Promise<void> {
     stage(b6.id, at(28), 'secondary', 'aging'),
     { ...event(b6.id, 'carbonate', at(21)), carbMethod: 'forced', carbLevel: 'petillant', psi: 12 },
     { ...event(b6.id, 'tasting', at(7), null, 'Bright and spritzy, like a honey lemonade. Gone too fast.'), rating: 7.5 },
+
+    ...logged(b0, at(220, 17), mustOf(b0)),
+    ...logged(b0, at(220), yeastOf(b0)),
+    event(b0.id, 'gravity', at(213), 1.04),
+    event(b0.id, 'gravity', at(200), 1.006),
+    { ...event(b0.id, 'gravity', at(186), 0.999), final: true },
+    stage(b0.id, at(185, 17), 'primary', 'secondary'),
+    { ...event(b0.id, 'rack', at(185)), fromVessels: [{ vesselId: 'sample-bucket', volumeL: null }], vessels: [{ vesselId: 'sample-jug-a', volumeL: null }] },
+    stage(b0.id, at(120), 'secondary', 'aging'),
+    { ...event(b0.id, 'stabilize', at(90)), method: 'Chemical' },
+    stage(b0.id, at(40), 'aging', 'bottled', '8 × 375 mL'),
+    stage(b0.id, at(38), 'bottled', 'archived'),
+
+    ...logged(ciderSplit, at(50, 17), mustOf(ciderSplit)),
+    ...logged(ciderSplit, at(50), yeastOf(ciderSplit)),
+    event(ciderSplit.id, 'gravity', at(44), 1.018),
+    event(ciderSplit.id, 'gravity', at(37), 1.002),
+    { ...event(ciderSplit.id, 'gravity', at(31), 1.0), final: true },
+    stage(ciderSplit.id, at(30, 17), 'primary', 'secondary'),
+    {
+      ...event(ciderSplit.id, 'rack', splitDay, null, 'Half and half, to try oak on one'),
+      fromVessels: [{ vesselId: 'sample-bucket', volumeL: null }],
+      vessels: [{ vesselId: 'sample-jug-b', volumeL: L_PER_GAL }, { vesselId: 'sample-jug-d', volumeL: L_PER_GAL }],
+    },
+    stage(ciderA.id, at(14), 'secondary', 'aging'),
+    { ...event(ciderA.id, 'tasting', at(6), null, 'Bone dry and crisp, like a farmhouse cider.'), rating: 7 },
+    ...logged(ciderB, at(28), ['Oak cubes']),
+    event(ciderB.id, 'gravity', at(14), 0.998),
+    event(ciderB.id, 'note', at(14, 19), null, 'The oak is coming through. Two more weeks, then taste against A.'),
   ];
 
   const c1: CellarEntry = {
@@ -364,11 +450,11 @@ export async function loadSampleData(): Promise<void> {
   };
   const c2: CellarEntry = {
     id: newId(),
-    batchId: null,
+    batchId: b0.id,
     name: 'Bramble Melomel #1',
     style: 'Melomel',
     bottleSizeMl: 375,
-    count: 8,
+    count: 6,
     bottledDate: daysFromToday(-40),
     bestAfter: daysFromToday(140),
     location: 'Basement rack',
@@ -383,6 +469,7 @@ export async function loadSampleData(): Promise<void> {
   const samplePours: Pour[] = [
     { id: newId(), cellarEntryId: c1.id, date: daysFromToday(-30), count: 1, type: 'drank', note: 'Dry and floral. A little hot still.', rating: 7, ...stamp() },
     { id: newId(), cellarEntryId: c1.id, date: daysFromToday(-12), count: 1, type: 'gifted', note: 'For the neighbors', rating: null, ...stamp() },
+    { id: newId(), cellarEntryId: c2.id, date: daysFromToday(-8), count: 2, type: 'competition', note: 'County fair, melomel category. Second place; the judges said give it time.', rating: 7.5, ...stamp() },
   ];
 
   await putMany('recipes', [traditional, blackberry, cyser]);
@@ -398,11 +485,13 @@ export async function loadSampleData(): Promise<void> {
   b3.vessels = [{ vesselId: 'sample-barrel', volumeL: null }];
   b4.vessels = [{ vesselId: 'sample-conical', volumeL: null }];
   b6.vessels = [{ vesselId: 'sample-keg', volumeL: null }];
+  // The cider's halves are in Jars B and C (the split set them); the cider itself has left its vessels.
   await putMany('equipment', [
     vessel('sample-bucket', 'Small bucket', 'bucket', 2, 14.99, 'Food-grade, with a grommet lid. Room for fruit in primary.'),
     vessel('sample-jug-a', 'Jar A', 'jar', 1, 7.99),
     vessel('sample-jug-b', 'Jar B', 'jar', 1, 7.99),
     vessel('sample-jug-c', 'Jar C', 'jar', 1, 7.99),
+    vessel('sample-jug-d', 'Jar D', 'jar', 1, 7.99),
     vessel('sample-carboy', '5 gal carboy', 'carboy', 5, 39.99, 'Glass. For the day a batch grows up.'),
     vessel('sample-barrel', 'Oak barrel', 'barrel', 1, 64.99, 'Toasted American oak. Small barrels oak fast, so taste every couple of weeks.'),
     vessel('sample-keg', 'Ball lock keg', 'keg', 2.5, 89.99, 'For carbonating and serving on tap.'),
@@ -412,7 +501,7 @@ export async function loadSampleData(): Promise<void> {
     gear('sample-ph', 'pH meter', 'ph', 24.99, 'Calibrate with the 4.0 and 7.0 buffers'),
     gear('sample-airlocks', 'Airlocks', 'airlock', 1.49, 'Three-piece', 6),
   ]);
-  await putMany('batches', [b1, b2, b3, b4, b5, b6]);
+  await putMany('batches', [b0, b1, b2, b3, b4, b5, b6, ciderSplit, ciderA, ciderB]);
   await putMany('events', sampleEvents);
   await putMany('cellar', [c1, c2]);
   await putMany('pours', samplePours);
