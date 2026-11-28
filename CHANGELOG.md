@@ -5,6 +5,20 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
+## Unreleased
+
+### Icons
+
+- **Icon colors.** Some icons come in colors: apples (green, red, yellow,
+  pink), grapes, cherries (red, dark, Rainier), pears, plums, raspberries
+  (red, golden, black), chilies and roses. Traditional comes in pale, gold,
+  amber and bochet, and its color also sets the mead's color; a bochet
+  suggests the Bochet style. Each icon has its own color, so a cider can
+  show a red, a green and a yellow apple.
+- **A simpler icon picker.** The picked icons are chips at the top. Tapping
+  an icon or a color changes the selected one, "+ Add 2nd icon" adds
+  another, and × removes one. Tapping icons no longer adds or removes them.
+
 ## v0.3.5 – 2026-11-28
 
 ### Batches

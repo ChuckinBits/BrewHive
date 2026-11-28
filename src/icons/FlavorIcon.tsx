@@ -1,15 +1,9 @@
 // The colorful flavor icons (strawberry, hops, maple...) used on recipes,
 // batches and bottles. The drawings live in flavors.ts.
 
-import { FLAVORS, type Flavor } from './flavors.ts';
+import { DEFAULT_FLAVOR, getFlavor } from './flavorColors.ts';
 
-const BY_ID = new Map(FLAVORS.map((f) => [f.id, f]));
-
-export const DEFAULT_FLAVOR = 'traditional';
-
-export function getFlavor(id: string | null | undefined): Flavor {
-  return BY_ID.get(id ?? '') ?? (BY_ID.get(DEFAULT_FLAVOR) as Flavor);
-}
+export { DEFAULT_FLAVOR, getFlavor };
 
 interface Props {
   id: string | null | undefined;
