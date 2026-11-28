@@ -23,6 +23,12 @@ a milestone.
   ingredients have Add buttons, so the honey, water and nutrients can go on
   the timeline before the yeast is pitched.
 
+### Icons
+
+- **Five new flavor icons:** red apple, guava, lime, kiwi and apricot.
+- **A to Z.** The icon picker lists Traditional first, then every other
+  flavor alphabetically.
+
 ### Sample data
 
 - **Every vessel type.** Winter Spice ages in an oak barrel, a new Lemon
@@ -31,9 +37,10 @@ a milestone.
   yeast ready to pitch.
 - **Gear with icons**, and a set of six airlocks to show counts and prices.
 - **An archived batch and a split.** Bramble Melomel #1 is archived (a book
-  on the shelf), linked to its bottles in the cellar. A new Heirloom Cider,
-  the first cider in the samples, was split after primary: half stays plain,
-  half goes on oak, each a sub-batch with its own timeline.
+  on the shelf), linked to its bottles in the cellar. A new 6 gallon
+  Heirloom Cider, the first cider in the samples, fermented in the conical
+  and was split after primary: 5 gallons stay plain in the carboy, and a
+  gallon goes on oak to try it, each a sub-batch with its own timeline.
 - **A competition pour:** two bottles of Bramble Melomel #1 went to the
   county fair.
 - **Up to date entries.** Yeast and nutrients are Ingredient entries, the

@@ -271,8 +271,9 @@ export async function loadSampleData(): Promise<void> {
     notes: 'The first try at this recipe. #2 gets oak.',
   });
 
-  // A cider split in two after primary: half stays plain, half goes on oak. The cider stops at Split,
-  // and each half is a sub-batch with its own timeline from then on, made the way the app's split makes them.
+  // A 6 gal cider split after primary: 5 gal stays plain in the carboy, a gallon goes on oak to try it.
+  // The cider stops at Split, and each part is a sub-batch with its own timeline from then on, made the
+  // way the app's split makes them.
   const splitDay = daysFromToday(-30) + 'T18:00';
   const cider = batch({
     name: 'Heirloom Cider',
@@ -281,30 +282,30 @@ export async function loadSampleData(): Promise<void> {
     style: 'Farmhouse',
     status: 'secondary',
     startDate: daysFromToday(-50),
-    volumeL: 2 * L_PER_GAL,
+    volumeL: 6 * L_PER_GAL,
     og: 1.052,
     targetFG: 1.0,
-    ingredients: priced(lines(['Apple juice', '2', 'gal', 'no preservatives'], ['Pectic enzyme', '1', 'tsp'], ['Fermaid O', '2', 'g'], ['Lalvin 71B', '1', 'packet'])),
-    icon: 'apple',
-    color: '#E3C26A',
+    ingredients: priced(lines(['Apple juice', '6', 'gal', 'no preservatives'], ['Pectic enzyme', '3', 'tsp'], ['Fermaid O', '6', 'g'], ['Lalvin 71B', '1', 'packet'])),
+    icon: 'red-apple',
+    color: '#E3AE4E',
     rating: null,
-    notes: 'Split in two to see what oak does to it.',
+    notes: 'Split after primary to try a gallon on oak.',
   });
   const split = planSplit(
     cider,
     [
-      { name: 'Heirloom Cider A', vesselId: 'sample-jug-b', volumeL: L_PER_GAL },
-      { name: 'Heirloom Cider B', vesselId: 'sample-jug-d', volumeL: L_PER_GAL },
+      { name: 'Heirloom Cider A', vesselId: 'sample-carboy', volumeL: 5 * L_PER_GAL },
+      { name: 'Heirloom Cider B', vesselId: 'sample-jug-b', volumeL: L_PER_GAL },
     ],
     splitDay,
     newId,
   );
   const ciderSplit: Batch = split.parent;
-  const ciderA: Batch = { ...split.children[0], ...stamp(), status: 'aging', rating: 7, notes: 'The plain half, for comparison.' };
+  const ciderA: Batch = { ...split.children[0], ...stamp(), status: 'aging', rating: 7, notes: 'The plain cider, for comparison.' };
   const ciderB: Batch = {
     ...split.children[1],
     ...stamp(),
-    notes: 'On oak cubes.',
+    notes: 'A gallon on oak cubes, to see if the rest should get some.',
     ingredients: [...split.children[1].ingredients, ...priced([{ ...line('Oak cubes', '0.25', 'oz', 'medium toast'), stage: 'secondary' as const }])],
   };
 
@@ -419,9 +420,9 @@ export async function loadSampleData(): Promise<void> {
     { ...event(ciderSplit.id, 'gravity', at(31), 1.0), final: true },
     stage(ciderSplit.id, at(30, 17), 'primary', 'secondary'),
     {
-      ...event(ciderSplit.id, 'rack', splitDay, null, 'Half and half, to try oak on one'),
-      fromVessels: [{ vesselId: 'sample-bucket', volumeL: null }],
-      vessels: [{ vesselId: 'sample-jug-b', volumeL: L_PER_GAL }, { vesselId: 'sample-jug-d', volumeL: L_PER_GAL }],
+      ...event(ciderSplit.id, 'rack', splitDay, null, 'Five gallons plain, one to try on oak'),
+      fromVessels: [{ vesselId: 'sample-conical', volumeL: null }],
+      vessels: [{ vesselId: 'sample-carboy', volumeL: 5 * L_PER_GAL }, { vesselId: 'sample-jug-b', volumeL: L_PER_GAL }],
     },
     stage(ciderA.id, at(14), 'secondary', 'aging'),
     { ...event(ciderA.id, 'tasting', at(6), null, 'Bone dry and crisp, like a farmhouse cider.'), rating: 7 },
@@ -485,7 +486,7 @@ export async function loadSampleData(): Promise<void> {
   b3.vessels = [{ vesselId: 'sample-barrel', volumeL: null }];
   b4.vessels = [{ vesselId: 'sample-conical', volumeL: null }];
   b6.vessels = [{ vesselId: 'sample-keg', volumeL: null }];
-  // The cider's halves are in Jars B and C (the split set them); the cider itself has left its vessels.
+  // The cider's parts are in the carboy and Jar B (the split set them); the cider itself has left its vessels.
   await putMany('equipment', [
     vessel('sample-bucket', 'Small bucket', 'bucket', 2, 14.99, 'Food-grade, with a grommet lid. Room for fruit in primary.'),
     vessel('sample-jug-a', 'Jar A', 'jar', 1, 7.99),
