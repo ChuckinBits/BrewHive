@@ -48,8 +48,8 @@ const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok 
   ok(await until(async () => (await size(4).inputValue() === '12')), 'fluid ounce starts at 12');
   await line(4).getByRole('button', { name: 'Remove this size' }).click();
   await p.screenshot({ path: process.argv[2] + '/20-sheet.png', fullPage: false });
-  await d.getByRole('button', { name: 'Add to cellar' }).click(); await p.waitForTimeout(500);
-  ok(p.url().endsWith('#/cellar'), 'several sizes go to the cellar list');
+  await d.getByRole('button', { name: 'Add to cellar' }).click();
+  ok(await until(async () => p.url().endsWith('#/cellar')), 'several sizes go to the cellar list');
   const links = await p.getByRole('link', { name: /Winter Spice/ }).count();
   ok(links === 3, 'one cellar entry per size (' + links + ')');
   await p.goto(BASE + '/#/batches'); await p.waitForSelector('.chips');
