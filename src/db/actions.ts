@@ -11,10 +11,11 @@ import { planSplit, subBatchesOf, type SplitPart } from '../lib/split.ts';
  * Moves a batch to a new stage and records it on the timeline, keeping at
  * most one automatic stage entry per day (see planStatusEntry).
  */
-export async function changeStatus(batch: Batch, to: BatchStatus, patch: Partial<Batch> = {}): Promise<void> {
+/** Moves a batch to a stage, with a stage entry on the timeline dated `date` (now, unless given). */
+export async function changeStatus(batch: Batch, to: BatchStatus, patch: Partial<Batch> = {}, date = nowLocal()): Promise<void> {
   if (to === batch.status) return;
   await batches.save({ ...batch, ...patch, status: to });
-  await recordStatusEntry(batch.id, batch.status, to);
+  await recordStatusEntry(batch.id, batch.status, to, date);
 }
 
 /**
@@ -74,9 +75,9 @@ export async function unarchiveBatch(batch: Batch): Promise<void> {
 }
 
 /** Records a stage change on the timeline, following the one-automatic-entry-per-day rule. */
-export async function recordStatusEntry(batchId: string, from: BatchStatus, to: BatchStatus): Promise<void> {
+export async function recordStatusEntry(batchId: string, from: BatchStatus, to: BatchStatus, date = nowLocal()): Promise<void> {
   const timeline = (await events.list()).filter((e) => e.batchId === batchId);
-  const plan = planStatusEntry(timeline, from, to, nowLocal());
+  const plan = planStatusEntry(timeline, from, to, date);
   if (plan.action === 'add') {
     await events.save({ batchId, ...plan.entry });
   } else if (plan.action === 'replace') {

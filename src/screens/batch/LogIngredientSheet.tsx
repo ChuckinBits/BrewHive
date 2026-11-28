@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { events } from '../../db/store.ts';
-import { type Batch, type IngredientLine } from '../../db/types.ts';
+import { type Batch, type BatchEvent, type IngredientLine } from '../../db/types.ts';
 import { Field, Sheet, toast } from '../../components/ui.tsx';
 import { entryFromLine, ingredientStageLabel } from '../../lib/stages.ts';
 import { nowLocal, today } from '../../lib/format.ts';
@@ -18,14 +18,16 @@ function logDateFor(line: IngredientLine, batch: Batch): string {
 }
 
 /** Logs one of a batch's ingredients on the timeline, asking when it went in. */
-export function LogIngredientSheet({ batch, line, onClose }: { batch: Batch; line: IngredientLine; onClose: () => void }) {
+export function LogIngredientSheet({ batch, line, onClose, onLogged }: { batch: Batch; line: IngredientLine; onClose: () => void; onLogged?: (saved: Partial<BatchEvent>, before: null) => void }) {
   const [date, setDate] = useState(() => logDateFor(line, batch));
   const [error, setError] = useState('');
   const save = async () => {
     if (!date) return setError('Enter when it went in.');
-    await events.save({ batchId: batch.id, type: 'ingredient', date, value: null, note: '', ...entryFromLine(line), ingredientLineId: line.id });
+    const entry = { batchId: batch.id, type: 'ingredient' as const, date, value: null, note: '', ...entryFromLine(line), ingredientLineId: line.id };
+    await events.save(entry);
     toast(`${line.name} logged on the timeline`);
     onClose();
+    onLogged?.(entry, null);
   };
   return (
     <Sheet title={`Log ${line.name}`} onClose={onClose}>

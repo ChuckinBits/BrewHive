@@ -48,8 +48,13 @@ export function EditableIngredients({ lines, onEdit }: EditableProps) {
 
 interface LoggableProps {
   lines: IngredientLine[];
-  /** The stage the batch is at: its ingredients, and any earlier stage's, can be logged. Null when none can (a planned batch). */
+  /** The stage the batch is at, marked Now: its ingredients, and any earlier stage's, can be logged. Null for a planned batch. */
   current: IngredientStage | null;
+  /**
+   * The latest stage whose ingredients can be logged, when it isn't `current`: a planned batch logs
+   * its Primary ingredients (the must, nutrients, then the yeast) before it moves to Primary.
+   */
+  logUpTo?: IngredientStage | null;
   /** The timeline entry that logged each ingredient, by line id. */
   added: Map<string, BatchEvent>;
   onLog: (line: IngredientLine) => void;
@@ -81,7 +86,7 @@ const MOVE_LABEL: Record<IngredientStage, string> = { primary: 'Primary', second
  * On the batch page: ingredients for the current stage, or any earlier one, can be tapped to log
  * them on the timeline. The next stage that has ingredients offers to move the batch on to it.
  */
-export function LoggableIngredients({ lines, current, added, onLog, onMoveTo, canAdd = true }: LoggableProps) {
+export function LoggableIngredients({ lines, current, logUpTo = current, added, onLog, onMoveTo, canAdd = true }: LoggableProps) {
   const groups = groupByStage(lines);
   const reached = (stage: IngredientStage) => stageReached(stage, current);
   const next = onMoveTo ? groups.find((g) => !reached(g.stage))?.stage : undefined;
@@ -89,7 +94,7 @@ export function LoggableIngredients({ lines, current, added, onLog, onMoveTo, ca
     <div className="staged-ingredients">
       {groups.map((group) => {
         const isCurrent = group.stage === current;
-        const canLog = canAdd && reached(group.stage);
+        const canLog = canAdd && stageReached(group.stage, logUpTo);
         return (
           <section key={group.stage} aria-label={`${ingredientStageLabel(group.stage)} ingredients`}>
             <h3 className={isCurrent ? 'stage-divider stage-divider-current' : 'stage-divider'}>
