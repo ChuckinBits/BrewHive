@@ -5,7 +5,7 @@ minor versions are milestones (0.2 Ingredient library, 0.3 Equipment, 0.4
 phone apps, 0.5 sync, 0.6 community) and patch versions are releases within
 a milestone.
 
-## Unreleased
+## v0.3.5 – 2026-11-28
 
 ### Batches
 
@@ -14,14 +14,14 @@ a milestone.
   stage change is dated when the yeast went in, and the batch's start date
   becomes that day. A pitch dated in the future doesn't ask, since the batch
   is still a plan, and changing its date to today or earlier later does.
+- **Log Primary ingredients while Planned.** A planned batch's Primary
+  ingredients have Add buttons, so the honey, water and nutrients can go on
+  the timeline before the yeast is pitched.
 - **Planned start.** A planned batch's Details say "Planned start" rather
   than "Started".
 - **Long ingredient amounts** such as "15 lb, frozen, then thawed" wrap
   instead of running into the name, and the Ingredients card's Edit and
   Hide Add sit side by side.
-- **Log Primary ingredients while Planned.** A planned batch's Primary
-  ingredients have Add buttons, so the honey, water and nutrients can go on
-  the timeline before the yeast is pitched.
 
 ### Icons
 
@@ -47,6 +47,10 @@ a milestone.
 - **Up to date entries.** Yeast and nutrients are Ingredient entries, the
   way they're logged now, and every batch logs what went in. There's also a
   pH reading, a note, and a backsweetening after stabilizing.
+
+**Updating from v0.3.4:** nothing to do. Sample data you added before keeps
+its old contents; to see the new set, erase all data in More and add it
+again (only if the sample is all you have there).
 
 ## v0.3.4 – 2026-11-27
 
