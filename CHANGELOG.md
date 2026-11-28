@@ -11,9 +11,12 @@ a milestone.
 
 - **Yeast pitched moves a plan to Primary.** Logging a yeast on a Planned
   batch, dated today or earlier, asks whether to move it to Primary. The
-  stage change is dated when the yeast went in. A pitch dated in the future
-  doesn't ask, since the batch is still a plan, and changing its date to
-  today or earlier later does.
+  stage change is dated when the yeast went in, and the batch's start date
+  becomes that day. A pitch dated in the future doesn't ask, since the batch
+  is still a plan, and changing its date to today or earlier later does.
+- **Log Primary ingredients while Planned.** A planned batch's Primary
+  ingredients have Add buttons, so the honey, water and nutrients can go on
+  the timeline before the yeast is pitched.
 
 ## v0.3.4 – 2026-11-27
 

@@ -157,9 +157,11 @@ export function BatchDetailScreen({ id }: { id: string }) {
   const toTarget = daysToTarget(batch, data.events);
 
   const currentStage = currentIngredientStage(batch.status);
+  // A planned batch can log its Primary ingredients already, as they go in before the yeast.
+  const logUpTo = batch.status === 'planned' ? 'primary' : currentStage;
   const added = addedLines(data.events);
   // Hide Add and the "Tap an ingredient" hint only show while something is left to log.
-  const toLog = anyToLog(batch.ingredients, currentStage, added);
+  const toLog = anyToLog(batch.ingredients, logUpTo, added);
 
   const hasVessels = data.equipment.some((e) => e.kind === 'vessel');
   const parentBatch = batch.parentId ? data.allBatches.find((b) => b.id === batch.parentId) : undefined;
@@ -389,6 +391,7 @@ export function BatchDetailScreen({ id }: { id: string }) {
           <LoggableIngredients
             lines={batch.ingredients}
             current={currentStage}
+            logUpTo={logUpTo}
             added={added}
             onLog={(line) => setLogging(line)}
             canAdd={!settings.hideIngredientAdd}
@@ -551,7 +554,8 @@ export function BatchDetailScreen({ id }: { id: string }) {
             const date = pitched;
             setPitched(null);
             const latest = await batches.get(batch.id);
-            if (latest?.status === 'planned') await changeStatus(latest, 'primary', {}, date);
+            // It started when the yeast went in, whatever date was planned.
+            if (latest?.status === 'planned') await changeStatus(latest, 'primary', { startDate: date.slice(0, 10) }, date);
             toast('Moved to Primary');
           }}
         />

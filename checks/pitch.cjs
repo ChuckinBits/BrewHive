@@ -11,6 +11,7 @@ const until = async (read, ms = Number(process.env.CHECK_WAIT || 5000)) => {
 };
 const ok = (c, m) => { if (!c) throw new Error('FAILED: ' + m); console.log('ok  ' + m); };
 const pad = (n) => String(n).padStart(2, '0');
+const shown = (offset) => new Date(Date.now() + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const day = (offset) => { const d = new Date(Date.now() + offset * 86400000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 (async () => {
   const out = process.argv[2];
@@ -19,6 +20,7 @@ const day = (offset) => { const d = new Date(Date.now() + offset * 86400000); re
   const d = p.getByRole('dialog').last();
   const status = async () => (await p.getByRole('group', { name: 'Status' }).getByRole('button', { pressed: true }).textContent()).trim();
   const asked = () => p.getByRole('dialog', { name: 'Yeast pitched' }).count();
+  const fact = async (name) => { const dt = p.locator('dt', { hasText: new RegExp('^' + name + '$') }); return (await dt.count()) ? (await dt.locator('xpath=following-sibling::dd[1]').textContent()).trim() : ''; };
   const logIngredient = async (name, when) => {
     await p.getByRole('button', { name: 'Add entry' }).click(); await d.waitFor();
     await d.getByRole('radiogroup', { name: 'What happened?' }).getByRole('radio', { name: 'Ingredient', exact: true }).click();
@@ -63,6 +65,7 @@ const day = (offset) => { const d = new Date(Date.now() + offset * 86400000); re
   ok(await until(async () => (await asked()) === 1), 'a yeast pitched yesterday asks too');
   await p.getByRole('dialog', { name: 'Yeast pitched' }).getByRole('button', { name: 'Move to Primary' }).click();
   ok(await until(async () => (await status()) === 'Primary'), 'Move to Primary moves it');
+  ok(await until(async () => (await fact('Started')) === shown(-1)), 'and it started when the yeast went in: ' + (await fact('Started')));
   const stageEntry = p.locator('.timeline-entry', { hasText: /Primary/ }).filter({ hasNotText: /Lalvin|Go-Ferm/ }).first();
   await stageEntry.click(); await d.waitFor();
   ok(await until(async () => (await d.getByLabel('When').inputValue()) === day(-1) + 'T19:30'), 'and the stage change is dated when the yeast went in: ' + (await d.getByLabel('When').inputValue()));
@@ -72,6 +75,32 @@ const day = (offset) => { const d = new Date(Date.now() + offset * 86400000); re
   await logIngredient('Lalvin D47', day(0) + 'T10:00');
   await p.waitForTimeout(500);
   ok((await asked()) === 0, 'in Primary, pitching again does not ask');
+
+  // 6. A planned batch logs its Primary ingredients from the list, then pitching moves it on
+  await p.goto(BASE + '/#/batches/new'); await p.waitForSelector('form');
+  await p.getByRole('textbox', { name: 'Name' }).fill('Saturday mead'); await p.getByRole('textbox', { name: 'Volume' }).fill('1');
+  await p.getByLabel('Status').selectOption('planned');
+  await p.getByLabel('Planned start').fill(day(2));
+  const addIngredient = async (name, stage) => {
+    await p.getByRole('button', { name: 'Add ingredient' }).click();
+    await p.getByRole('dialog').getByRole('combobox', { name: 'Ingredient', exact: true }).fill(name);
+    await p.getByRole('dialog').getByLabel(/^Stage/).selectOption(stage);
+    await p.getByRole('dialog').getByRole('button', { name: 'Add ingredient' }).click();
+    await p.getByRole('dialog').waitFor({ state: 'detached' });
+  };
+  await addIngredient('Clover honey', 'primary'); await addIngredient('Lalvin 71B', 'primary'); await addIngredient('Raspberries', 'secondary');
+  await p.getByRole('button', { name: 'Start batch' }).click(); await p.waitForSelector('.hero');
+  const primaryList = p.getByRole('region', { name: 'Primary ingredients' });
+  ok(await until(async () => (await p.getByRole('button', { name: 'Log Clover honey as added' }).count()) === 1 && (await p.getByRole('button', { name: 'Log Lalvin 71B as added' }).count()) === 1), 'while Planned, Primary ingredients have Add');
+  ok((await p.getByRole('button', { name: 'Log Raspberries as added' }).count()) === 0, 'Secondary ones do not');
+  ok((await primaryList.getByRole('button', { name: 'Move to Primary' }).count()) === 1 && (await primaryList.locator('.stage-now').count()) === 0, 'Primary still offers Move to Primary, and is not marked Now');
+  await p.screenshot({ path: out + '/pitch-planned-list.png', fullPage: true });
+  await p.getByRole('button', { name: 'Log Clover honey as added' }).click(); await d.getByRole('button', { name: 'Add to timeline' }).click(); await p.waitForTimeout(500);
+  ok(await until(async () => (await p.locator('.staged-row-done', { hasText: 'Clover honey' }).count()) === 1 && (await asked()) === 0 && (await status()) === 'Planned'), 'logging the honey ticks it off, still Planned');
+  await p.getByRole('button', { name: 'Log Lalvin 71B as added' }).click(); await d.getByRole('button', { name: 'Add to timeline' }).click();
+  ok(await until(async () => (await asked()) === 1), 'logging the yeast from the list asks to move to Primary');
+  await p.getByRole('dialog', { name: 'Yeast pitched' }).getByRole('button', { name: 'Move to Primary' }).click();
+  ok(await until(async () => (await status()) === 'Primary' && (await fact('Started')) === shown(0)), 'moved to Primary, started today rather than the planned date');
 
   ok(errors.length === 0, 'no page errors ' + errors.join(' | '));
   await b.close();
